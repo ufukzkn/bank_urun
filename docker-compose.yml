@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: bank_urun_postgres
+    environment:
+      POSTGRES_DB: bank_urun
+      POSTGRES_USER: bank_urun
+      POSTGRES_PASSWORD: bank_urun
+    ports:
+      - "5432:5432"
+    volumes:
+      - bank_urun_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank_urun -d bank_urun"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bank_urun_pgdata:

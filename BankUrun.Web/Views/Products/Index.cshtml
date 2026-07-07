@@ -1,0 +1,253 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.ProductIndexViewModel
+
+@{
+    ViewData["Title"] = "Ürün Yönetimi";
+    var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
+    var activeSubProducts = Model.SubProducts.Where(product => product.IsActive).ToList();
+}
+
+<section class="page-head">
+    <div>
+        <h1>Ürün Yönetimi</h1>
+        <p>Yıl, dönem, ana ürün ve alt ürün kayıtları</p>
+    </div>
+</section>
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success" role="alert">@success</div>
+}
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+<section class="toolbar-band">
+    <form asp-action="Index" method="get" class="filter-grid">
+        <label>
+            <span>Yıl</span>
+            <input class="form-control" type="number" name="Year" value="@Model.Filter.Year" min="2000" max="2100" />
+        </label>
+        <label>
+            <span>Dönem</span>
+            <input class="form-control" type="number" name="Term" value="@Model.Filter.Term" min="1" max="12" />
+        </label>
+        <label>
+            <span>Ana ürün</span>
+            <input class="form-control" type="search" name="MainQuery" value="@Model.Filter.MainQuery" />
+        </label>
+        <label>
+            <span>Alt ürün</span>
+            <input class="form-control" type="search" name="SubQuery" value="@Model.Filter.SubQuery" />
+        </label>
+        <label class="check-line">
+            <input class="form-check-input" type="checkbox" name="IncludeInactive" value="true" checked="@Model.Filter.IncludeInactive" />
+            <span>Pasifleri göster</span>
+        </label>
+        <button class="btn btn-primary" type="submit">Filtrele</button>
+    </form>
+</section>
+
+<section class="action-grid">
+    <div class="action-panel">
+        <h2>Ürün Oluştur</h2>
+        <form asp-action="CreateProduct" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Tip</span>
+                <select class="form-select" name="Type" id="productType">
+                    <option value="@ProductType.Main">Ana ürün</option>
+                    <option value="@ProductType.Sub">Alt ürün</option>
+                </select>
+            </label>
+            <label>
+                <span>Kod</span>
+                <select class="form-select" name="CodeMode" id="codeMode">
+                    <option value="Auto">Otomatik</option>
+                    <option value="Manual">Manuel</option>
+                </select>
+            </label>
+            <label id="manualCodeWrap" class="manual-code-wrap">
+                <span>Manuel kod</span>
+                <input class="form-control code-input" type="text" name="ManualCode" id="manualCode" maxlength="2" autocomplete="off" />
+                <small id="codeSuggestion" class="form-text"></small>
+            </label>
+            <label>
+                <span>Ad</span>
+                <input class="form-control" type="text" name="Name" maxlength="180" required />
+            </label>
+            <button class="btn btn-primary" type="submit">Oluştur</button>
+        </form>
+    </div>
+
+    <div class="action-panel">
+        <h2>Döneme Ana Ürün Ekle</h2>
+        <form asp-action="AddMainToPeriod" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Ana ürün</span>
+                <select class="form-select" name="MainProductId" required>
+                    <option value="">Seç</option>
+                    @foreach (var product in activeMainProducts)
+                    {
+                        <option value="@product.Id">@product.Label</option>
+                    }
+                </select>
+            </label>
+            <div class="split-fields">
+                <label>
+                    <span>Yıl</span>
+                    <input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required />
+                </label>
+                <label>
+                    <span>Dönem</span>
+                    <input class="form-control" type="number" name="Term" min="1" max="12" value="1" required />
+                </label>
+            </div>
+            <button class="btn btn-primary" type="submit">Ekle</button>
+        </form>
+    </div>
+
+    <div class="action-panel">
+        <h2>Alt Ürün Bağla</h2>
+        <form asp-action="AssignSubProduct" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Ana ürün dönemi</span>
+                <select class="form-select" name="MainProductPeriodId" required>
+                    <option value="">Seç</option>
+                    @foreach (var item in Model.MainProductPeriods)
+                    {
+                        <option value="@item.Id">@item.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Alt ürün</span>
+                <select class="form-select" name="SubProductId" required>
+                    <option value="">Seç</option>
+                    @foreach (var product in activeSubProducts)
+                    {
+                        <option value="@product.Id">@product.Label</option>
+                    }
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Bağla</button>
+        </form>
+    </div>
+</section>
+
+<section class="table-band">
+    <div class="table-responsive">
+        <table class="table align-middle product-table">
+            <thead>
+                <tr>
+                    <th>Yıl</th>
+                    <th>Dönem</th>
+                    <th>Ana Ürün</th>
+                    <th>Alt Ürün</th>
+                    <th>Durum</th>
+                    <th class="text-end">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <tr>
+                    <td colspan="6" class="empty-cell">Kayıt yok</td>
+                </tr>
+            }
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td>@row.Year</td>
+                    <td>@row.Term</td>
+                    <td>
+                        <strong>@row.MainProductCode</strong>
+                        <span>@row.MainProductName</span>
+                    </td>
+                    <td>
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <strong>@row.SubProductCode</strong>
+                            <span>@row.SubProductName</span>
+                        }
+                        else
+                        {
+                            <span class="muted">-</span>
+                        }
+                    </td>
+                    <td>
+                        <span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span>
+                        }
+                    </td>
+                    <td class="actions-cell">
+                        <form asp-action="RenameProduct" method="post" class="inline-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ProductId" value="@row.MainProductId" />
+                            <input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" />
+                            <button class="btn btn-sm btn-outline-primary" type="submit">Ana adı</button>
+                        </form>
+
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <form asp-action="RenameProduct" method="post" class="inline-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ProductId" value="@row.SubProductId" />
+                                <input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" />
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Alt adı</button>
+                            </form>
+                            <form asp-action="RemoveSubProductAssignment" method="post" class="button-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="Id" value="@row.AssignmentId" />
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Bağı kaldır</button>
+                            </form>
+                        }
+
+                        <form asp-action="RemoveMainProductPeriod" method="post" class="button-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Id" value="@row.MainProductPeriodId" />
+                            <button class="btn btn-sm btn-outline-secondary" type="submit">Dönemden kaldır</button>
+                        </form>
+
+                        <form asp-action="DeactivateProduct" method="post" class="button-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ProductId" value="@row.MainProductId" />
+                            <button class="btn btn-sm btn-outline-warning" type="submit">Ana pasif</button>
+                        </form>
+
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <form asp-action="DeactivateProduct" method="post" class="button-form">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ProductId" value="@row.SubProductId" />
+                                <button class="btn btn-sm btn-outline-warning" type="submit">Alt pasif</button>
+                            </form>
+                        }
+
+                        <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu ana ürün ve ilişkili dönem/bağlantı kayıtları kalıcı silinecek.">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ProductId" value="@row.MainProductId" />
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Ana sil</button>
+                        </form>
+
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu alt ürün tüm ana ürün ve dönem bağlantılarından kalıcı silinecek.">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ProductId" value="@row.SubProductId" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Alt sil</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
