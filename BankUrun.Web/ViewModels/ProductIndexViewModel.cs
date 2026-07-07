@@ -85,6 +85,14 @@ public class CreateProductInput
     [Required]
     [StringLength(180, MinimumLength = 2)]
     public string Name { get; set; } = string.Empty;
+
+    [Range(2000, 2100)]
+    public int Year { get; set; }
+
+    [Range(1, 12)]
+    public int Term { get; set; }
+
+    public int? MainProductId { get; set; }
 }
 
 public class AddMainToPeriodInput

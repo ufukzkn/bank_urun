@@ -70,6 +70,10 @@ label span {
   margin-bottom: 18px;
 }
 
+.compact-action-grid {
+  grid-template-columns: minmax(320px, 520px);
+}
+
 .action-panel {
   padding: 18px;
 }
@@ -108,8 +112,13 @@ label span {
   display: none;
 }
 
-.manual-code-wrap.is-visible {
+.manual-code-wrap.is-visible,
+.sub-product-field.is-visible {
   display: block;
+}
+
+.sub-product-field {
+  display: none;
 }
 
 .code-input {

@@ -199,6 +199,34 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         db.Products.Add(product);
         await db.SaveChangesAsync(cancellationToken);
         AddAudit("CreateProduct", "Product", product.Id.ToString(), $"{product.Type} {product.Code} oluşturuldu.", actor);
+
+        var period = await GetOrCreatePeriodAsync(input.Year, input.Term, cancellationToken);
+        if (product.Type == ProductType.Main)
+        {
+            var mainPeriod = await GetOrCreateMainProductPeriodAsync(product, period, cancellationToken);
+            AddAudit("AddMainToPeriod", "MainProductPeriod", mainPeriod.Id.ToString(), $"{product.Code} {period.Year}/{period.Term} dönemine eklendi.", actor);
+        }
+        else
+        {
+            if (!input.MainProductId.HasValue)
+            {
+                throw new InvalidOperationException("Alt ürün için bağlı ana ürün seçilmeli.");
+            }
+
+            var mainProduct = await GetProductAsync(input.MainProductId.Value, ProductType.Main, cancellationToken);
+            var mainPeriod = await GetOrCreateMainProductPeriodAsync(mainProduct, period, cancellationToken);
+            var assignment = new SubProductAssignment
+            {
+                MainProductPeriodId = mainPeriod.Id,
+                SubProductId = product.Id,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            db.SubProductAssignments.Add(assignment);
+            await db.SaveChangesAsync(cancellationToken);
+            AddAudit("AssignSubProduct", "SubProductAssignment", assignment.Id.ToString(), $"{product.Code}, {mainProduct.Code} ürününe {period.Year}/{period.Term} döneminde bağlandı.", actor);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -360,6 +388,28 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         db.Periods.Add(period);
         await db.SaveChangesAsync(cancellationToken);
         return period;
+    }
+
+    private async Task<MainProductPeriod> GetOrCreateMainProductPeriodAsync(Product mainProduct, Period period, CancellationToken cancellationToken)
+    {
+        var mainPeriod = await db.MainProductPeriods
+            .FirstOrDefaultAsync(item => item.MainProductId == mainProduct.Id && item.PeriodId == period.Id, cancellationToken);
+
+        if (mainPeriod is not null)
+        {
+            return mainPeriod;
+        }
+
+        mainPeriod = new MainProductPeriod
+        {
+            MainProductId = mainProduct.Id,
+            PeriodId = period.Id,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.MainProductPeriods.Add(mainPeriod);
+        await db.SaveChangesAsync(cancellationToken);
+        return mainPeriod;
     }
 
     private void AddAudit(string action, string entityName, string entityKey, string description, string actor)

@@ -8,24 +8,54 @@
 
     string PageUrl(int page)
     {
-        return Url.Action("Index", new
+        var routeValues = new Dictionary<string, object?>();
+
+        if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
         {
-            Model.Filter.Year,
-            Model.Filter.Term,
-            Model.Filter.Search,
-            Model.Filter.MainQuery,
-            Model.Filter.SubQuery,
-            Model.Filter.IncludeInactive,
-            Model.Filter.ShowMainProducts,
-            Model.Filter.ShowSubProducts,
-            Page = page,
-            Model.Filter.PageSize
-        }) ?? "#";
+            routeValues["Search"] = Model.Filter.Search;
+        }
+
+        if (Model.Filter.Year.HasValue)
+        {
+            routeValues["Year"] = Model.Filter.Year;
+        }
+
+        if (Model.Filter.Term.HasValue)
+        {
+            routeValues["Term"] = Model.Filter.Term;
+        }
+
+        if (Model.Filter.IncludeInactive)
+        {
+            routeValues["IncludeInactive"] = true;
+        }
+
+        if (!Model.Filter.ShowMainProducts)
+        {
+            routeValues["ShowMainProducts"] = false;
+        }
+
+        if (!Model.Filter.ShowSubProducts)
+        {
+            routeValues["ShowSubProducts"] = false;
+        }
+
+        if (page > 1)
+        {
+            routeValues["Page"] = page;
+        }
+
+        if (Model.Filter.PageSize != 10)
+        {
+            routeValues["PageSize"] = Model.Filter.PageSize;
+        }
+
+        return Url.Action("Index", routeValues) ?? "#";
     }
 }
 
-<section class="action-grid">
-    <div class="action-panel">
+<section class="action-grid compact-action-grid">
+    <div class="action-panel create-panel">
         <h2>Ürün Oluştur</h2>
         <form asp-action="CreateProduct" method="post" class="stack-form">
             @Html.AntiForgeryToken()
@@ -52,6 +82,27 @@
                 <span>Ad</span>
                 <input class="form-control" type="text" name="Name" maxlength="180" required />
             </label>
+            <div class="split-fields">
+                <label>
+                    <span>Yıl</span>
+                    <input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required />
+                </label>
+                <label>
+                    <span>Dönem</span>
+                    <input class="form-control" type="number" name="Term" min="1" max="12" value="1" required />
+                </label>
+            </div>
+            <label id="createMainProductWrap" class="sub-product-field">
+                <span>Bağlı ana ürün</span>
+                <input class="form-control combobox-input" type="search" id="createMainProductSearch" list="mainProductOptions" placeholder="Ana ürün kodu veya adı ara" autocomplete="off" />
+                <input type="hidden" name="MainProductId" id="createMainProductId" />
+                <datalist id="mainProductOptions">
+                    @foreach (var product in activeMainProducts)
+                    {
+                        <option value="@product.Label" data-id="@product.Id"></option>
+                    }
+                </datalist>
+            </label>
             <button class="btn btn-primary" type="submit">Oluştur</button>
         </form>
         @if (TempData["Success"] is string success)
@@ -64,80 +115,10 @@
             <div class="alert alert-danger action-alert" role="alert">@error</div>
         }
     </div>
-
-    <div class="action-panel">
-        <h2>Döneme Ana Ürün Ekle</h2>
-        <p class="panel-note">Yeni oluşturulan ana ürünler listede görünmek için bir yıl/döneme eklenmelidir.</p>
-        <form asp-action="AddMainToPeriod" method="post" class="stack-form">
-            @Html.AntiForgeryToken()
-            <label>
-                <span>Ana ürün</span>
-                <input class="form-control select-search" type="search" placeholder="Ana ürün ara" data-select-filter="#mainProductForPeriod" />
-                <select class="form-select searchable-select" name="MainProductId" id="mainProductForPeriod" required>
-                    <option value="">Seç</option>
-                    @foreach (var product in activeMainProducts)
-                    {
-                        <option value="@product.Id">@product.Label</option>
-                    }
-                </select>
-            </label>
-            <div class="split-fields">
-                <label>
-                    <span>Yıl</span>
-                    <input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required />
-                </label>
-                <label>
-                    <span>Dönem</span>
-                    <input class="form-control" type="number" name="Term" min="1" max="12" value="1" required />
-                </label>
-            </div>
-            <button class="btn btn-primary" type="submit">Ekle</button>
-        </form>
-    </div>
-
-    <div class="action-panel">
-        <h2>Alt Ürün Bağla</h2>
-        <form asp-action="AssignSubProduct" method="post" class="stack-form">
-            @Html.AntiForgeryToken()
-            <label>
-                <span>Ana ürün</span>
-                <input class="form-control select-search" type="search" placeholder="Ana ürün ara" data-select-filter="#assignmentMainProduct" />
-                <select class="form-select searchable-select" id="assignmentMainProduct" required>
-                    <option value="">Seç</option>
-                    @foreach (var product in activeMainProducts)
-                    {
-                        <option value="@product.Id">@product.Label</option>
-                    }
-                </select>
-            </label>
-            <label>
-                <span>Yıl / dönem</span>
-                <select class="form-select" name="MainProductPeriodId" id="assignmentPeriod" required disabled>
-                    <option value="">Önce ana ürün seç</option>
-                    @foreach (var item in Model.MainProductPeriods)
-                    {
-                        <option value="@item.Id" data-main-product-id="@item.MainProductId">@item.Year/@item.Term</option>
-                    }
-                </select>
-            </label>
-            <label>
-                <span>Alt ürün</span>
-                <input class="form-control select-search" type="search" placeholder="Alt ürün ara" data-select-filter="#assignmentSubProduct" />
-                <select class="form-select searchable-select" name="SubProductId" id="assignmentSubProduct" required>
-                    <option value="">Seç</option>
-                    @foreach (var product in activeSubProducts)
-                    {
-                        <option value="@product.Id">@product.Label</option>
-                    }
-                </select>
-            </label>
-            <button class="btn btn-primary" type="submit">Bağla</button>
-        </form>
-    </div>
 </section>
 
 <section class="table-band">
-    <form asp-action="Index" method="get" class="filter-grid table-filter">
+    <form asp-action="Index" method="get" class="filter-grid table-filter" id="listFilterForm">
         <label class="search-field">
             <span>Arama</span>
             <input class="form-control auto-submit-filter debounced-filter" type="search" name="Search" value="@Model.Filter.Search" placeholder="Kod veya ad ara" />
@@ -156,12 +137,10 @@
         </label>
         <label class="check-line">
             <input class="form-check-input auto-submit-filter" type="checkbox" name="ShowMainProducts" value="true" checked="@Model.Filter.ShowMainProducts" />
-            <input type="hidden" name="ShowMainProducts" value="false" />
             <span>Ana ürün kayıtları</span>
         </label>
         <label class="check-line">
             <input class="form-check-input auto-submit-filter" type="checkbox" name="ShowSubProducts" value="true" checked="@Model.Filter.ShowSubProducts" />
-            <input type="hidden" name="ShowSubProducts" value="false" />
             <span>Alt ürün kayıtları</span>
         </label>
         <label>
