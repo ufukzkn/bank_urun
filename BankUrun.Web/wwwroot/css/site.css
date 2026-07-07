@@ -9,8 +9,9 @@ body {
   margin-bottom: 0;
 }
 
-.navbar {
-  background: #ffffff;
+.app-shell {
+  padding-bottom: 32px;
+  padding-top: 28px;
 }
 
 .table-band,
@@ -66,11 +67,11 @@ label span {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .action-panel {
-  padding: 16px;
+  padding: 18px;
 }
 
 .action-panel h2 {
