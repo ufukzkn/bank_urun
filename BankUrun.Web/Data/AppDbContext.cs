@@ -5,86 +5,57 @@ namespace BankUrun.Web.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public DbSet<Product> Products => Set<Product>();
-    public DbSet<Period> Periods => Set<Period>();
-    public DbSet<MainProductPeriod> MainProductPeriods => Set<MainProductPeriod>();
-    public DbSet<SubProductAssignment> SubProductAssignments => Set<SubProductAssignment>();
+    public DbSet<MainProduct> MainProducts => Set<MainProduct>();
+    public DbSet<SubProduct> SubProducts => Set<SubProduct>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Product>(entity =>
+        modelBuilder.Entity<MainProduct>(entity =>
         {
-            entity.ToTable("products");
+            entity.ToTable("main_products");
             entity.HasKey(product => product.Id);
             entity.Property(product => product.Id).HasColumnName("id");
             entity.Property(product => product.Code).HasColumnName("code").HasMaxLength(2).IsRequired();
             entity.Property(product => product.Name).HasColumnName("name").HasMaxLength(180).IsRequired();
-            entity.Property(product => product.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(12).IsRequired();
+            entity.Property(product => product.Year).HasColumnName("year").IsRequired();
+            entity.Property(product => product.Term).HasColumnName("term").IsRequired();
             entity.Property(product => product.IsActive).HasColumnName("is_active").HasDefaultValue(true);
             entity.Property(product => product.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.Property(product => product.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(product => new { product.Type, product.Code }).IsUnique();
+            entity.HasIndex(product => new { product.Code, product.Year, product.Term }).IsUnique();
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("ck_products_code_format", "code ~ '^[A-Z0-9]{2}$'");
-                table.HasCheckConstraint("ck_products_name_not_blank", "length(btrim(name)) > 0");
+                table.HasCheckConstraint("ck_main_products_code_format", "code ~ '^[A-Z0-9]{2}$'");
+                table.HasCheckConstraint("ck_main_products_name_not_blank", "length(btrim(name)) > 0");
+                table.HasCheckConstraint("ck_main_products_year_range", "year between 2000 and 2100");
+                table.HasCheckConstraint("ck_main_products_term_range", "term between 1 and 12");
             });
         });
 
-        modelBuilder.Entity<Period>(entity =>
+        modelBuilder.Entity<SubProduct>(entity =>
         {
-            entity.ToTable("periods");
-            entity.HasKey(period => period.Id);
-            entity.Property(period => period.Id).HasColumnName("id");
-            entity.Property(period => period.Year).HasColumnName("year");
-            entity.Property(period => period.Term).HasColumnName("term");
-            entity.HasIndex(period => new { period.Year, period.Term }).IsUnique();
+            entity.ToTable("sub_products");
+            entity.HasKey(product => product.Id);
+            entity.Property(product => product.Id).HasColumnName("id");
+            entity.Property(product => product.MainProductId).HasColumnName("main_product_id");
+            entity.Property(product => product.Code).HasColumnName("code").HasMaxLength(2).IsRequired();
+            entity.Property(product => product.Name).HasColumnName("name").HasMaxLength(180).IsRequired();
+            entity.Property(product => product.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(product => product.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            entity.Property(product => product.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            entity.HasIndex(product => new { product.MainProductId, product.Code }).IsUnique();
+            entity.HasOne(product => product.MainProduct)
+                .WithMany(mainProduct => mainProduct.SubProducts)
+                .HasForeignKey(product => product.MainProductId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("ck_periods_year_range", "year between 2000 and 2100");
-                table.HasCheckConstraint("ck_periods_term_range", "term between 1 and 12");
+                table.HasCheckConstraint("ck_sub_products_code_format", "code ~ '^[A-Z0-9]{2}$'");
+                table.HasCheckConstraint("ck_sub_products_name_not_blank", "length(btrim(name)) > 0");
             });
-        });
-
-        modelBuilder.Entity<MainProductPeriod>(entity =>
-        {
-            entity.ToTable("main_product_periods");
-            entity.HasKey(item => item.Id);
-            entity.Property(item => item.Id).HasColumnName("id");
-            entity.Property(item => item.MainProductId).HasColumnName("main_product_id");
-            entity.Property(item => item.PeriodId).HasColumnName("period_id");
-            entity.Property(item => item.CreatedAt).HasColumnName("created_at");
-            entity.HasIndex(item => new { item.MainProductId, item.PeriodId }).IsUnique();
-            entity.HasOne(item => item.MainProduct)
-                .WithMany(product => product.MainProductPeriods)
-                .HasForeignKey(item => item.MainProductId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(item => item.Period)
-                .WithMany(period => period.MainProductPeriods)
-                .HasForeignKey(item => item.PeriodId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<SubProductAssignment>(entity =>
-        {
-            entity.ToTable("sub_product_assignments");
-            entity.HasKey(item => item.Id);
-            entity.Property(item => item.Id).HasColumnName("id");
-            entity.Property(item => item.MainProductPeriodId).HasColumnName("main_product_period_id");
-            entity.Property(item => item.SubProductId).HasColumnName("sub_product_id");
-            entity.Property(item => item.CreatedAt).HasColumnName("created_at");
-            entity.HasIndex(item => new { item.MainProductPeriodId, item.SubProductId }).IsUnique();
-            entity.HasOne(item => item.MainProductPeriod)
-                .WithMany(period => period.SubProductAssignments)
-                .HasForeignKey(item => item.MainProductPeriodId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(item => item.SubProduct)
-                .WithMany(product => product.SubProductAssignments)
-                .HasForeignKey(item => item.SubProductId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditLog>(entity =>

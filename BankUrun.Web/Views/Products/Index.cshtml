@@ -4,85 +4,50 @@
 @{
     ViewData["Title"] = "";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
-    var activeSubProducts = Model.SubProducts.Where(product => product.IsActive).ToList();
-
-    string PageUrl(int page)
-    {
-        var routeValues = new Dictionary<string, object?>();
-
-        if (!string.IsNullOrWhiteSpace(Model.Filter.Search))
-        {
-            routeValues["Search"] = Model.Filter.Search;
-        }
-
-        if (Model.Filter.Year.HasValue)
-        {
-            routeValues["Year"] = Model.Filter.Year;
-        }
-
-        if (Model.Filter.Term.HasValue)
-        {
-            routeValues["Term"] = Model.Filter.Term;
-        }
-
-        if (Model.Filter.IncludeInactive)
-        {
-            routeValues["IncludeInactive"] = true;
-        }
-
-        if (!Model.Filter.ShowMainProducts)
-        {
-            routeValues["ShowMainProducts"] = false;
-        }
-
-        if (!Model.Filter.ShowSubProducts)
-        {
-            routeValues["ShowSubProducts"] = false;
-        }
-
-        if (page > 1)
-        {
-            routeValues["Page"] = page;
-        }
-
-        if (Model.Filter.PageSize != 10)
-        {
-            routeValues["PageSize"] = Model.Filter.PageSize;
-        }
-
-        return Url.Action("Index", routeValues) ?? "#";
-    }
+    var mainCount = Model.MainProducts.Count;
+    var subCount = Model.Rows.Count(row => row.SubProductId.HasValue);
 }
 
-<section class="action-grid compact-action-grid">
-    <div class="action-panel create-panel">
-        <h2>Ürün Oluştur</h2>
+<section class="workspace-grid">
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h1>Kayıt oluştur</h1>
+                <p>Ana ürün veya seçili ana ürün altında alt ürün ekle.</p>
+            </div>
+        </div>
+
         <form asp-action="CreateProduct" method="post" class="stack-form">
             @Html.AntiForgeryToken()
-            <label>
-                <span>Tip</span>
-                <select class="form-select" name="Type" id="productType">
-                    <option value="@ProductType.Main">Ana ürün</option>
-                    <option value="@ProductType.Sub">Alt ürün</option>
-                </select>
-            </label>
-            <label>
-                <span>Kod</span>
-                <select class="form-select" name="CodeMode" id="codeMode">
-                    <option value="Auto">Otomatik</option>
-                    <option value="Manual">Manuel</option>
-                </select>
-            </label>
+            <div class="form-row">
+                <label>
+                    <span>Tip</span>
+                    <select class="form-select" name="Type" id="productType">
+                        <option value="@ProductType.Main">Ana ürün</option>
+                        <option value="@ProductType.Sub">Alt ürün</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Kod</span>
+                    <select class="form-select" name="CodeMode" id="codeMode">
+                        <option value="Auto">Otomatik üret</option>
+                        <option value="Manual">Manuel gir</option>
+                    </select>
+                </label>
+            </div>
+
             <label id="manualCodeWrap" class="manual-code-wrap">
                 <span>Manuel kod</span>
                 <input class="form-control code-input" type="text" name="ManualCode" id="manualCode" maxlength="2" autocomplete="off" />
                 <small id="codeSuggestion" class="form-text"></small>
             </label>
+
             <label>
                 <span>Ad</span>
                 <input class="form-control" type="text" name="Name" maxlength="180" required />
             </label>
-            <div class="split-fields">
+
+            <div class="form-row" id="periodFields">
                 <label>
                     <span>Yıl</span>
                     <input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required />
@@ -92,9 +57,10 @@
                     <input class="form-control" type="number" name="Term" min="1" max="12" value="1" required />
                 </label>
             </div>
+
             <label id="createMainProductWrap" class="sub-product-field">
                 <span>Bağlı ana ürün</span>
-                <input class="form-control combobox-input" type="search" id="createMainProductSearch" list="mainProductOptions" placeholder="Ana ürün kodu veya adı ara" autocomplete="off" />
+                <input class="form-control combobox-input" type="search" id="createMainProductSearch" list="mainProductOptions" placeholder="Kod, ad veya yıl/dönem ara" autocomplete="off" />
                 <input type="hidden" name="MainProductId" id="createMainProductId" />
                 <datalist id="mainProductOptions">
                     @foreach (var product in activeMainProducts)
@@ -103,8 +69,10 @@
                     }
                 </datalist>
             </label>
-            <button class="btn btn-primary" type="submit">Oluştur</button>
+
+            <button class="btn btn-primary" type="submit">Kaydı oluştur</button>
         </form>
+
         @if (TempData["Success"] is string success)
         {
             <div class="alert alert-success action-alert" role="alert">@success</div>
@@ -115,73 +83,95 @@
             <div class="alert alert-danger action-alert" role="alert">@error</div>
         }
     </div>
+
+    <aside class="surface-panel summary-panel">
+        <div>
+            <span class="summary-label">Ana ürün</span>
+            <strong>@mainCount</strong>
+        </div>
+        <div>
+            <span class="summary-label">Alt ürün</span>
+            <strong>@subCount</strong>
+        </div>
+        <div>
+            <span class="summary-label">Görünen</span>
+            <strong id="visibleCount">@Model.Rows.Count</strong>
+        </div>
+    </aside>
 </section>
 
-<section class="table-band">
-    <form asp-action="Index" method="get" class="filter-grid table-filter" id="listFilterForm">
-        <label class="search-field">
-            <span>Arama</span>
-            <input class="form-control auto-submit-filter debounced-filter" type="search" name="Search" value="@Model.Filter.Search" placeholder="Kod veya ad ara" />
+<section class="surface-panel table-panel">
+    <div class="table-toolbar" id="listFilterForm">
+        <label class="toolbar-search">
+            <span>Liste içinde ara</span>
+            <input class="form-control list-filter" type="search" id="filterSearch" placeholder="Kod, ana ürün veya alt ürün adı" />
         </label>
         <label>
             <span>Yıl</span>
-            <input class="form-control auto-submit-filter debounced-filter" type="number" name="Year" value="@Model.Filter.Year" min="2000" max="2100" />
+            <input class="form-control list-filter" type="number" id="filterYear" min="2000" max="2100" />
         </label>
         <label>
             <span>Dönem</span>
-            <input class="form-control auto-submit-filter debounced-filter" type="number" name="Term" value="@Model.Filter.Term" min="1" max="12" />
-        </label>
-        <label class="check-line">
-            <input class="form-check-input auto-submit-filter" type="checkbox" name="IncludeInactive" value="true" checked="@Model.Filter.IncludeInactive" />
-            <span>Pasifleri göster</span>
-        </label>
-        <label class="check-line">
-            <input class="form-check-input auto-submit-filter" type="checkbox" name="ShowMainProducts" value="true" checked="@Model.Filter.ShowMainProducts" />
-            <span>Ana ürün kayıtları</span>
-        </label>
-        <label class="check-line">
-            <input class="form-check-input auto-submit-filter" type="checkbox" name="ShowSubProducts" value="true" checked="@Model.Filter.ShowSubProducts" />
-            <span>Alt ürün kayıtları</span>
+            <input class="form-control list-filter" type="number" id="filterTerm" min="1" max="12" />
         </label>
         <label>
-            <span>Sayfa boyutu</span>
-            <select class="form-select auto-submit-filter" name="PageSize">
-                <option value="10" selected="@(Model.PageSize == 10)">10</option>
-                <option value="25" selected="@(Model.PageSize == 25)">25</option>
-                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            <span>Sayfa</span>
+            <select class="form-select list-filter" id="pageSize">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
             </select>
         </label>
-        <input type="hidden" name="Page" value="1" />
-        <button class="btn btn-primary" type="submit">Filtrele</button>
-    </form>
+        <label class="check-line">
+            <input class="form-check-input list-filter" type="checkbox" id="includeInactive" />
+            <span>Pasifler</span>
+        </label>
+        <label class="check-line">
+            <input class="form-check-input list-filter" type="checkbox" id="showMainProducts" checked />
+            <span>Ana kayıtlar</span>
+        </label>
+        <label class="check-line">
+            <input class="form-check-input list-filter" type="checkbox" id="showSubProducts" checked />
+            <span>Alt kayıtlar</span>
+        </label>
+    </div>
 
     <div class="table-responsive">
-        <table class="table align-middle product-table">
+        <table class="table product-table">
             <thead>
                 <tr>
                     <th>Yıl</th>
                     <th>Dönem</th>
-                    <th>Ana Ürün Kodu</th>
-                    <th>Alt Ürün Kodu</th>
+                    <th>Ana Kod</th>
+                    <th>Alt Kod</th>
                     <th>Alt Ürün Adı</th>
-                    <th class="text-end">Düzenle</th>
+                    <th class="text-end">İşlem</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="productTableBody">
             @if (Model.Rows.Count == 0)
             {
-                <tr>
+                <tr class="empty-row">
                     <td colspan="6" class="empty-cell">Kayıt yok</td>
                 </tr>
             }
             @for (var rowIndex = 0; rowIndex < Model.Rows.Count; rowIndex++)
             {
                 var row = Model.Rows[rowIndex];
-                var detailsId = $"row-actions-{row.MainProductPeriodId}-{row.AssignmentId ?? 0}-{rowIndex}";
-                <tr>
+                var detailsId = $"row-actions-{row.MainProductId}-{row.SubProductId ?? 0}-{rowIndex}";
+                var searchText = $"{row.Year} {row.Term} {row.MainProductCode} {row.MainProductName} {row.SubProductCode} {row.SubProductName}".ToUpperInvariant();
+                <tr class="product-row"
+                    data-year="@row.Year"
+                    data-term="@row.Term"
+                    data-has-sub="@(row.SubProductId.HasValue ? "true" : "false")"
+                    data-active="@((row.MainProductActive && (!row.SubProductId.HasValue || row.SubProductActive == true)) ? "true" : "false")"
+                    data-search="@searchText">
                     <td>@row.Year</td>
                     <td>@row.Term</td>
-                    <td><strong>@row.MainProductCode</strong></td>
+                    <td>
+                        <strong>@row.MainProductCode</strong>
+                        <small>@row.MainProductName</small>
+                    </td>
                     <td>
                         @if (row.SubProductId.HasValue)
                         {
@@ -199,14 +189,14 @@
                         }
                         else
                         {
-                            <span class="muted">-</span>
+                            <span class="muted">Alt ürün yok</span>
                         }
                     </td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">Düzenle</button>
                     </td>
                 </tr>
-                <tr class="actions-row">
+                <tr class="actions-row" data-actions-for="@detailsId">
                     <td colspan="6">
                         <div class="collapse" id="@detailsId">
                             <div class="actions-panel">
@@ -221,27 +211,22 @@
                                     <span class="action-group-title">Ana ürün</span>
                                     <form asp-action="RenameProduct" method="post" class="inline-form">
                                         @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Type" value="@ProductType.Main" />
                                         <input type="hidden" name="ProductId" value="@row.MainProductId" />
                                         <input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" />
                                         <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Ana ürün adını değiştirmek istediğinize emin misiniz?">Adını değiştir</button>
                                     </form>
-
-                                    <form asp-action="RemoveMainProductPeriod" method="post" class="button-form">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Id" value="@row.MainProductPeriodId" />
-                                        <button class="btn btn-sm btn-outline-secondary" type="submit" data-confirm="Bu ana ürünü yalnızca bu yıl/dönem listesinden silmek istediğinize emin misiniz?">Sil</button>
-                                    </form>
-
                                     <form asp-action="DeactivateProduct" method="post" class="button-form">
                                         @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Type" value="@ProductType.Main" />
                                         <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürünü pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
+                                        <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürünü ve alt ürünlerini pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
                                     </form>
-
-                                    <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu ana ürün tüm geçmişi ve ilişkili kayıtlarıyla kalıcı silinecek. Emin misiniz?">
+                                    <form asp-action="DeleteProduct" method="post" class="button-form">
                                         @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Type" value="@ProductType.Main" />
                                         <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit">Tüm geçmişten sil</button>
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Bu ana ürün ve alt ürünleri kalıcı silinecek. Emin misiniz?">Sil</button>
                                     </form>
 
                                     @if (row.SubProductId.HasValue)
@@ -249,27 +234,22 @@
                                         <span class="action-group-title">Alt ürün</span>
                                         <form asp-action="RenameProduct" method="post" class="inline-form">
                                             @Html.AntiForgeryToken()
+                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
                                             <input type="hidden" name="ProductId" value="@row.SubProductId" />
                                             <input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" />
                                             <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Alt ürün adını değiştirmek istediğinize emin misiniz?">Adını değiştir</button>
                                         </form>
-
-                                        <form asp-action="RemoveSubProductAssignment" method="post" class="button-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="Id" value="@row.AssignmentId" />
-                                            <button class="btn btn-sm btn-outline-secondary" type="submit" data-confirm="Bu alt ürün bağlantısını yalnızca bu satırdan silmek istediğinize emin misiniz?">Sil</button>
-                                        </form>
-
                                         <form asp-action="DeactivateProduct" method="post" class="button-form">
                                             @Html.AntiForgeryToken()
+                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
                                             <input type="hidden" name="ProductId" value="@row.SubProductId" />
                                             <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Alt ürünü pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
                                         </form>
-
-                                        <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu alt ürün tüm ana ürün ve dönem bağlantılarından kalıcı silinecek.">
+                                        <form asp-action="DeleteProduct" method="post" class="button-form">
                                             @Html.AntiForgeryToken()
+                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
                                             <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <button class="btn btn-sm btn-outline-danger" type="submit">Tüm geçmişten sil</button>
+                                            <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Bu alt ürün kalıcı silinecek. Emin misiniz?">Sil</button>
                                         </form>
                                     }
                                 </div>
@@ -278,36 +258,19 @@
                     </td>
                 </tr>
             }
+            <tr id="noClientRows" class="empty-row d-none">
+                <td colspan="6" class="empty-cell">Filtreye uygun kayıt yok</td>
+            </tr>
             </tbody>
         </table>
     </div>
 
     <div class="pagination-bar">
-        <div class="pagination-summary">
-            @if (Model.TotalRows == 0)
-            {
-                <span>0 kayıt</span>
-            }
-            else
-            {
-                <span>@Model.TotalRows kayıttan @Model.FirstRowNumber-@Model.LastRowNumber arası gösteriliyor</span>
-            }
+        <div class="pagination-summary" id="paginationSummary">Kayıtlar hazırlanıyor</div>
+        <div class="pager-buttons">
+            <button class="btn btn-sm btn-outline-secondary" type="button" id="prevPage">Önceki</button>
+            <span id="pageIndicator">1 / 1</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" id="nextPage">Sonraki</button>
         </div>
-        <nav aria-label="Ürün listesi sayfaları">
-            <ul class="pagination pagination-sm mb-0">
-                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
-                    <a class="page-link" href="@PageUrl(Model.Page - 1)">Önceki</a>
-                </li>
-                @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
-                {
-                    <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
-                        <a class="page-link" href="@PageUrl(pageNumber)">@pageNumber</a>
-                    </li>
-                }
-                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
-                    <a class="page-link" href="@PageUrl(Model.Page + 1)">Sonraki</a>
-                </li>
-            </ul>
-        </nav>
     </div>
 </section>

@@ -1,6 +1,6 @@
 # Bank Ürün Yönetimi
 
-ASP.NET Core MVC + PostgreSQL ile ana ürün, alt ürün ve yıl/dönem bazlı ürün bağlantılarını yöneten küçük bir web uygulaması.
+ASP.NET Core MVC + PostgreSQL ile ana ürün ve ana ürüne bağlı alt ürün kayıtlarını yöneten küçük bir web uygulaması.
 
 ## Çalıştırma
 
@@ -38,8 +38,10 @@ Not: pgAdmin kendi bilgisayarında uygulama olarak çalışıyorsa host `localho
 
 ## Temel Kurallar
 
-- Ürün kodları 2 karakterli alfanumerik ve ürün tipi içinde benzersizdir.
-- Ana ürün ve alt ürün adları canonical tabloda tutulur; isim değişince dönem görünümleri yeni adı gösterir.
-- Alt ürün aynı dönemde farklı ana ürünlere bağlanabilir.
-- Alt ürün farklı yıl/dönemlerde tekrar listelenebilir.
+- Ana tablo yapısı `main_products`, `sub_products` ve `audit_logs` şeklindedir.
+- Ana ürün yıl/dönem bilgisini kendi üzerinde taşır.
+- Alt ürün `main_product_id` foreign key'i ile ana ürüne bağlanır; alt ürünün yıl/dönemi bağlı olduğu ana üründen gelir.
+- Ürün kodları 2 karakterli alfanumeriktir.
+- Ana ürün kodları otomatik üretimde tekrar etmez.
+- Alt ürün kodu aynı ana ürün altında tekrar etmez; farklı ana ürünlerin altında aynı alt ürün kodu kullanılabilir.
 - Pasifleştirme veriyi saklar; kalıcı silme ilişkili kayıtları temizler ve audit log yazar.

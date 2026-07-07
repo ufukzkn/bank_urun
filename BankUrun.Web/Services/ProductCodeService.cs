@@ -24,9 +24,9 @@ public class ProductCodeService(AppDbContext db) : IProductCodeService
         return code.Trim().ToUpperInvariant();
     }
 
-    public async Task<string> GenerateNextCodeAsync(ProductType type, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateNextCodeAsync(ProductType type, int? mainProductId = null, CancellationToken cancellationToken = default)
     {
-        var usedCodes = await GetUsedCodesAsync(type, cancellationToken);
+        var usedCodes = await GetUsedCodesAsync(type, mainProductId, cancellationToken);
         for (var i = 0; i < CodeCount; i++)
         {
             var code = FromIndex(i);
@@ -39,7 +39,7 @@ public class ProductCodeService(AppDbContext db) : IProductCodeService
         throw new InvalidOperationException("Bu ürün tipi için boş 2 karakterli kod kalmadı.");
     }
 
-    public async Task<string?> SuggestCodeAsync(ProductType type, string requestedCode, CancellationToken cancellationToken = default)
+    public async Task<string?> SuggestCodeAsync(ProductType type, string requestedCode, int? mainProductId = null, CancellationToken cancellationToken = default)
     {
         if (!IsValidCode(requestedCode))
         {
@@ -47,7 +47,7 @@ public class ProductCodeService(AppDbContext db) : IProductCodeService
         }
 
         var requested = NormalizeCode(requestedCode);
-        var usedCodes = await GetUsedCodesAsync(type, cancellationToken);
+        var usedCodes = await GetUsedCodesAsync(type, mainProductId, cancellationToken);
         var startIndex = ToIndex(requested);
 
         for (var offset = 0; offset < CodeCount; offset++)
@@ -62,13 +62,20 @@ public class ProductCodeService(AppDbContext db) : IProductCodeService
         return null;
     }
 
-    private async Task<HashSet<string>> GetUsedCodesAsync(ProductType type, CancellationToken cancellationToken)
+    private async Task<HashSet<string>> GetUsedCodesAsync(ProductType type, int? mainProductId, CancellationToken cancellationToken)
     {
-        var codes = await db.Products
-            .AsNoTracking()
-            .Where(product => product.Type == type)
-            .Select(product => product.Code)
-            .ToListAsync(cancellationToken);
+        var codes = type == ProductType.Main
+            ? await db.MainProducts
+                .AsNoTracking()
+                .Select(product => product.Code)
+                .Distinct()
+                .ToListAsync(cancellationToken)
+            : await db.SubProducts
+                .AsNoTracking()
+                .Where(product => !mainProductId.HasValue || product.MainProductId == mainProductId.Value)
+                .Select(product => product.Code)
+                .Distinct()
+                .ToListAsync(cancellationToken);
 
         return codes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
