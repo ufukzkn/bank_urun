@@ -120,5 +120,9 @@ assignmentMainProduct?.addEventListener("change", refreshAssignmentPeriods);
 document.querySelectorAll("[data-select-filter]").forEach((input) => {
   input.addEventListener("input", () => filterSelectOptions(input));
 });
+
+document.querySelectorAll(".auto-submit-filter").forEach((input) => {
+  input.addEventListener("change", () => input.form?.requestSubmit());
+});
 toggleManualCode();
 refreshAssignmentPeriods();

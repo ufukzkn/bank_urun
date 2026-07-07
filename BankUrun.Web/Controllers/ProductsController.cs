@@ -26,7 +26,7 @@ public class ProductsController(IProductManagementService productService, IProdu
 
         return await ExecuteAndRedirectAsync(
             () => productService.CreateProductAsync(input, Actor, cancellationToken),
-            "Ürün oluşturuldu.");
+            "Ürün oluşturuldu. Alttaki listede görünmesi için ürünü bir yıl/döneme ekleyin.");
     }
 
     [HttpPost]
