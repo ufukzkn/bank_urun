@@ -87,9 +87,38 @@ function refreshAssignmentPeriods() {
   }
 }
 
+function normalizeSearchText(value) {
+  return (value || "").trim().toLocaleUpperCase("tr-TR");
+}
+
+function filterSelectOptions(input) {
+  const select = document.querySelector(input.dataset.selectFilter);
+  if (!select) {
+    return;
+  }
+
+  const query = normalizeSearchText(input.value);
+  Array.from(select.options).forEach((option) => {
+    if (!option.value) {
+      option.hidden = false;
+      return;
+    }
+
+    option.hidden = query.length > 0 && !normalizeSearchText(option.textContent).includes(query);
+  });
+
+  if (select.selectedOptions.length > 0 && select.selectedOptions[0].hidden) {
+    select.value = "";
+    select.dispatchEvent(new Event("change"));
+  }
+}
+
 codeMode?.addEventListener("change", toggleManualCode);
 manualCode?.addEventListener("input", refreshSuggestion);
 productType?.addEventListener("change", refreshSuggestion);
 assignmentMainProduct?.addEventListener("change", refreshAssignmentPeriods);
+document.querySelectorAll("[data-select-filter]").forEach((input) => {
+  input.addEventListener("input", () => filterSelectOptions(input));
+});
 toggleManualCode();
 refreshAssignmentPeriods();

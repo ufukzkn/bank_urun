@@ -24,16 +24,6 @@
     }
 }
 
-@if (TempData["Success"] is string success)
-{
-    <div class="alert alert-success" role="alert">@success</div>
-}
-
-@if (TempData["Error"] is string error)
-{
-    <div class="alert alert-danger" role="alert">@error</div>
-}
-
 <section class="action-grid">
     <div class="action-panel">
         <h2>Ürün Oluştur</h2>
@@ -64,6 +54,15 @@
             </label>
             <button class="btn btn-primary" type="submit">Oluştur</button>
         </form>
+        @if (TempData["Success"] is string success)
+        {
+            <div class="alert alert-success action-alert" role="alert">@success</div>
+        }
+
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-danger action-alert" role="alert">@error</div>
+        }
     </div>
 
     <div class="action-panel">
@@ -72,7 +71,8 @@
             @Html.AntiForgeryToken()
             <label>
                 <span>Ana ürün</span>
-                <select class="form-select" name="MainProductId" required>
+                <input class="form-control select-search" type="search" placeholder="Ana ürün ara" data-select-filter="#mainProductForPeriod" />
+                <select class="form-select searchable-select" name="MainProductId" id="mainProductForPeriod" required>
                     <option value="">Seç</option>
                     @foreach (var product in activeMainProducts)
                     {
@@ -100,7 +100,8 @@
             @Html.AntiForgeryToken()
             <label>
                 <span>Ana ürün</span>
-                <select class="form-select" id="assignmentMainProduct" required>
+                <input class="form-control select-search" type="search" placeholder="Ana ürün ara" data-select-filter="#assignmentMainProduct" />
+                <select class="form-select searchable-select" id="assignmentMainProduct" required>
                     <option value="">Seç</option>
                     @foreach (var product in activeMainProducts)
                     {
@@ -120,7 +121,8 @@
             </label>
             <label>
                 <span>Alt ürün</span>
-                <select class="form-select" name="SubProductId" required>
+                <input class="form-control select-search" type="search" placeholder="Alt ürün ara" data-select-filter="#assignmentSubProduct" />
+                <select class="form-select searchable-select" name="SubProductId" id="assignmentSubProduct" required>
                     <option value="">Seç</option>
                     @foreach (var product in activeSubProducts)
                     {
