@@ -3,6 +3,8 @@ const manualCodeWrap = document.querySelector("#manualCodeWrap");
 const manualCode = document.querySelector("#manualCode");
 const productType = document.querySelector("#productType");
 const codeSuggestion = document.querySelector("#codeSuggestion");
+const assignmentMainProduct = document.querySelector("#assignmentMainProduct");
+const assignmentPeriod = document.querySelector("#assignmentPeriod");
 
 function toggleManualCode() {
   if (!codeMode || !manualCodeWrap) {
@@ -46,7 +48,38 @@ document.querySelectorAll("form[data-confirm]").forEach((form) => {
   });
 });
 
+function refreshAssignmentPeriods() {
+  if (!assignmentMainProduct || !assignmentPeriod) {
+    return;
+  }
+
+  const selectedMainProductId = assignmentMainProduct.value;
+  let visibleOptionCount = 0;
+  assignmentPeriod.value = "";
+
+  Array.from(assignmentPeriod.options).forEach((option) => {
+    if (!option.value) {
+      option.hidden = false;
+      option.textContent = selectedMainProductId ? "Yıl / dönem seç" : "Önce ana ürün seç";
+      return;
+    }
+
+    const isVisible = option.dataset.mainProductId === selectedMainProductId;
+    option.hidden = !isVisible;
+    if (isVisible) {
+      visibleOptionCount += 1;
+    }
+  });
+
+  assignmentPeriod.disabled = !selectedMainProductId || visibleOptionCount === 0;
+  if (selectedMainProductId && visibleOptionCount === 0) {
+    assignmentPeriod.options[0].textContent = "Bu ana ürün için dönem yok";
+  }
+}
+
 codeMode?.addEventListener("change", toggleManualCode);
 manualCode?.addEventListener("input", refreshSuggestion);
 productType?.addEventListener("change", refreshSuggestion);
+assignmentMainProduct?.addEventListener("change", refreshAssignmentPeriods);
 toggleManualCode();
+refreshAssignmentPeriods();

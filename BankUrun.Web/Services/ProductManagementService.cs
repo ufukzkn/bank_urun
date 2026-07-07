@@ -35,6 +35,17 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             query = query.Where(item => item.MainProduct.IsActive);
         }
 
+        var searchQuery = NormalizeSearch(filter.Search);
+        if (!string.IsNullOrEmpty(searchQuery))
+        {
+            query = query.Where(item =>
+                item.MainProduct.Code.Contains(searchQuery) ||
+                item.MainProduct.Name.ToUpper().Contains(searchQuery) ||
+                item.SubProductAssignments.Any(assignment =>
+                    assignment.SubProduct.Code.Contains(searchQuery) ||
+                    assignment.SubProduct.Name.ToUpper().Contains(searchQuery)));
+        }
+
         var mainQuery = NormalizeSearch(filter.MainQuery);
         if (!string.IsNullOrEmpty(mainQuery))
         {
@@ -57,6 +68,20 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
                 .Where(assignment => filter.IncludeInactive || assignment.SubProduct.IsActive)
                 .OrderBy(assignment => assignment.SubProduct.Code)
                 .ToList();
+
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                var mainMatches =
+                    record.MainProduct.Code.Contains(searchQuery) ||
+                    record.MainProduct.Name.ToUpperInvariant().Contains(searchQuery);
+
+                assignments = assignments
+                    .Where(assignment =>
+                        mainMatches ||
+                        assignment.SubProduct.Code.Contains(searchQuery) ||
+                        assignment.SubProduct.Name.ToUpperInvariant().Contains(searchQuery))
+                    .ToList();
+            }
 
             if (!string.IsNullOrEmpty(subQuery))
             {
@@ -113,6 +138,7 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             .Select(item => new MainProductPeriodOptionViewModel
             {
                 Id = item.Id,
+                MainProductId = item.MainProductId,
                 Year = item.Period.Year,
                 Term = item.Period.Term,
                 MainProductCode = item.MainProduct.Code,

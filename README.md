@@ -20,17 +20,11 @@ docker cp scripts\seed-mock-data.sql bank_urun_postgres:/tmp/seed-mock-data.sql
 docker exec bank_urun_postgres psql -U bank_urun -d bank_urun -f /tmp/seed-mock-data.sql
 ```
 
-## pgAdmin
+## pgAdmin Bağlantısı
 
-```powershell
-docker compose up -d pgadmin
-```
+Kendi pgAdmin uygulamanda server eklerken:
 
-pgAdmin: `http://localhost:5050`
-
-- E-posta: `admin@bankurun.com`
-- Şifre: `bankurun`
-- Server host: `postgres`
+- Host: `localhost`
 - Port: `5432`
 - Database: `bank_urun`
 - Username: `bank_urun`

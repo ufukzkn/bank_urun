@@ -22,6 +22,7 @@ public class ProductFilterInput
 {
     public int? Year { get; set; }
     public int? Term { get; set; }
+    public string? Search { get; set; }
     public string? MainQuery { get; set; }
     public string? SubQuery { get; set; }
     public bool IncludeInactive { get; set; }
@@ -58,6 +59,7 @@ public class ProductOptionViewModel
 public class MainProductPeriodOptionViewModel
 {
     public int Id { get; set; }
+    public int MainProductId { get; set; }
     public int Year { get; set; }
     public int Term { get; set; }
     public string MainProductCode { get; set; } = string.Empty;

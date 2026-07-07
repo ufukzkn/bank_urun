@@ -15,21 +15,5 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: bank_urun_pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@bankurun.com
-      PGADMIN_DEFAULT_PASSWORD: bankurun
-    ports:
-      - "5050:80"
-    volumes:
-      - bank_urun_pgadmin:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   bank_urun_pgdata:
-  bank_urun_pgadmin:
