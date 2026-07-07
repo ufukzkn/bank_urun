@@ -122,6 +122,15 @@ document.querySelectorAll("[data-select-filter]").forEach((input) => {
 });
 
 document.querySelectorAll(".auto-submit-filter").forEach((input) => {
+  if (input.classList.contains("debounced-filter")) {
+    let submitTimer;
+    input.addEventListener("input", () => {
+      clearTimeout(submitTimer);
+      submitTimer = setTimeout(() => input.form?.requestSubmit(), 450);
+    });
+    return;
+  }
+
   input.addEventListener("change", () => input.form?.requestSubmit());
 });
 toggleManualCode();
