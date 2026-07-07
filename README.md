@@ -13,6 +13,29 @@ dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:51
 
 Uygulama: `http://localhost:5188`
 
+## Mock Veri
+
+```powershell
+docker cp scripts\seed-mock-data.sql bank_urun_postgres:/tmp/seed-mock-data.sql
+docker exec bank_urun_postgres psql -U bank_urun -d bank_urun -f /tmp/seed-mock-data.sql
+```
+
+## pgAdmin
+
+```powershell
+docker compose up -d pgadmin
+```
+
+pgAdmin: `http://localhost:5050`
+
+- E-posta: `admin@bankurun.com`
+- Şifre: `bankurun`
+- Server host: `postgres`
+- Port: `5432`
+- Database: `bank_urun`
+- Username: `bank_urun`
+- Password: `bank_urun`
+
 ## Temel Kurallar
 
 - Ürün kodları 2 karakterli alfanumerik ve ürün tipi içinde benzersizdir.
