@@ -10,6 +10,12 @@ public class ProductIndexViewModel
     public IReadOnlyList<ProductOptionViewModel> MainProducts { get; set; } = [];
     public IReadOnlyList<ProductOptionViewModel> SubProducts { get; set; } = [];
     public IReadOnlyList<MainProductPeriodOptionViewModel> MainProductPeriods { get; set; } = [];
+    public int TotalRows { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalRows / (double)PageSize));
+    public int FirstRowNumber => TotalRows == 0 ? 0 : ((Page - 1) * PageSize) + 1;
+    public int LastRowNumber => Math.Min(Page * PageSize, TotalRows);
 }
 
 public class ProductFilterInput
@@ -19,6 +25,8 @@ public class ProductFilterInput
     public string? MainQuery { get; set; }
     public string? SubQuery { get; set; }
     public bool IncludeInactive { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
 }
 
 public class ProductRowViewModel

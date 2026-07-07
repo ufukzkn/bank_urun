@@ -51,7 +51,7 @@ body {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
 }
 
 label span {
@@ -117,8 +117,10 @@ label span {
 }
 
 .product-table th {
+  background: #f8fafc;
   color: #475467;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
   white-space: nowrap;
@@ -171,6 +173,21 @@ label span {
   min-width: 420px;
 }
 
+.pagination-bar {
+  align-items: center;
+  border-top: 1px solid #e7edf3;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.pagination-summary {
+  color: #667085;
+  font-size: 0.9rem;
+}
+
 .inline-form {
   align-items: center;
   display: flex;
@@ -195,5 +212,10 @@ label span {
   .actions-cell {
     justify-content: flex-start;
     min-width: 320px;
+  }
+
+  .pagination-bar {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

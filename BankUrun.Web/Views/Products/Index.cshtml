@@ -5,6 +5,20 @@
     ViewData["Title"] = "Ürün Yönetimi";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
     var activeSubProducts = Model.SubProducts.Where(product => product.IsActive).ToList();
+
+    string PageUrl(int page)
+    {
+        return Url.Action("Index", new
+        {
+            Model.Filter.Year,
+            Model.Filter.Term,
+            Model.Filter.MainQuery,
+            Model.Filter.SubQuery,
+            Model.Filter.IncludeInactive,
+            Page = page,
+            Model.Filter.PageSize
+        }) ?? "#";
+    }
 }
 
 <section class="page-head">
@@ -46,6 +60,15 @@
             <input class="form-check-input" type="checkbox" name="IncludeInactive" value="true" checked="@Model.Filter.IncludeInactive" />
             <span>Pasifleri göster</span>
         </label>
+        <label>
+            <span>Sayfa boyutu</span>
+            <select class="form-select" name="PageSize">
+                <option value="10" selected="@(Model.PageSize == 10)">10</option>
+                <option value="25" selected="@(Model.PageSize == 25)">25</option>
+                <option value="50" selected="@(Model.PageSize == 50)">50</option>
+            </select>
+        </label>
+        <input type="hidden" name="Page" value="1" />
         <button class="btn btn-primary" type="submit">Filtrele</button>
     </form>
 </section>
@@ -146,9 +169,12 @@
                 <tr>
                     <th>Yıl</th>
                     <th>Dönem</th>
-                    <th>Ana Ürün</th>
-                    <th>Alt Ürün</th>
-                    <th>Durum</th>
+                    <th>Ana Ürün Kodu</th>
+                    <th>Ana Ürün Adı</th>
+                    <th>Alt Ürün Kodu</th>
+                    <th>Alt Ürün Adı</th>
+                    <th>Ana Durum</th>
+                    <th>Alt Durum</th>
                     <th class="text-end">İşlemler</th>
                 </tr>
             </thead>
@@ -156,7 +182,7 @@
             @if (Model.Rows.Count == 0)
             {
                 <tr>
-                    <td colspan="6" class="empty-cell">Kayıt yok</td>
+                    <td colspan="9" class="empty-cell">Kayıt yok</td>
                 </tr>
             }
             @foreach (var row in Model.Rows)
@@ -164,15 +190,12 @@
                 <tr>
                     <td>@row.Year</td>
                     <td>@row.Term</td>
-                    <td>
-                        <strong>@row.MainProductCode</strong>
-                        <span>@row.MainProductName</span>
-                    </td>
+                    <td><strong>@row.MainProductCode</strong></td>
+                    <td><span>@row.MainProductName</span></td>
                     <td>
                         @if (row.SubProductId.HasValue)
                         {
                             <strong>@row.SubProductCode</strong>
-                            <span>@row.SubProductName</span>
                         }
                         else
                         {
@@ -180,10 +203,24 @@
                         }
                     </td>
                     <td>
-                        <span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>
                         @if (row.SubProductId.HasValue)
                         {
-                            <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span>
+                            <span>@row.SubProductName</span>
+                        }
+                        else
+                        {
+                            <span class="muted">-</span>
+                        }
+                    </td>
+                    <td><span class="status-pill @(row.MainProductActive ? "active" : "passive")">@(row.MainProductActive ? "Aktif" : "Pasif")</span></td>
+                    <td>
+                        @if (row.SubProductId.HasValue)
+                        {
+                            <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">@(row.SubProductActive == true ? "Aktif" : "Pasif")</span>
+                        }
+                        else
+                        {
+                            <span class="muted">-</span>
                         }
                     </td>
                     <td class="actions-cell">
@@ -249,5 +286,34 @@
             }
             </tbody>
         </table>
+    </div>
+
+    <div class="pagination-bar">
+        <div class="pagination-summary">
+            @if (Model.TotalRows == 0)
+            {
+                <span>0 kayıt</span>
+            }
+            else
+            {
+                <span>@Model.TotalRows kayıttan @Model.FirstRowNumber-@Model.LastRowNumber arası gösteriliyor</span>
+            }
+        </div>
+        <nav aria-label="Ürün listesi sayfaları">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page - 1)">Önceki</a>
+                </li>
+                @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
+                {
+                    <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                        <a class="page-link" href="@PageUrl(pageNumber)">@pageNumber</a>
+                    </li>
+                }
+                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page + 1)">Sonraki</a>
+                </li>
+            </ul>
+        </nav>
     </div>
 </section>

@@ -9,6 +9,9 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
 {
     public async Task<ProductIndexViewModel> GetIndexAsync(ProductFilterInput filter, CancellationToken cancellationToken = default)
     {
+        filter.Page = Math.Max(1, filter.Page);
+        filter.PageSize = NormalizePageSize(filter.PageSize);
+
         var query = db.MainProductPeriods
             .AsNoTracking()
             .Include(item => item.MainProduct)
@@ -73,6 +76,18 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             rows.AddRange(assignments.Select(assignment => ToRow(record, assignment)));
         }
 
+        var totalRows = rows.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalRows / (double)filter.PageSize));
+        if (filter.Page > totalPages)
+        {
+            filter.Page = totalPages;
+        }
+
+        var pagedRows = rows
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToList();
+
         var products = await db.Products
             .AsNoTracking()
             .OrderBy(product => product.Type)
@@ -108,7 +123,10 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         return new ProductIndexViewModel
         {
             Filter = filter,
-            Rows = rows,
+            Rows = pagedRows,
+            TotalRows = totalRows,
+            Page = filter.Page,
+            PageSize = filter.PageSize,
             MainProducts = products.Where(product => product.Type == ProductType.Main).ToList(),
             SubProducts = products.Where(product => product.Type == ProductType.Sub).ToList(),
             MainProductPeriods = periodOptions
@@ -347,5 +365,14 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
     private static string? NormalizeSearch(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+    }
+
+    private static int NormalizePageSize(int pageSize)
+    {
+        return pageSize switch
+        {
+            10 or 25 or 50 => pageSize,
+            _ => 10
+        };
     }
 }
