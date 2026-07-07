@@ -16,6 +16,8 @@
             Model.Filter.MainQuery,
             Model.Filter.SubQuery,
             Model.Filter.IncludeInactive,
+            Model.Filter.ShowMainProducts,
+            Model.Filter.ShowSubProducts,
             Page = page,
             Model.Filter.PageSize
         }) ?? "#";
@@ -149,6 +151,16 @@
             <input class="form-check-input" type="checkbox" name="IncludeInactive" value="true" checked="@Model.Filter.IncludeInactive" />
             <span>Pasifleri göster</span>
         </label>
+        <label class="check-line">
+            <input class="form-check-input" type="checkbox" name="ShowMainProducts" value="true" checked="@Model.Filter.ShowMainProducts" />
+            <input type="hidden" name="ShowMainProducts" value="false" />
+            <span>Ana ürün kayıtları</span>
+        </label>
+        <label class="check-line">
+            <input class="form-check-input" type="checkbox" name="ShowSubProducts" value="true" checked="@Model.Filter.ShowSubProducts" />
+            <input type="hidden" name="ShowSubProducts" value="false" />
+            <span>Alt ürün kayıtları</span>
+        </label>
         <label>
             <span>Sayfa boyutu</span>
             <select class="form-select" name="PageSize">
@@ -224,61 +236,58 @@
                                     }
                                 </div>
                                 <div class="actions-cell">
+                                    <span class="action-group-title">Ana ürün</span>
                                     <form asp-action="RenameProduct" method="post" class="inline-form">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProductId" value="@row.MainProductId" />
                                         <input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" />
-                                        <button class="btn btn-sm btn-outline-primary" type="submit">Ana adı</button>
+                                        <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Ana ürün adını değiştirmek istediğinize emin misiniz?">Adını değiştir</button>
                                     </form>
-
-                                    @if (row.SubProductId.HasValue)
-                                    {
-                                        <form asp-action="RenameProduct" method="post" class="inline-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" />
-                                            <button class="btn btn-sm btn-outline-primary" type="submit">Alt adı</button>
-                                        </form>
-                                        <form asp-action="RemoveSubProductAssignment" method="post" class="button-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="Id" value="@row.AssignmentId" />
-                                            <button class="btn btn-sm btn-outline-secondary" type="submit">Bağı kaldır</button>
-                                        </form>
-                                    }
 
                                     <form asp-action="RemoveMainProductPeriod" method="post" class="button-form">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="Id" value="@row.MainProductPeriodId" />
-                                        <button class="btn btn-sm btn-outline-secondary" type="submit">Dönemden kaldır</button>
+                                        <button class="btn btn-sm btn-outline-secondary" type="submit" data-confirm="Bu ana ürünü yalnızca bu yıl/dönem listesinden silmek istediğinize emin misiniz?">Sil</button>
                                     </form>
 
                                     <form asp-action="DeactivateProduct" method="post" class="button-form">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <button class="btn btn-sm btn-outline-warning" type="submit">Ana pasif</button>
+                                        <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürünü pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
+                                    </form>
+
+                                    <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu ana ürün tüm geçmişi ve ilişkili kayıtlarıyla kalıcı silinecek. Emin misiniz?">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProductId" value="@row.MainProductId" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Tüm geçmişten sil</button>
                                     </form>
 
                                     @if (row.SubProductId.HasValue)
                                     {
+                                        <span class="action-group-title">Alt ürün</span>
+                                        <form asp-action="RenameProduct" method="post" class="inline-form">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="ProductId" value="@row.SubProductId" />
+                                            <input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" />
+                                            <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Alt ürün adını değiştirmek istediğinize emin misiniz?">Adını değiştir</button>
+                                        </form>
+
+                                        <form asp-action="RemoveSubProductAssignment" method="post" class="button-form">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="Id" value="@row.AssignmentId" />
+                                            <button class="btn btn-sm btn-outline-secondary" type="submit" data-confirm="Bu alt ürün bağlantısını yalnızca bu satırdan silmek istediğinize emin misiniz?">Sil</button>
+                                        </form>
+
                                         <form asp-action="DeactivateProduct" method="post" class="button-form">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <button class="btn btn-sm btn-outline-warning" type="submit">Alt pasif</button>
+                                            <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Alt ürünü pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
                                         </form>
-                                    }
 
-                                    <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu ana ürün ve ilişkili dönem/bağlantı kayıtları kalıcı silinecek.">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit">Ana sil</button>
-                                    </form>
-
-                                    @if (row.SubProductId.HasValue)
-                                    {
                                         <form asp-action="DeleteProduct" method="post" class="button-form" data-confirm="Bu alt ürün tüm ana ürün ve dönem bağlantılarından kalıcı silinecek.">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <button class="btn btn-sm btn-outline-danger" type="submit">Alt sil</button>
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">Tüm geçmişten sil</button>
                                         </form>
                                     }
                                 </div>

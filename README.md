@@ -24,11 +24,17 @@ docker exec bank_urun_postgres psql -U bank_urun -d bank_urun -f /tmp/seed-mock-
 
 Kendi pgAdmin uygulamanda server eklerken:
 
-- Host: `localhost`
-- Port: `5432`
-- Database: `bank_urun`
-- Username: `bank_urun`
-- Password: `bank_urun`
+- `Servers` üzerinde sağ tıkla, `Register` -> `Server...` seç.
+- `General` sekmesinde `Name`: `Bank Urun Local`.
+- `Connection` sekmesinde:
+  - `Host name/address`: `localhost`
+  - `Port`: `5432`
+  - `Maintenance database`: `bank_urun`
+  - `Username`: `bank_urun`
+  - `Password`: `bank_urun`
+  - `Save password`: açık olabilir.
+
+Not: pgAdmin kendi bilgisayarında uygulama olarak çalışıyorsa host `localhost` olmalı. Sadece başka bir Docker container içinden bağlanırken host adı `postgres` olur.
 
 ## Temel Kurallar
 

@@ -101,6 +101,12 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             rows.AddRange(assignments.Select(assignment => ToRow(record, assignment)));
         }
 
+        rows = rows
+            .Where(row =>
+                (filter.ShowMainProducts && !row.SubProductId.HasValue) ||
+                (filter.ShowSubProducts && row.SubProductId.HasValue))
+            .ToList();
+
         var totalRows = rows.Count;
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalRows / (double)filter.PageSize));
         if (filter.Page > totalPages)

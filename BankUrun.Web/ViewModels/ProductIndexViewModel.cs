@@ -26,6 +26,8 @@ public class ProductFilterInput
     public string? MainQuery { get; set; }
     public string? SubQuery { get; set; }
     public bool IncludeInactive { get; set; }
+    public bool ShowMainProducts { get; set; } = true;
+    public bool ShowSubProducts { get; set; } = true;
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 10;
 }

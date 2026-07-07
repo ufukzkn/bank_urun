@@ -42,7 +42,17 @@ async function refreshSuggestion() {
 
 document.querySelectorAll("form[data-confirm]").forEach((form) => {
   form.addEventListener("submit", (event) => {
-    if (!confirm(form.dataset.confirm)) {
+    const message = event.submitter?.dataset.confirm || form.dataset.confirm;
+    if (message && !confirm(message)) {
+      event.preventDefault();
+    }
+  });
+});
+
+document.querySelectorAll("form:not([data-confirm])").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    const message = event.submitter?.dataset.confirm;
+    if (message && !confirm(message)) {
       event.preventDefault();
     }
   });

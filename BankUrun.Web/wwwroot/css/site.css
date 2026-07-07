@@ -30,7 +30,7 @@ body {
   align-items: end;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(240px, 2fr) repeat(5, minmax(120px, 1fr));
+  grid-template-columns: minmax(240px, 2fr) repeat(7, minmax(120px, 1fr));
 }
 
 .search-field {
@@ -157,8 +157,17 @@ label span {
 .actions-cell {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 10px;
   justify-content: flex-start;
+}
+
+.action-group-title {
+  align-items: center;
+  color: #344054;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-height: 31px;
 }
 
 .actions-row td {
