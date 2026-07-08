@@ -9,39 +9,46 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
 {
     public async Task<ProductIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default)
     {
-        var mainProducts = await db.MainProducts
+        var instances = await db.MainProductInstances
             .AsNoTracking()
-            .Include(product => product.SubProducts)
-            .OrderByDescending(product => product.Year)
-            .ThenByDescending(product => product.Term)
-            .ThenBy(product => product.Code)
+            .Include(instance => instance.MainProduct)
+            .Include(instance => instance.SubProductInstances)
+                .ThenInclude(instance => instance.SubProduct)
+            .OrderByDescending(instance => instance.Year)
+            .ThenByDescending(instance => instance.Term)
+            .ThenBy(instance => instance.MainProduct.Code)
             .ToListAsync(cancellationToken);
 
         var rows = new List<ProductRowViewModel>();
-        foreach (var mainProduct in mainProducts)
+        foreach (var instance in instances)
         {
-            var subProducts = mainProduct.SubProducts.OrderBy(product => product.Code).ToList();
-            if (subProducts.Count == 0)
+            var subInstances = instance.SubProductInstances
+                .OrderBy(subInstance => subInstance.SubProduct.Code)
+                .ToList();
+
+            if (subInstances.Count == 0)
             {
-                rows.Add(ToRow(mainProduct, null));
+                rows.Add(ToRow(instance, null));
                 continue;
             }
 
-            rows.AddRange(subProducts.Select(subProduct => ToRow(mainProduct, subProduct)));
+            rows.AddRange(subInstances.Select(subInstance => ToRow(instance, subInstance)));
         }
 
         return new ProductIndexViewModel
         {
             Rows = rows,
-            MainProducts = mainProducts
-                .Select(product => new MainProductOptionViewModel
+            MainProducts = instances
+                .Where(instance => instance.MainProduct.IsActive)
+                .Select(instance => new MainProductOptionViewModel
                 {
-                    Id = product.Id,
-                    Code = product.Code,
-                    Name = product.Name,
-                    Year = product.Year,
-                    Term = product.Term,
-                    IsActive = product.IsActive
+                    Id = instance.Id,
+                    MainProductId = instance.MainProductId,
+                    Code = instance.MainProduct.Code,
+                    Name = instance.MainProduct.Name,
+                    Year = instance.Year,
+                    Term = instance.Term,
+                    IsActive = instance.MainProduct.IsActive
                 })
                 .ToList()
         };
@@ -55,64 +62,80 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         if (input.Type == ProductType.Main)
         {
             var code = await ResolveCodeAsync(input.Type, input.CodeMode, input.ManualCode, null, cancellationToken);
-            if (await db.MainProducts.AnyAsync(product => product.Code == code, cancellationToken))
+            var mainProduct = await GetOrCreateProductDefinitionAsync(ProductType.Main, code, input.Name, now, cancellationToken);
+            var year = input.Year ?? throw new InvalidOperationException("Ana ürün için yıl zorunlu.");
+            var term = input.Term ?? throw new InvalidOperationException("Ana ürün için dönem zorunlu.");
+
+            var exists = await db.MainProductInstances.AnyAsync(
+                instance => instance.MainProductId == mainProduct.Id && instance.Year == year && instance.Term == term,
+                cancellationToken);
+
+            if (exists)
             {
-                var suggestion = await codeService.SuggestCodeAsync(ProductType.Main, code, null, cancellationToken);
-                throw DuplicateCodeException(code, suggestion);
+                throw new InvalidOperationException($"{mainProduct.Code} ana ürünü {year}/{term} döneminde zaten var.");
             }
 
-            var mainProduct = new MainProduct
+            var instanceRecord = new MainProductInstance
             {
-                Code = code,
-                Name = input.Name.Trim(),
-                Year = input.Year ?? throw new InvalidOperationException("Ana ürün için yıl zorunlu."),
-                Term = input.Term ?? throw new InvalidOperationException("Ana ürün için dönem zorunlu."),
-                IsActive = true,
-                CreatedAt = now,
-                UpdatedAt = now
+                MainProductId = mainProduct.Id,
+                MainProductType = ProductType.Main,
+                Year = year,
+                Term = term,
+                CreatedAt = now
             };
 
-            db.MainProducts.Add(mainProduct);
+            db.MainProductInstances.Add(instanceRecord);
             await db.SaveChangesAsync(cancellationToken);
-            AddAudit("CreateMainProduct", "MainProduct", mainProduct.Id.ToString(), $"{mainProduct.Code} ana ürünü {mainProduct.Year}/{mainProduct.Term} için oluşturuldu.", actor);
+            AddAudit("CreateMainProductInstance", "MainProductInstance", instanceRecord.Id.ToString(), $"{mainProduct.Code} ana ürünü {year}/{term} dönemine eklendi.", actor);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return;
         }
 
-        if (!input.MainProductId.HasValue)
+        if (!input.MainProductInstanceId.HasValue)
         {
             throw new InvalidOperationException("Alt ürün için bağlı ana ürün seçilmeli.");
         }
 
-        var main = await db.MainProducts.FirstOrDefaultAsync(product => product.Id == input.MainProductId.Value, cancellationToken)
-            ?? throw new InvalidOperationException("Bağlı ana ürün bulunamadı.");
+        var mainInstance = await db.MainProductInstances
+            .Include(instance => instance.MainProduct)
+            .FirstOrDefaultAsync(instance => instance.Id == input.MainProductInstanceId.Value, cancellationToken)
+            ?? throw new InvalidOperationException("Bağlı ana ürün instance kaydı bulunamadı.");
 
-        if (!main.IsActive)
+        if (!mainInstance.MainProduct.IsActive)
         {
             throw new InvalidOperationException("Pasif ana ürüne alt ürün eklenemez.");
         }
 
-        var subCode = await ResolveCodeAsync(input.Type, input.CodeMode, input.ManualCode, main.Id, cancellationToken);
-        if (await db.SubProducts.AnyAsync(product => product.MainProductId == main.Id && product.Code == subCode, cancellationToken))
+        var subCode = await ResolveCodeAsync(input.Type, input.CodeMode, input.ManualCode, mainInstance.Id, cancellationToken);
+        var subProduct = await GetOrCreateProductDefinitionAsync(ProductType.Sub, subCode, input.Name, now, cancellationToken);
+
+        if (!subProduct.IsActive)
         {
-            var suggestion = await codeService.SuggestCodeAsync(ProductType.Sub, subCode, main.Id, cancellationToken);
+            throw new InvalidOperationException("Pasif alt ürün bağlanamaz.");
+        }
+
+        var subInstanceExists = await db.SubProductInstances.AnyAsync(
+            instance => instance.MainProductInstanceId == mainInstance.Id && instance.SubProductId == subProduct.Id,
+            cancellationToken);
+
+        if (subInstanceExists)
+        {
+            var suggestion = await codeService.SuggestCodeAsync(ProductType.Sub, subCode, mainInstance.Id, cancellationToken);
             throw DuplicateCodeException(subCode, suggestion);
         }
 
-        var subProduct = new SubProduct
+        var subInstanceRecord = new SubProductInstance
         {
-            MainProductId = main.Id,
-            Code = subCode,
-            Name = input.Name.Trim(),
-            IsActive = true,
-            CreatedAt = now,
-            UpdatedAt = now
+            MainProductInstanceId = mainInstance.Id,
+            SubProductId = subProduct.Id,
+            SubProductType = ProductType.Sub,
+            CreatedAt = now
         };
 
-        db.SubProducts.Add(subProduct);
+        db.SubProductInstances.Add(subInstanceRecord);
         await db.SaveChangesAsync(cancellationToken);
-        AddAudit("CreateSubProduct", "SubProduct", subProduct.Id.ToString(), $"{subProduct.Code} alt ürünü {main.Code} ana ürününe bağlandı.", actor);
+        AddAudit("CreateSubProductInstance", "SubProductInstance", subInstanceRecord.Id.ToString(), $"{subProduct.Code} alt ürünü {mainInstance.MainProduct.Code} {mainInstance.Year}/{mainInstance.Term} kaydına bağlandı.", actor);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -122,24 +145,22 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
 
-        if (input.Type == ProductType.Main)
+        var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.ProductId && item.Type == input.Type, cancellationToken)
+            ?? throw new InvalidOperationException("Ürün tanımı bulunamadı.");
+
+        var oldCode = product.Code;
+        var oldName = product.Name;
+        var newCode = ResolveOptionalCode(input.Code, product.Code);
+
+        if (newCode != product.Code && await db.ProductDefinitions.AnyAsync(item => item.Type == input.Type && item.Code == newCode, cancellationToken))
         {
-            var product = await db.MainProducts.FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Ana ürün bulunamadı.");
-            var oldName = product.Name;
-            product.Name = input.Name.Trim();
-            product.UpdatedAt = now;
-            AddAudit("RenameMainProduct", "MainProduct", product.Id.ToString(), $"{product.Code} adı '{oldName}' -> '{product.Name}' değişti.", actor);
+            throw new InvalidOperationException($"{newCode} kodlu {ProductTypeName(input.Type)} zaten var.");
         }
-        else
-        {
-            var product = await db.SubProducts.FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Alt ürün bulunamadı.");
-            var oldName = product.Name;
-            product.Name = input.Name.Trim();
-            product.UpdatedAt = now;
-            AddAudit("RenameSubProduct", "SubProduct", product.Id.ToString(), $"{product.Code} adı '{oldName}' -> '{product.Name}' değişti.", actor);
-        }
+
+        product.Code = newCode;
+        product.Name = input.Name.Trim();
+        product.UpdatedAt = now;
+        AddAudit("UpdateProductDefinition", "ProductDefinition", product.Id.ToString(), $"{oldCode} '{oldName}' -> {product.Code} '{product.Name}' güncellendi.", actor);
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -149,33 +170,12 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
+        var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.ProductId && item.Type == input.Type, cancellationToken)
+            ?? throw new InvalidOperationException("Ürün tanımı bulunamadı.");
 
-        if (input.Type == ProductType.Main)
-        {
-            var product = await db.MainProducts
-                .Include(item => item.SubProducts)
-                .FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Ana ürün bulunamadı.");
-
-            product.IsActive = false;
-            product.UpdatedAt = now;
-            foreach (var subProduct in product.SubProducts)
-            {
-                subProduct.IsActive = false;
-                subProduct.UpdatedAt = now;
-            }
-
-            AddAudit("DeactivateMainProduct", "MainProduct", product.Id.ToString(), $"{product.Code} ana ürünü ve alt ürünleri pasifleştirildi.", actor);
-        }
-        else
-        {
-            var product = await db.SubProducts.FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Alt ürün bulunamadı.");
-
-            product.IsActive = false;
-            product.UpdatedAt = now;
-            AddAudit("DeactivateSubProduct", "SubProduct", product.Id.ToString(), $"{product.Code} alt ürünü pasifleştirildi.", actor);
-        }
+        product.IsActive = false;
+        product.UpdatedAt = now;
+        AddAudit("DeactivateProductDefinition", "ProductDefinition", product.Id.ToString(), $"{product.Code} {ProductTypeName(input.Type)} pasifleştirildi.", actor);
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -184,33 +184,88 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
     public async Task DeleteProductAsync(ProductIdInput input, string actor, CancellationToken cancellationToken = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var deleteAll = input.DeleteScope.Equals("All", StringComparison.OrdinalIgnoreCase);
 
         if (input.Type == ProductType.Main)
         {
-            var product = await db.MainProducts.FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Ana ürün bulunamadı.");
+            if (deleteAll)
+            {
+                var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.ProductId && item.Type == ProductType.Main, cancellationToken)
+                    ?? throw new InvalidOperationException("Ana ürün tanımı bulunamadı.");
 
-            AddAudit("DeleteMainProduct", "MainProduct", product.Id.ToString(), $"{product.Code} ana ürünü kalıcı silindi.", actor);
-            db.MainProducts.Remove(product);
+                AddAudit("DeleteMainProductDefinition", "ProductDefinition", product.Id.ToString(), $"{product.Code} ana ürünü tüm instance'larıyla kalıcı silindi.", actor);
+                db.ProductDefinitions.Remove(product);
+            }
+            else
+            {
+                var instance = await db.MainProductInstances
+                    .Include(item => item.MainProduct)
+                    .FirstOrDefaultAsync(item => item.Id == input.MainProductInstanceId, cancellationToken)
+                    ?? throw new InvalidOperationException("Ana ürün instance kaydı bulunamadı.");
+
+                AddAudit("DeleteMainProductInstance", "MainProductInstance", instance.Id.ToString(), $"{instance.MainProduct.Code} {instance.Year}/{instance.Term} instance kaydı silindi.", actor);
+                db.MainProductInstances.Remove(instance);
+            }
         }
         else
         {
-            var product = await db.SubProducts.FirstOrDefaultAsync(item => item.Id == input.ProductId, cancellationToken)
-                ?? throw new InvalidOperationException("Alt ürün bulunamadı.");
+            if (deleteAll)
+            {
+                var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.ProductId && item.Type == ProductType.Sub, cancellationToken)
+                    ?? throw new InvalidOperationException("Alt ürün tanımı bulunamadı.");
 
-            AddAudit("DeleteSubProduct", "SubProduct", product.Id.ToString(), $"{product.Code} alt ürünü kalıcı silindi.", actor);
-            db.SubProducts.Remove(product);
+                AddAudit("DeleteSubProductDefinition", "ProductDefinition", product.Id.ToString(), $"{product.Code} alt ürünü tüm instance'larıyla kalıcı silindi.", actor);
+                db.ProductDefinitions.Remove(product);
+            }
+            else
+            {
+                var instance = await db.SubProductInstances
+                    .Include(item => item.SubProduct)
+                    .FirstOrDefaultAsync(item => item.Id == input.SubProductInstanceId, cancellationToken)
+                    ?? throw new InvalidOperationException("Alt ürün instance kaydı bulunamadı.");
+
+                AddAudit("DeleteSubProductInstance", "SubProductInstance", instance.Id.ToString(), $"{instance.SubProduct.Code} alt ürün instance kaydı silindi.", actor);
+                db.SubProductInstances.Remove(instance);
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private async Task<string> ResolveCodeAsync(ProductType type, string codeMode, string? manualCode, int? mainProductId, CancellationToken cancellationToken)
+    private async Task<ProductDefinition> GetOrCreateProductDefinitionAsync(ProductType type, string code, string name, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Type == type && item.Code == code, cancellationToken);
+        if (product is not null)
+        {
+            if (!product.IsActive)
+            {
+                throw new InvalidOperationException($"Pasif {ProductTypeName(type)} kullanılamaz.");
+            }
+
+            return product;
+        }
+
+        product = new ProductDefinition
+        {
+            Type = type,
+            Code = code,
+            Name = name.Trim(),
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        db.ProductDefinitions.Add(product);
+        await db.SaveChangesAsync(cancellationToken);
+        return product;
+    }
+
+    private async Task<string> ResolveCodeAsync(ProductType type, string codeMode, string? manualCode, int? mainProductInstanceId, CancellationToken cancellationToken)
     {
         var code = codeMode.Equals("Manual", StringComparison.OrdinalIgnoreCase)
             ? codeService.NormalizeCode(manualCode ?? string.Empty)
-            : await codeService.GenerateNextCodeAsync(type, mainProductId, cancellationToken);
+            : await codeService.GenerateNextCodeAsync(type, mainProductInstanceId, cancellationToken);
 
         if (!codeService.IsValidCode(code))
         {
@@ -220,11 +275,32 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         return code;
     }
 
+    private string ResolveOptionalCode(string? code, string fallbackCode)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return fallbackCode;
+        }
+
+        var normalized = codeService.NormalizeCode(code);
+        if (!codeService.IsValidCode(normalized))
+        {
+            throw new InvalidOperationException("Ürün kodu 2 karakter alfanumerik olmalı.");
+        }
+
+        return normalized;
+    }
+
     private static InvalidOperationException DuplicateCodeException(string code, string? suggestion)
     {
         return new InvalidOperationException(suggestion is null
-            ? "Boş 2 karakterli kod kalmadı."
-            : $"{code} kodu dolu. En yakın uygun kod: {suggestion}.");
+            ? "Bu ana ürün altında boş 2 karakterli alt ürün kodu kalmadı."
+            : $"{code} kodu bu ana ürün instance'ında zaten bağlı. En yakın uygun kod: {suggestion}.");
+    }
+
+    private static string ProductTypeName(ProductType type)
+    {
+        return type == ProductType.Main ? "ana ürün" : "alt ürün";
     }
 
     private void AddAudit(string action, string entityName, string entityKey, string description, string actor)
@@ -240,20 +316,22 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         });
     }
 
-    private static ProductRowViewModel ToRow(MainProduct mainProduct, SubProduct? subProduct)
+    private static ProductRowViewModel ToRow(MainProductInstance mainInstance, SubProductInstance? subInstance)
     {
         return new ProductRowViewModel
         {
-            MainProductId = mainProduct.Id,
-            SubProductId = subProduct?.Id,
-            Year = mainProduct.Year,
-            Term = mainProduct.Term,
-            MainProductCode = mainProduct.Code,
-            MainProductName = mainProduct.Name,
-            MainProductActive = mainProduct.IsActive,
-            SubProductCode = subProduct?.Code,
-            SubProductName = subProduct?.Name,
-            SubProductActive = subProduct?.IsActive
+            MainProductId = mainInstance.MainProductId,
+            MainProductInstanceId = mainInstance.Id,
+            SubProductId = subInstance?.SubProductId,
+            SubProductInstanceId = subInstance?.Id,
+            Year = mainInstance.Year,
+            Term = mainInstance.Term,
+            MainProductCode = mainInstance.MainProduct.Code,
+            MainProductName = mainInstance.MainProduct.Name,
+            MainProductActive = mainInstance.MainProduct.IsActive,
+            SubProductCode = subInstance?.SubProduct.Code,
+            SubProductName = subInstance?.SubProduct.Name,
+            SubProductActive = subInstance?.SubProduct.IsActive
         };
     }
 }

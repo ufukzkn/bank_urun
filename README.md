@@ -1,8 +1,8 @@
 # Bank Ürün Yönetimi
 
-ASP.NET Core MVC + PostgreSQL ile ana ürün ve ana ürüne bağlı alt ürün kayıtlarını yöneten küçük bir web uygulaması.
+ASP.NET Core MVC + PostgreSQL ile ana ürün, alt ürün ve dönem bazlı bağlantıları yöneten küçük bir web uygulaması.
 
-## Çalıştırma
+## Docker ile Çalıştırma
 
 ```powershell
 dotnet tool restore
@@ -13,11 +13,81 @@ dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:51
 
 Uygulama: `http://localhost:5188`
 
+## Docker Olmadan Çalıştırma
+
+Bu seçenek için bilgisayarda PostgreSQL kurulu ve servis olarak çalışıyor olmalı. Varsayılan connection string:
+
+```text
+Host=localhost;Port=5432;Database=bank_urun;Username=bank_urun;Password=bank_urun
+```
+
+PostgreSQL içinde kullanıcı ve database yoksa önce şunu çalıştır:
+
+```powershell
+psql -U postgres -d postgres -c "create user bank_urun with password 'bank_urun';" -c "create database bank_urun owner bank_urun;"
+```
+
+Sonra projeyi çalıştır:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj
+dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
+```
+
+Tek komut halinde çalıştırmak istersen:
+
+```powershell
+dotnet tool restore; dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj; dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
+```
+
+## Portable PostgreSQL ile Çalıştırma
+
+Şirket bilgisayarında admin yetkisi yoksa Docker veya PostgreSQL installer çoğu zaman çalışmaz. Bu durumda PostgreSQL'in ZIP binary paketini kullanıcı klasöründen portable olarak çalıştırabilirsin.
+
+1. PostgreSQL Windows x86-64 ZIP binaries paketini indir:
+   - Resmi EDB sayfası: https://www.enterprisedb.com/download-postgresql-binaries
+   - PostgreSQL 17.x Windows x86-64 ZIP dosyasını indir.
+
+2. Repo klasöründe şu komutu çalıştır:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgZipPath "$env:USERPROFILE\Downloads\postgresql-17.x-x-windows-x64-binaries.zip" -Seed
+```
+
+ZIP dosyasını daha önce açtıysan `-PgRoot` ile klasörü göster:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgRoot "$env:USERPROFILE\Tools\postgresql"
+```
+
+Bu script şunları yapar:
+
+- Portable PostgreSQL'i `.tools\postgres` altına çıkarır.
+- Data klasörünü `.data\postgres` altında oluşturur.
+- PostgreSQL'i servis kurmadan process olarak başlatır.
+- `bank_urun` user/database oluşturur.
+- EF migration uygular.
+- İstersen `-Seed` ile mock veriyi yükler.
+- Uygulamayı `http://localhost:5188` adresinde başlatır.
+
+Portable PostgreSQL'i durdurmak için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Stop-PortablePostgres.ps1
+```
+
 ## Mock Veri
 
 ```powershell
 docker cp scripts\seed-mock-data.sql bank_urun_postgres:/tmp/seed-mock-data.sql
 docker exec bank_urun_postgres psql -U bank_urun -d bank_urun -f /tmp/seed-mock-data.sql
+```
+
+Docker olmadan mock veri yüklemek için:
+
+```powershell
+psql -U bank_urun -d bank_urun -f scripts\seed-mock-data.sql
 ```
 
 ## pgAdmin Bağlantısı
@@ -38,10 +108,14 @@ Not: pgAdmin kendi bilgisayarında uygulama olarak çalışıyorsa host `localho
 
 ## Temel Kurallar
 
-- Ana tablo yapısı `main_products`, `sub_products` ve `audit_logs` şeklindedir.
-- Ana ürün yıl/dönem bilgisini kendi üzerinde taşır.
-- Alt ürün `main_product_id` foreign key'i ile ana ürüne bağlanır; alt ürünün yıl/dönemi bağlı olduğu ana üründen gelir.
+- Ana/alt ürün kod-ad tanımları `product_definitions` tablosunda tutulur.
+- Ana ürünün yıl/dönem varlığı `main_product_instances` tablosunda tutulur.
+- Alt ürünün ana ürün instance'ını beslemesi `sub_product_instances` tablosunda tutulur.
+- Ürün adı veya kodu değişince tek tanım satırı güncellenir; dönem ve bağlantı satırları yeni bilgiyi join ile görür.
 - Ürün kodları 2 karakterli alfanumeriktir.
-- Ana ürün kodları otomatik üretimde tekrar etmez.
-- Alt ürün kodu aynı ana ürün altında tekrar etmez; farklı ana ürünlerin altında aynı alt ürün kodu kullanılabilir.
-- Pasifleştirme veriyi saklar; kalıcı silme ilişkili kayıtları temizler ve audit log yazar.
+- Ürün kodu `(product_type, code)` bazında benzersizdir.
+- `main_product_instances.main_product_type = 'Main'` ve composite foreign key ile yalnızca ana ürün tanımına bağlanabilir.
+- `sub_product_instances.sub_product_type = 'Sub'` ve composite foreign key ile yalnızca alt ürün tanımına bağlanabilir.
+- Aynı alt ürün birden fazla ana ürün dönemine bağlanabilir.
+- Seçili instance silme sadece dönem/bağlantı satırını kaldırır; tüm tablodan silme tanım satırını ve ilişkilerini kaldırır.
+- Pasifleştirme tanım satırını pasif yapar ve audit log yazar.

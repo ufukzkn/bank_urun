@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BankUrun.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260707134511_InitialCreate")]
+    [Migration("20260707192525_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -75,7 +75,7 @@ namespace BankUrun.Web.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.MainProduct", b =>
+            modelBuilder.Entity("BankUrun.Web.Models.MainProductInstance", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -84,39 +84,25 @@ namespace BankUrun.Web.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)")
-                        .HasColumnName("code");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
+                    b.Property<int>("MainProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("main_product_id");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("MainProductType")
                         .IsRequired()
-                        .HasMaxLength(180)
-                        .HasColumnType("character varying(180)")
-                        .HasColumnName("name");
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("main_product_type");
 
                     b.Property<int>("Term")
                         .HasColumnType("integer")
                         .HasColumnName("term");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
 
                     b.Property<int>("Year")
                         .HasColumnType("integer")
@@ -124,22 +110,22 @@ namespace BankUrun.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code", "Year", "Term")
+                    b.HasIndex("MainProductId", "MainProductType");
+
+                    b.HasIndex("MainProductId", "Year", "Term")
                         .IsUnique();
 
-                    b.ToTable("main_products", null, t =>
+                    b.ToTable("main_product_instances", null, t =>
                         {
-                            t.HasCheckConstraint("ck_main_products_code_format", "code ~ '^[A-Z0-9]{2}$'");
+                            t.HasCheckConstraint("ck_main_product_instances_term_range", "term between 1 and 12");
 
-                            t.HasCheckConstraint("ck_main_products_name_not_blank", "length(btrim(name)) > 0");
+                            t.HasCheckConstraint("ck_main_product_instances_type", "main_product_type = 'Main'");
 
-                            t.HasCheckConstraint("ck_main_products_term_range", "term between 1 and 12");
-
-                            t.HasCheckConstraint("ck_main_products_year_range", "year between 2000 and 2100");
+                            t.HasCheckConstraint("ck_main_product_instances_year_range", "year between 2000 and 2100");
                         });
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.SubProduct", b =>
+            modelBuilder.Entity("BankUrun.Web.Models.ProductDefinition", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -166,15 +152,17 @@ namespace BankUrun.Web.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
-                    b.Property<int>("MainProductId")
-                        .HasColumnType("integer")
-                        .HasColumnName("main_product_id");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(180)
                         .HasColumnType("character varying(180)")
                         .HasColumnName("name");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("product_type");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -184,31 +172,103 @@ namespace BankUrun.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MainProductId", "Code")
+                    b.HasIndex("Type", "Code")
                         .IsUnique();
 
-                    b.ToTable("sub_products", null, t =>
+                    b.ToTable("product_definitions", null, t =>
                         {
-                            t.HasCheckConstraint("ck_sub_products_code_format", "code ~ '^[A-Z0-9]{2}$'");
+                            t.HasCheckConstraint("ck_product_definitions_code_format", "code ~ '^[A-Z0-9]{2}$'");
 
-                            t.HasCheckConstraint("ck_sub_products_name_not_blank", "length(btrim(name)) > 0");
+                            t.HasCheckConstraint("ck_product_definitions_name_not_blank", "length(btrim(name)) > 0");
+
+                            t.HasCheckConstraint("ck_product_definitions_type", "product_type in ('Main', 'Sub')");
                         });
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.SubProduct", b =>
+            modelBuilder.Entity("BankUrun.Web.Models.SubProductInstance", b =>
                 {
-                    b.HasOne("BankUrun.Web.Models.MainProduct", "MainProduct")
-                        .WithMany("SubProducts")
-                        .HasForeignKey("MainProductId")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("MainProductInstanceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("main_product_instance_id");
+
+                    b.Property<int>("SubProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_product_id");
+
+                    b.Property<string>("SubProductType")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("sub_product_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MainProductInstanceId", "SubProductId")
+                        .IsUnique();
+
+                    b.HasIndex("SubProductId", "SubProductType");
+
+                    b.ToTable("sub_product_instances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sub_product_instances_type", "sub_product_type = 'Sub'");
+                        });
+                });
+
+            modelBuilder.Entity("BankUrun.Web.Models.MainProductInstance", b =>
+                {
+                    b.HasOne("BankUrun.Web.Models.ProductDefinition", "MainProduct")
+                        .WithMany("MainProductInstances")
+                        .HasForeignKey("MainProductId", "MainProductType")
+                        .HasPrincipalKey("Id", "Type")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("MainProduct");
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.MainProduct", b =>
+            modelBuilder.Entity("BankUrun.Web.Models.SubProductInstance", b =>
                 {
-                    b.Navigation("SubProducts");
+                    b.HasOne("BankUrun.Web.Models.MainProductInstance", "MainProductInstance")
+                        .WithMany("SubProductInstances")
+                        .HasForeignKey("MainProductInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BankUrun.Web.Models.ProductDefinition", "SubProduct")
+                        .WithMany("SubProductInstances")
+                        .HasForeignKey("SubProductId", "SubProductType")
+                        .HasPrincipalKey("Id", "Type")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MainProductInstance");
+
+                    b.Navigation("SubProduct");
+                });
+
+            modelBuilder.Entity("BankUrun.Web.Models.MainProductInstance", b =>
+                {
+                    b.Navigation("SubProductInstances");
+                });
+
+            modelBuilder.Entity("BankUrun.Web.Models.ProductDefinition", b =>
+                {
+                    b.Navigation("MainProductInstances");
+
+                    b.Navigation("SubProductInstances");
                 });
 #pragma warning restore 612, 618
         }

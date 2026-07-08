@@ -1,15 +1,15 @@
 namespace BankUrun.Web.Models;
 
-public class MainProduct
+public class ProductDefinition
 {
     public int Id { get; set; }
+    public ProductType Type { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public int Year { get; set; }
-    public int Term { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
-    public ICollection<SubProduct> SubProducts { get; set; } = new List<SubProduct>();
+    public ICollection<MainProductInstance> MainProductInstances { get; set; } = new List<MainProductInstance>();
+    public ICollection<SubProductInstance> SubProductInstances { get; set; } = new List<SubProductInstance>();
 }

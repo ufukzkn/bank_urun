@@ -12,7 +12,9 @@ public class ProductIndexViewModel
 public class ProductRowViewModel
 {
     public int MainProductId { get; set; }
+    public int MainProductInstanceId { get; set; }
     public int? SubProductId { get; set; }
+    public int? SubProductInstanceId { get; set; }
     public int Year { get; set; }
     public int Term { get; set; }
     public string MainProductCode { get; set; } = string.Empty;
@@ -26,6 +28,7 @@ public class ProductRowViewModel
 public class MainProductOptionViewModel
 {
     public int Id { get; set; }
+    public int MainProductId { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public int Year { get; set; }
@@ -57,7 +60,7 @@ public class CreateProductInput
     [Range(1, 12)]
     public int? Term { get; set; }
 
-    public int? MainProductId { get; set; }
+    public int? MainProductInstanceId { get; set; }
 }
 
 public class RenameProductInput
@@ -67,6 +70,10 @@ public class RenameProductInput
 
     [Required]
     public ProductType Type { get; set; }
+
+    [StringLength(2, MinimumLength = 2)]
+    [RegularExpression("^[A-Za-z0-9]{2}$", ErrorMessage = "Kod 2 karakter alfanumerik olmalı.")]
+    public string? Code { get; set; }
 
     [Required]
     [StringLength(180, MinimumLength = 2)]
@@ -80,4 +87,10 @@ public class ProductIdInput
 
     [Required]
     public ProductType Type { get; set; }
+
+    public int? MainProductInstanceId { get; set; }
+
+    public int? SubProductInstanceId { get; set; }
+
+    public string DeleteScope { get; set; } = "Single";
 }

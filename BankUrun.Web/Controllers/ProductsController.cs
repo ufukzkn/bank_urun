@@ -40,7 +40,7 @@ public class ProductsController(IProductManagementService productService, IProdu
     {
         if (!ModelState.IsValid)
         {
-            TempData["Error"] = "Ürün adı en az 2 karakter olmalı.";
+            TempData["Error"] = "Ürün kodu ve adını kontrol edin.";
             return Redirect("~/");
         }
 
@@ -68,7 +68,7 @@ public class ProductsController(IProductManagementService productService, IProdu
     }
 
     [HttpGet("/code-suggestion")]
-    public async Task<IActionResult> SuggestCode(ProductType type, string code, int? mainProductId, CancellationToken cancellationToken)
+    public async Task<IActionResult> SuggestCode(ProductType type, string code, int? mainProductInstanceId, CancellationToken cancellationToken)
     {
         if (!codeService.IsValidCode(code))
         {
@@ -76,7 +76,7 @@ public class ProductsController(IProductManagementService productService, IProdu
         }
 
         var normalized = codeService.NormalizeCode(code);
-        var suggestion = await codeService.SuggestCodeAsync(type, normalized, mainProductId, cancellationToken);
+        var suggestion = await codeService.SuggestCodeAsync(type, normalized, mainProductInstanceId, cancellationToken);
         return Json(new
         {
             valid = suggestion is not null,
