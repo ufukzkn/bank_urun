@@ -1,0 +1,224 @@
+@model BankUrun.Web.ViewModels.ScoreIndexViewModel
+
+@{
+    ViewData["Title"] = "Puanlar";
+    string Fmt(decimal value) => value.ToString("0.####");
+}
+
+<section class="page-title">
+    <div>
+        <h1>Puanlar</h1>
+        <p>Grup bazlı alt ürün puan, hedef ve pay parametreleri.</p>
+    </div>
+</section>
+
+<section class="surface-panel create-panel score-create-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Puan satırı oluştur</h2>
+            <p>Grup ve alt ürün instance seçerek parametreleri kaydedin.</p>
+        </div>
+    </div>
+    <form asp-action="CreateScore" method="post" class="stack-form combo-required-form">
+        @Html.AntiForgeryToken()
+        <div class="form-row">
+            <label>
+                <span>Grup</span>
+                <div class="combo generic-combo">
+                    <input class="form-control combobox-input" type="search" placeholder="Grup no veya adı ara" autocomplete="off" data-combo-input />
+                    <div class="combo-menu" role="listbox">
+                        @foreach (var group in Model.Groups)
+                        {
+                            <button class="combo-option" type="button" role="option" data-combo-option data-id="@group.Id" data-label="@group.Label">
+                                <strong>@group.GroupNo</strong>
+                                <span>@group.Name</span>
+                                <small>Grup</small>
+                            </button>
+                        }
+                        <div class="combo-empty">Uygun grup yok</div>
+                    </div>
+                    <input type="hidden" name="GroupId" data-combo-value data-combo-required="Grup seçmelisiniz." />
+                </div>
+            </label>
+            <label>
+                <span>Alt ürün instance</span>
+                <div class="combo generic-combo">
+                    <input class="form-control combobox-input" type="search" placeholder="Yıl, dönem, ana kod veya alt ürün ara" autocomplete="off" data-combo-input />
+                    <div class="combo-menu wide-combo-menu" role="listbox">
+                        @foreach (var product in Model.SubProductInstances)
+                        {
+                            <button class="combo-option product-combo-option" type="button" role="option" data-combo-option data-id="@product.Id" data-label="@product.Label">
+                                <strong>@product.MainProductCode/@product.SubProductCode</strong>
+                                <span>@product.SubProductName</span>
+                                <small>@product.Year/@product.Term</small>
+                            </button>
+                        }
+                        <div class="combo-empty">Uygun alt ürün yok</div>
+                    </div>
+                    <input type="hidden" name="SubProductInstanceId" data-combo-value data-combo-required="Alt ürün instance seçmelisiniz." />
+                </div>
+            </label>
+        </div>
+        <div class="form-row score-fields">
+            <label>
+                <span>Puan</span>
+                <input class="form-control decimal-input" name="Score" inputmode="decimal" value="0" required />
+            </label>
+            <label>
+                <span>Hedef</span>
+                <input class="form-control decimal-input" name="TargetValue" inputmode="decimal" value="0" required />
+            </label>
+            <label>
+                <span>HGO payı</span>
+                <input class="form-control decimal-input" name="HgoShare" inputmode="decimal" value="0" required />
+            </label>
+            <label>
+                <span>Gelişim payı</span>
+                <input class="form-control decimal-input" name="DevelopmentShare" inputmode="decimal" value="0" required />
+            </label>
+            <label>
+                <span>Büyüklük payı</span>
+                <input class="form-control decimal-input" name="SizeShare" inputmode="decimal" value="0" required />
+            </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Puan oluştur</button>
+    </form>
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success action-alert" role="alert">@success</div>
+    }
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger action-alert" role="alert">@error</div>
+    }
+</section>
+
+<section class="score-summary-grid" id="scoreSummary">
+    <div class="score-summary-card">
+        <span>Toplam puan</span>
+        <strong id="totalScore">@Fmt(Model.TotalScore)</strong>
+    </div>
+    <div class="score-summary-card">
+        <span>Toplam hedef</span>
+        <strong id="totalTarget">@Fmt(Model.TotalTarget)</strong>
+    </div>
+    <div class="score-summary-card">
+        <span>Kayıt</span>
+        <strong id="scoreCount">@Model.Scores.Count</strong>
+    </div>
+</section>
+
+<section class="surface-panel table-panel">
+    <div class="table-toolbar score-toolbar">
+        <label class="toolbar-search">
+            <span>Puan listesinde ara</span>
+            <input class="form-control score-filter" type="search" id="scoreSearch" placeholder="Grup, ürün, kod veya dönem" />
+        </label>
+        <label>
+            <span>Yıl</span>
+            <input class="form-control score-filter" type="number" id="scoreYear" min="2000" max="2100" />
+        </label>
+        <label>
+            <span>Dönem</span>
+            <input class="form-control score-filter" type="number" id="scoreTerm" min="1" max="12" />
+        </label>
+    </div>
+    <div class="table-responsive">
+        <table class="table product-table score-table">
+            <thead>
+                <tr>
+                    <th>Yıl</th>
+                    <th>Dönem</th>
+                    <th>Grup</th>
+                    <th>Ana kod</th>
+                    <th>Alt kod</th>
+                    <th>Alt ürün adı</th>
+                    <th class="text-end">Puan</th>
+                    <th class="text-end">Hedef</th>
+                    <th class="text-end">HGO</th>
+                    <th class="text-end">Gelişim</th>
+                    <th class="text-end">Büyüklük</th>
+                    <th class="text-end">İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+            @if (Model.Scores.Count == 0)
+            {
+                <tr>
+                    <td colspan="12" class="empty-cell">Puan satırı yok</td>
+                </tr>
+            }
+            @foreach (var score in Model.Scores)
+            {
+                var search = $"{score.Year} {score.Term} {score.GroupNo} {score.GroupName} {score.MainProductCode} {score.MainProductName} {score.SubProductCode} {score.SubProductName}".ToUpperInvariant();
+                <tr class="score-row"
+                    data-search="@search"
+                    data-year="@score.Year"
+                    data-term="@score.Term"
+                    data-score="@score.Score"
+                    data-target="@score.TargetValue">
+                    <td>@score.Year</td>
+                    <td>@score.Term</td>
+                    <td><strong>@score.GroupNo</strong><small>@score.GroupName</small></td>
+                    <td><strong>@score.MainProductCode</strong><small>@score.MainProductName</small></td>
+                    <td><strong>@score.SubProductCode</strong></td>
+                    <td>@score.SubProductName</td>
+                    <td class="text-end">@Fmt(score.Score)</td>
+                    <td class="text-end">@Fmt(score.TargetValue)</td>
+                    <td class="text-end">@Fmt(score.HgoShare)</td>
+                    <td class="text-end">@Fmt(score.DevelopmentShare)</td>
+                    <td class="text-end">@Fmt(score.SizeShare)</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id">Düzenle</button>
+                    </td>
+                </tr>
+                <tr class="score-actions-row">
+                    <td colspan="12">
+                        <div class="collapse" id="score-actions-@score.Id">
+                            <div class="actions-panel">
+                                <form asp-action="UpdateScore" method="post" class="inline-form score-edit-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@score.Id" />
+                                    <input type="hidden" name="GroupId" value="@score.GroupId" />
+                                    <input type="hidden" name="SubProductInstanceId" value="@score.SubProductInstanceId" />
+                                    <label>
+                                        <span>Puan</span>
+                                        <input class="form-control form-control-sm decimal-input" name="Score" inputmode="decimal" value="@Fmt(score.Score)" />
+                                    </label>
+                                    <label>
+                                        <span>Hedef</span>
+                                        <input class="form-control form-control-sm decimal-input" name="TargetValue" inputmode="decimal" value="@Fmt(score.TargetValue)" />
+                                    </label>
+                                    <label>
+                                        <span>HGO</span>
+                                        <input class="form-control form-control-sm decimal-input" name="HgoShare" inputmode="decimal" value="@Fmt(score.HgoShare)" />
+                                    </label>
+                                    <label>
+                                        <span>Gelişim</span>
+                                        <input class="form-control form-control-sm decimal-input" name="DevelopmentShare" inputmode="decimal" value="@Fmt(score.DevelopmentShare)" />
+                                    </label>
+                                    <label>
+                                        <span>Büyüklük</span>
+                                        <input class="form-control form-control-sm decimal-input" name="SizeShare" inputmode="decimal" value="@Fmt(score.SizeShare)" />
+                                    </label>
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Puan satırını güncellemek istediğinize emin misiniz?">Güncelle</button>
+                                </form>
+                                <form asp-action="DeleteScore" method="post" class="button-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@score.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Puan satırını silmek istediğinize emin misiniz?">Sil</button>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+            <tr id="noScoreRows" class="empty-row d-none">
+                <td colspan="12" class="empty-cell">Filtreye uygun puan satırı yok</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>

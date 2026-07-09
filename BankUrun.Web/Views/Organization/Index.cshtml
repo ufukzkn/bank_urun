@@ -1,0 +1,363 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.OrganizationIndexViewModel
+
+@{
+    ViewData["Title"] = "Organizasyon";
+}
+
+<section class="page-title">
+    <div>
+        <h1>Organizasyon</h1>
+        <p>Grup, şube, birim ve bağlantılarını yönetin.</p>
+    </div>
+</section>
+
+<section class="management-grid">
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Grup</h2>
+                <p>Grup no ve ad tanımı.</p>
+            </div>
+        </div>
+        <form asp-action="CreateGroup" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label>
+                    <span>Grup no</span>
+                    <input class="form-control code-input" name="GroupNo" maxlength="24" required />
+                </label>
+                <label>
+                    <span>Grup adı</span>
+                    <input class="form-control" name="Name" maxlength="180" required />
+                </label>
+            </div>
+            <button class="btn btn-primary" type="submit">Grup oluştur</button>
+        </form>
+    </div>
+
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Birim</h2>
+                <p>Birim no ve ad tanımı.</p>
+            </div>
+        </div>
+        <form asp-action="CreateUnit" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label>
+                    <span>Birim no</span>
+                    <input class="form-control code-input" name="UnitNo" maxlength="24" required />
+                </label>
+                <label>
+                    <span>Birim adı</span>
+                    <input class="form-control" name="Name" maxlength="180" required />
+                </label>
+            </div>
+            <button class="btn btn-primary" type="submit">Birim oluştur</button>
+        </form>
+    </div>
+
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Şube</h2>
+                <p>Kod, ad ve şube türü.</p>
+            </div>
+        </div>
+        <form asp-action="CreateBranch" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label>
+                    <span>Şube kodu</span>
+                    <input class="form-control code-input" name="BranchCode" maxlength="24" required />
+                </label>
+                <label>
+                    <span>Şube türü</span>
+                    <select class="form-select" name="BranchType" required>
+                        <option value="@BranchType.Karma">Karma</option>
+                        <option value="@BranchType.Kurumsal">Kurumsal</option>
+                        <option value="@BranchType.Ticari">Ticari</option>
+                    </select>
+                </label>
+            </div>
+            <label>
+                <span>Şube adı</span>
+                <input class="form-control" name="Name" maxlength="180" required />
+            </label>
+            <button class="btn btn-primary" type="submit">Şube oluştur</button>
+        </form>
+    </div>
+</section>
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success action-alert" role="alert">@success</div>
+}
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger action-alert" role="alert">@error</div>
+}
+
+<section class="management-grid links-grid">
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Grup-birim bağı</h2>
+                <p>Bir birimi bir gruba bağlayın.</p>
+            </div>
+        </div>
+        <form asp-action="AddGroupUnit" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label>
+                    <span>Grup</span>
+                    <select class="form-select searchable-native" name="GroupId" required>
+                        @foreach (var group in Model.Groups)
+                        {
+                            <option value="@group.Id">@group.Label</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Birim</span>
+                    <select class="form-select searchable-native" name="UnitId" required>
+                        @foreach (var unit in Model.Units)
+                        {
+                            <option value="@unit.Id">@unit.Label</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <button class="btn btn-outline-primary" type="submit">Bağlantı ekle</button>
+        </form>
+    </div>
+
+    <div class="surface-panel create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Şube-birim bağı</h2>
+                <p>Bir birimi bir şubeye bağlayın.</p>
+            </div>
+        </div>
+        <form asp-action="AddBranchUnit" method="post" class="stack-form">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label>
+                    <span>Şube</span>
+                    <select class="form-select searchable-native" name="BranchId" required>
+                        @foreach (var branch in Model.Branches)
+                        {
+                            <option value="@branch.Id">@branch.Label</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Birim</span>
+                    <select class="form-select searchable-native" name="UnitId" required>
+                        @foreach (var unit in Model.Units)
+                        {
+                            <option value="@unit.Id">@unit.Label</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <button class="btn btn-outline-primary" type="submit">Bağlantı ekle</button>
+        </form>
+    </div>
+</section>
+
+<section class="surface-panel table-panel">
+    <div class="table-toolbar simple-toolbar">
+        <label class="toolbar-search">
+            <span>Organizasyon içinde ara</span>
+            <input class="form-control live-table-filter" type="search" data-target=".organization-row" placeholder="Grup, birim, şube kodu veya adı" />
+        </label>
+    </div>
+
+    <div class="org-section">
+        <h2>Gruplar</h2>
+        <div class="table-responsive">
+            <table class="table product-table">
+                <thead>
+                    <tr>
+                        <th>Grup no</th>
+                        <th>Ad</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var group in Model.Groups)
+                    {
+                        <tr class="organization-row" data-search="@($"{group.GroupNo} {group.Name}".ToUpperInvariant())">
+                            <td><strong>@group.GroupNo</strong></td>
+                            <td>@group.Name</td>
+                            <td class="text-end">
+                                <form asp-action="UpdateGroup" method="post" class="inline-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@group.Id" />
+                                    <input class="form-control form-control-sm code-edit-input wide-code" name="GroupNo" value="@group.GroupNo" maxlength="24" />
+                                    <input class="form-control form-control-sm" name="Name" value="@group.Name" maxlength="180" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Grubu güncellemek istediğinize emin misiniz?">Güncelle</button>
+                                </form>
+                                <form asp-action="DeleteGroup" method="post" class="button-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@group.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Grubu silmek istediğinize emin misiniz? Bağlantıları ve puanları da silinir.">Sil</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="org-section">
+        <h2>Birimler</h2>
+        <div class="table-responsive">
+            <table class="table product-table">
+                <thead>
+                    <tr>
+                        <th>Birim no</th>
+                        <th>Ad</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var unit in Model.Units)
+                    {
+                        <tr class="organization-row" data-search="@($"{unit.UnitNo} {unit.Name}".ToUpperInvariant())">
+                            <td><strong>@unit.UnitNo</strong></td>
+                            <td>@unit.Name</td>
+                            <td class="text-end">
+                                <form asp-action="UpdateUnit" method="post" class="inline-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@unit.Id" />
+                                    <input class="form-control form-control-sm code-edit-input wide-code" name="UnitNo" value="@unit.UnitNo" maxlength="24" />
+                                    <input class="form-control form-control-sm" name="Name" value="@unit.Name" maxlength="180" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Birimi güncellemek istediğinize emin misiniz?">Güncelle</button>
+                                </form>
+                                <form asp-action="DeleteUnit" method="post" class="button-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@unit.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Birimi silmek istediğinize emin misiniz? Bağlantıları da silinir.">Sil</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="org-section">
+        <h2>Şubeler</h2>
+        <div class="table-responsive">
+            <table class="table product-table">
+                <thead>
+                    <tr>
+                        <th>Şube kodu</th>
+                        <th>Ad</th>
+                        <th>Tür</th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var branch in Model.Branches)
+                    {
+                        <tr class="organization-row" data-search="@($"{branch.BranchCode} {branch.Name} {branch.BranchType}".ToUpperInvariant())">
+                            <td><strong>@branch.BranchCode</strong></td>
+                            <td>@branch.Name</td>
+                            <td><span class="status-pill neutral">@branch.BranchType</span></td>
+                            <td class="text-end">
+                                <form asp-action="UpdateBranch" method="post" class="inline-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@branch.Id" />
+                                    <input class="form-control form-control-sm code-edit-input wide-code" name="BranchCode" value="@branch.BranchCode" maxlength="24" />
+                                    <input class="form-control form-control-sm" name="Name" value="@branch.Name" maxlength="180" />
+                                    <select class="form-select form-select-sm compact-select" name="BranchType">
+                                        <option value="@BranchType.Karma" selected="@(branch.BranchType == BranchType.Karma)">Karma</option>
+                                        <option value="@BranchType.Kurumsal" selected="@(branch.BranchType == BranchType.Kurumsal)">Kurumsal</option>
+                                        <option value="@BranchType.Ticari" selected="@(branch.BranchType == BranchType.Ticari)">Ticari</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Şubeyi güncellemek istediğinize emin misiniz?">Güncelle</button>
+                                </form>
+                                <form asp-action="DeleteBranch" method="post" class="button-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@branch.Id" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Şubeyi silmek istediğinize emin misiniz? Bağlantıları da silinir.">Sil</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="org-section two-column-tables">
+        <div>
+            <h2>Grup-birim bağlantıları</h2>
+            <div class="table-responsive">
+                <table class="table product-table">
+                    <thead>
+                        <tr>
+                            <th>Grup</th>
+                            <th>Birim</th>
+                            <th class="text-end">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var link in Model.GroupUnits)
+                        {
+                            <tr class="organization-row" data-search="@($"{link.GroupNo} {link.GroupName} {link.UnitNo} {link.UnitName}".ToUpperInvariant())">
+                                <td><strong>@link.GroupNo</strong><small>@link.GroupName</small></td>
+                                <td><strong>@link.UnitNo</strong><small>@link.UnitName</small></td>
+                                <td class="text-end">
+                                    <form asp-action="RemoveGroupUnit" method="post" class="button-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@link.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Grup-birim bağlantısını kaldırmak istediğinize emin misiniz?">Kaldır</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div>
+            <h2>Şube-birim bağlantıları</h2>
+            <div class="table-responsive">
+                <table class="table product-table">
+                    <thead>
+                        <tr>
+                            <th>Şube</th>
+                            <th>Birim</th>
+                            <th class="text-end">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var link in Model.BranchUnits)
+                        {
+                            <tr class="organization-row" data-search="@($"{link.BranchCode} {link.BranchName} {link.BranchType} {link.UnitNo} {link.UnitName}".ToUpperInvariant())">
+                                <td><strong>@link.BranchCode</strong><small>@link.BranchName (@link.BranchType)</small></td>
+                                <td><strong>@link.UnitNo</strong><small>@link.UnitName</small></td>
+                                <td class="text-end">
+                                    <form asp-action="RemoveBranchUnit" method="post" class="button-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@link.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Şube-birim bağlantısını kaldırmak istediğinize emin misiniz?">Kaldır</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>

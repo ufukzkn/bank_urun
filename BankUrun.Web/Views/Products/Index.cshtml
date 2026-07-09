@@ -2,9 +2,16 @@
 @model BankUrun.Web.ViewModels.ProductIndexViewModel
 
 @{
-    ViewData["Title"] = "";
+    ViewData["Title"] = "Ürünler";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
 }
+
+<section class="page-title">
+    <div>
+        <h1>Ürünler</h1>
+        <p>Ana ürün, alt ürün ve dönem bağlantıları.</p>
+    </div>
+</section>
 
 <section class="workspace-grid">
     <div class="surface-panel create-panel">

@@ -10,11 +10,6 @@ public class ProductsController(IProductManagementService productService, IProdu
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        if (Request.Path.Value?.Equals("/Products", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            return Redirect("~/");
-        }
-
         var model = await productService.GetIndexAsync(cancellationToken);
         return View(model);
     }
@@ -26,7 +21,7 @@ public class ProductsController(IProductManagementService productService, IProdu
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Ürün bilgilerini kontrol edin.";
-            return Redirect("~/");
+            return RedirectToAction(nameof(Index));
         }
 
         return await ExecuteAndRedirectAsync(
@@ -41,7 +36,7 @@ public class ProductsController(IProductManagementService productService, IProdu
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Ürün kodu ve adını kontrol edin.";
-            return Redirect("~/");
+            return RedirectToAction(nameof(Index));
         }
 
         return await ExecuteAndRedirectAsync(
@@ -101,6 +96,6 @@ public class ProductsController(IProductManagementService productService, IProdu
             TempData["Error"] = ex.Message;
         }
 
-        return Redirect("~/");
+        return RedirectToAction(nameof(Index));
     }
 }

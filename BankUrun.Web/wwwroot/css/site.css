@@ -4,15 +4,68 @@ html {
 }
 
 body {
-  background: #eef2f6;
+  background: #edf3f7;
   color: #172033;
   margin: 0;
+}
+
+.app-header {
+  background: #ffffff;
+  border-bottom: 1px solid #cddce8;
+  box-shadow: 0 6px 22px rgba(0, 83, 137, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+}
+
+.app-header-inner {
+  align-items: center;
+  display: flex;
+  gap: 28px;
+  min-height: 68px;
+}
+
+.brand-mark {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.brand-mark img {
+  display: block;
+  height: 34px;
+  object-fit: contain;
+  width: 176px;
+}
+
+.app-nav {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.app-nav-link {
+  border-radius: 6px;
+  color: #31506b;
+  font-weight: 750;
+  padding: 9px 13px;
+  text-decoration: none;
+}
+
+.app-nav-link:hover {
+  background: #eef7fb;
+  color: #00598f;
+}
+
+.app-nav-link.is-active {
+  background: #00598f;
+  color: #ffffff;
 }
 
 .app-shell {
   max-width: 1220px;
   padding-bottom: 28px;
-  padding-top: 56px;
+  padding-top: 28px;
 }
 
 .workspace-grid {
@@ -473,9 +526,162 @@ label span {
   justify-content: flex-end;
 }
 
+.page-title {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.page-title h1 {
+  color: #003f67;
+  font-size: 1.42rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 4px;
+}
+
+.page-title p {
+  color: #5f7081;
+  margin: 0;
+}
+
+.panel-heading h2,
+.org-section h2 {
+  color: #203246;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0 0 3px;
+}
+
+.status-pill.neutral {
+  background: #e9f6fb;
+  border-color: #bee4f2;
+  color: #00598f;
+}
+
+.inline-form .wide-code {
+  min-width: 90px;
+  width: 90px;
+}
+
+.compact-select {
+  min-width: 110px;
+  width: 110px;
+}
+
+.management-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.links-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.simple-toolbar {
+  grid-template-columns: minmax(240px, 1fr);
+}
+
+.org-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+.org-section + .org-section {
+  margin-top: 18px;
+}
+
+.two-column-tables {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.score-create-panel {
+  margin-bottom: 14px;
+}
+
+.score-fields {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.score-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.score-summary-card {
+  background: #ffffff;
+  border: 1px solid #d3e4ee;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 83, 137, 0.06);
+  padding: 14px 16px;
+}
+
+.score-summary-card span {
+  color: #5f7081;
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.score-summary-card strong {
+  color: #00598f;
+  display: block;
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+
+.score-toolbar {
+  grid-template-columns: minmax(260px, 1fr) minmax(110px, 0.25fr) minmax(110px, 0.25fr);
+}
+
+.score-table {
+  min-width: 1120px;
+}
+
+.score-edit-form {
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.score-edit-form label {
+  margin: 0;
+}
+
+.score-edit-form label span {
+  font-size: 0.72rem;
+}
+
+.score-edit-form .form-control {
+  min-width: 92px;
+  width: 92px;
+}
+
+.wide-combo-menu {
+  min-width: 420px;
+}
+
+.product-combo-option {
+  grid-template-columns: 88px 1fr auto;
+}
+
 @media (max-width: 1080px) {
   .workspace-grid,
-  .table-toolbar {
+  .table-toolbar,
+  .management-grid,
+  .links-grid,
+  .score-fields,
+  .score-summary-grid,
+  .two-column-tables {
     grid-template-columns: 1fr;
   }
 
@@ -483,7 +689,19 @@ label span {
 
 @media (max-width: 720px) {
   .app-shell {
-    padding-top: 24px;
+    padding-top: 20px;
+  }
+
+  .app-header-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 12px;
+    padding-top: 12px;
+  }
+
+  .app-nav {
+    flex-wrap: wrap;
   }
 
   .workspace-grid,
@@ -520,5 +738,9 @@ label span {
     flex: 1;
     min-width: 120px;
     width: auto;
+  }
+
+  .wide-combo-menu {
+    min-width: 0;
   }
 }

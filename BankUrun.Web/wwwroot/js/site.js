@@ -42,6 +42,16 @@ let currentSort = { key: "year", direction: "desc" };
 let pendingForm = null;
 let pendingSubmitter = null;
 
+function parseLocalizedDecimal(value) {
+  return Number((value || "0").toString().replace(",", "."));
+}
+
+function normalizeDecimalInputs(form) {
+  form.querySelectorAll(".decimal-input").forEach((input) => {
+    input.value = input.value.trim().replace(".", ",");
+  });
+}
+
 function toggleManualCode() {
   if (!codeMode || !manualCodeWrap) {
     return;
@@ -373,6 +383,16 @@ function submitPendingForm(deleteScope) {
 
 document.querySelectorAll("form").forEach((form) => {
   form.addEventListener("submit", (event) => {
+    normalizeDecimalInputs(form);
+
+    const missingCombo = Array.from(form.querySelectorAll("[data-combo-required]"))
+      .find((input) => !input.value);
+    if (missingCombo) {
+      event.preventDefault();
+      alert(missingCombo.dataset.comboRequired || "Seçim yapmalısınız.");
+      return;
+    }
+
     if (form.dataset.toastConfirmed === "true") {
       delete form.dataset.toastConfirmed;
       return;
@@ -440,10 +460,72 @@ document.querySelectorAll("#mainProductOptions .combo-option").forEach((option) 
   option.addEventListener("click", () => selectMainProductOption(option));
 });
 
+document.querySelectorAll(".generic-combo").forEach((combo) => {
+  const input = combo.querySelector("[data-combo-input]");
+  const value = combo.querySelector("[data-combo-value]");
+  const options = Array.from(combo.querySelectorAll("[data-combo-option]"));
+
+  function filterOptions() {
+    const query = input?.value.trim().toUpperCase() || "";
+    let visibleCount = 0;
+    options.forEach((option) => {
+      const text = (option.dataset.label || option.textContent || "").toUpperCase();
+      const isVisible = !query || text.includes(query);
+      option.classList.toggle("d-none", !isVisible);
+      if (isVisible) {
+        visibleCount += 1;
+      }
+    });
+    combo.classList.toggle("has-no-results", visibleCount === 0);
+  }
+
+  input?.addEventListener("focus", () => {
+    combo.classList.add("is-open");
+    filterOptions();
+  });
+
+  input?.addEventListener("click", () => {
+    combo.classList.add("is-open");
+    filterOptions();
+  });
+
+  input?.addEventListener("input", () => {
+    if (value) {
+      value.value = "";
+    }
+    combo.classList.add("is-open");
+    filterOptions();
+  });
+
+  input?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      combo.classList.remove("is-open");
+    }
+  });
+
+  options.forEach((option) => {
+    option.addEventListener("click", () => {
+      if (input) {
+        input.value = option.dataset.label || "";
+      }
+      if (value) {
+        value.value = option.dataset.id || "";
+      }
+      combo.classList.remove("is-open");
+    });
+  });
+});
+
 document.addEventListener("click", (event) => {
   if (mainProductCombo && !mainProductCombo.contains(event.target)) {
     closeMainProductCombo();
   }
+
+  document.querySelectorAll(".generic-combo.is-open").forEach((combo) => {
+    if (!combo.contains(event.target)) {
+      combo.classList.remove("is-open");
+    }
+  });
 });
 
 createMainProductSearch?.closest("form")?.addEventListener("submit", (event) => {
@@ -503,6 +585,68 @@ pageJump?.addEventListener("keydown", (event) => {
   }
 });
 
+document.querySelectorAll(".live-table-filter").forEach((input) => {
+  input.addEventListener("input", () => {
+    const query = input.value.trim().toUpperCase();
+    document.querySelectorAll(input.dataset.target || "").forEach((row) => {
+      row.classList.toggle("d-none", query && !(row.dataset.search || "").includes(query));
+    });
+  });
+});
+
+const scoreRows = Array.from(document.querySelectorAll(".score-row"));
+const scoreFilters = Array.from(document.querySelectorAll(".score-filter"));
+const noScoreRows = document.querySelector("#noScoreRows");
+const totalScore = document.querySelector("#totalScore");
+const totalTarget = document.querySelector("#totalTarget");
+const scoreCount = document.querySelector("#scoreCount");
+
+function getScoreActionsRow(row) {
+  return row.nextElementSibling?.classList.contains("score-actions-row") ? row.nextElementSibling : null;
+}
+
+function applyScoreFilters() {
+  const search = document.querySelector("#scoreSearch")?.value.trim().toUpperCase() || "";
+  const year = document.querySelector("#scoreYear")?.value.trim() || "";
+  const term = document.querySelector("#scoreTerm")?.value.trim() || "";
+  let visibleCount = 0;
+  let scoreSum = 0;
+  let targetSum = 0;
+
+  scoreRows.forEach((row) => {
+    const matches = (!search || (row.dataset.search || "").includes(search))
+      && (!year || row.dataset.year === year)
+      && (!term || row.dataset.term === term);
+
+    row.classList.toggle("d-none", !matches);
+    getScoreActionsRow(row)?.classList.toggle("d-none", !matches);
+
+    if (matches) {
+      visibleCount += 1;
+      scoreSum += parseLocalizedDecimal(row.dataset.score);
+      targetSum += parseLocalizedDecimal(row.dataset.target);
+    }
+  });
+
+  if (totalScore) {
+    totalScore.textContent = scoreSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
+  }
+
+  if (totalTarget) {
+    totalTarget.textContent = targetSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
+  }
+
+  if (scoreCount) {
+    scoreCount.textContent = visibleCount.toString();
+  }
+
+  noScoreRows?.classList.toggle("d-none", visibleCount !== 0 || scoreRows.length === 0);
+}
+
+scoreFilters.forEach((input) => {
+  input.addEventListener("input", applyScoreFilters);
+});
+
 codeMode?.addEventListener("change", toggleManualCode);
 manualCode?.addEventListener("input", refreshSuggestion);
 productType?.addEventListener("change", () => {
@@ -510,11 +654,8 @@ productType?.addEventListener("change", () => {
   toggleCreateProductFields();
 });
 
-if (window.location.pathname.toLowerCase() === "/products") {
-  window.history.replaceState(null, "", "/");
-}
-
 toggleManualCode();
 toggleCreateProductFields();
 updateSortButtons();
 applyClientFilters(true);
+applyScoreFilters();
