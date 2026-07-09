@@ -205,8 +205,8 @@ docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
 - Ürün adı veya kodu değişince tek tanım satırı güncellenir; dönem ve bağlantı satırları yeni bilgiyi join ile görür.
 - Ürün kodları 2 karakterli alfanumeriktir.
 - Ürün kodu `(product_type, code)` bazında benzersizdir.
-- `main_product_instances.main_product_type = 'Main'` ve composite foreign key ile yalnızca ana ürün tanımına bağlanabilir.
-- `sub_product_instances.sub_product_type = 'Sub'` ve composite foreign key ile yalnızca alt ürün tanımına bağlanabilir.
+- `main_product_instances.product_definition_type = 'Main'` ve composite foreign key ile yalnızca ana ürün tanımına bağlanabilir.
+- `sub_product_instances.product_definition_type = 'Sub'` ve composite foreign key ile yalnızca alt ürün tanımına bağlanabilir.
 - Aynı alt ürün birden fazla ana ürün dönemine bağlanabilir.
 - Seçili instance silme sadece dönem/bağlantı satırını kaldırır; tüm tablodan silme tanım satırını ve ilişkilerini kaldırır.
 - Pasifleştirme tanım satırını pasif yapar ve audit log yazar.

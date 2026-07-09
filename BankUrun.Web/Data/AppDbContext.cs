@@ -41,19 +41,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).HasColumnName("id");
             entity.Property(item => item.MainProductId).HasColumnName("main_product_id");
-            entity.Property(item => item.MainProductType).HasColumnName("main_product_type").HasConversion<string>().HasMaxLength(12).IsRequired();
+            entity.Property(item => item.ProductDefinitionType).HasColumnName("product_definition_type").HasConversion<string>().HasMaxLength(12).IsRequired();
             entity.Property(item => item.Year).HasColumnName("year").IsRequired();
             entity.Property(item => item.Term).HasColumnName("term").IsRequired();
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.HasIndex(item => new { item.MainProductId, item.Year, item.Term }).IsUnique();
             entity.HasOne(item => item.MainProduct)
                 .WithMany(product => product.MainProductInstances)
-                .HasForeignKey(item => new { item.MainProductId, item.MainProductType })
+                .HasForeignKey(item => new { item.MainProductId, item.ProductDefinitionType })
                 .HasPrincipalKey(product => new { product.Id, product.Type })
                 .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("ck_main_product_instances_type", "main_product_type = 'Main'");
+                table.HasCheckConstraint("ck_main_product_instances_type", "product_definition_type = 'Main'");
                 table.HasCheckConstraint("ck_main_product_instances_year_range", "year between 2000 and 2100");
                 table.HasCheckConstraint("ck_main_product_instances_term_range", "term between 1 and 12");
             });
@@ -66,7 +66,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.Id).HasColumnName("id");
             entity.Property(item => item.MainProductInstanceId).HasColumnName("main_product_instance_id");
             entity.Property(item => item.SubProductId).HasColumnName("sub_product_id");
-            entity.Property(item => item.SubProductType).HasColumnName("sub_product_type").HasConversion<string>().HasMaxLength(12).IsRequired();
+            entity.Property(item => item.ProductDefinitionType).HasColumnName("product_definition_type").HasConversion<string>().HasMaxLength(12).IsRequired();
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.HasIndex(item => new { item.MainProductInstanceId, item.SubProductId }).IsUnique();
             entity.HasOne(item => item.MainProductInstance)
@@ -75,12 +75,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.SubProduct)
                 .WithMany(product => product.SubProductInstances)
-                .HasForeignKey(item => new { item.SubProductId, item.SubProductType })
+                .HasForeignKey(item => new { item.SubProductId, item.ProductDefinitionType })
                 .HasPrincipalKey(product => new { product.Id, product.Type })
                 .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("ck_sub_product_instances_type", "sub_product_type = 'Sub'");
+                table.HasCheckConstraint("ck_sub_product_instances_type", "product_definition_type = 'Sub'");
             });
         });
 

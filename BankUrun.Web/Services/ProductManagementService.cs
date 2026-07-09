@@ -78,7 +78,7 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             var instanceRecord = new MainProductInstance
             {
                 MainProductId = mainProduct.Id,
-                MainProductType = ProductType.Main,
+                ProductDefinitionType = ProductType.Main,
                 Year = year,
                 Term = term,
                 CreatedAt = now
@@ -129,7 +129,7 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         {
             MainProductInstanceId = mainInstance.Id,
             SubProductId = subProduct.Id,
-            SubProductType = ProductType.Sub,
+            ProductDefinitionType = ProductType.Sub,
             CreatedAt = now
         };
 
