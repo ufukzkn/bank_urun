@@ -84,74 +84,54 @@ join (
  and sub_product.code = seed.sub_code
 on conflict (main_product_instance_id, sub_product_id) do nothing;
 
-insert into group_definitions (group_no, name, created_at, updated_at)
+insert into group_definitions (
+  group_no,
+  name,
+  group_segment,
+  is_active,
+  branch_performance_enabled,
+  miy_performance_enabled,
+  scale_enabled,
+  created_at,
+  updated_at
+)
 values
-  ('1001', 'Ankara Karma Grup', now(), now()),
-  ('1002', 'İstanbul Kurumsal Grup', now(), now()),
-  ('1003', 'Ege Ticari Grup', now(), now())
+  ('1001', 'KARMA - 1', 'Karma', true, true, true, true, now(), now()),
+  ('1002', 'KURUMSAL - 1', 'Kurumsal', true, true, true, true, now(), now()),
+  ('1003', 'TICARI - 1', 'Ticari', true, true, true, true, now(), now()),
+  ('1004', 'KOBI - 1', 'Kobi', true, true, true, true, now(), now()),
+  ('1005', 'DIGER - 1', 'Diger', true, true, false, false, now(), now())
 on conflict (group_no) do update
 set
   name = excluded.name,
+  group_segment = excluded.group_segment,
+  is_active = excluded.is_active,
+  branch_performance_enabled = excluded.branch_performance_enabled,
+  miy_performance_enabled = excluded.miy_performance_enabled,
+  scale_enabled = excluded.scale_enabled,
   updated_at = now();
 
-insert into unit_definitions (unit_no, name, created_at, updated_at)
-values
-  ('BIR01', 'Kredi Tahsis Birimi', now(), now()),
-  ('BIR02', 'Mevduat Yönetimi Birimi', now(), now()),
-  ('BIR03', 'Dış İşlemler Birimi', now(), now()),
-  ('BIR04', 'Portföy Yönetimi Birimi', now(), now())
-on conflict (unit_no) do update
-set
-  name = excluded.name,
-  updated_at = now();
-
-insert into branches (branch_code, name, branch_type, created_at, updated_at)
-values
-  ('0601', 'Ankara Merkez Şube', 'Karma', now(), now()),
-  ('3401', 'İstanbul Kurumsal Şube', 'Kurumsal', now(), now()),
-  ('3501', 'İzmir Ticari Şube', 'Ticari', now(), now())
-on conflict (branch_code) do update
-set
-  name = excluded.name,
-  branch_type = excluded.branch_type,
-  updated_at = now();
-
-insert into group_units (group_id, unit_id, created_at)
-select group_definition.id, unit_definition.id, now()
+insert into branches (group_id, branch_code, name, created_at, updated_at)
+select group_definition.id, seed.branch_code, seed.name, now(), now()
 from (
   values
-    ('1001', 'BIR01'),
-    ('1001', 'BIR02'),
-    ('1002', 'BIR01'),
-    ('1002', 'BIR04'),
-    ('1003', 'BIR02'),
-    ('1003', 'BIR03')
-) as seed(group_no, unit_no)
+    ('1001', '0601', 'Ankara Merkez Şube'),
+    ('1001', '0101', 'Adana Bölge Şube'),
+    ('1002', '3401', 'İstanbul Kurumsal Şube'),
+    ('1003', '3501', 'İzmir Ticari Şube'),
+    ('1004', '1601', 'Bursa Kobi Şube'),
+    ('1005', '9901', 'Operasyon Destek Şube')
+) as seed(group_no, branch_code, name)
 join group_definitions group_definition
   on group_definition.group_no = seed.group_no
-join unit_definitions unit_definition
-  on unit_definition.unit_no = seed.unit_no
-on conflict (group_id, unit_id) do nothing;
+on conflict (branch_code) do update
+set
+  group_id = excluded.group_id,
+  name = excluded.name,
+  updated_at = now();
 
-insert into branch_units (branch_id, unit_id, created_at)
-select branch.id, unit_definition.id, now()
-from (
-  values
-    ('0601', 'BIR01'),
-    ('0601', 'BIR02'),
-    ('3401', 'BIR01'),
-    ('3401', 'BIR04'),
-    ('3501', 'BIR02'),
-    ('3501', 'BIR03')
-) as seed(branch_code, unit_no)
-join branches branch
-  on branch.branch_code = seed.branch_code
-join unit_definitions unit_definition
-  on unit_definition.unit_no = seed.unit_no
-on conflict (branch_id, unit_id) do nothing;
-
-insert into group_product_scores (
-  group_id,
+insert into branch_product_scores (
+  branch_id,
   sub_product_instance_id,
   score,
   target_value,
@@ -162,7 +142,7 @@ insert into group_product_scores (
   updated_at
 )
 select
-  group_definition.id,
+  branch.id,
   sub_instance.id,
   seed.score,
   seed.target_value,
@@ -173,15 +153,17 @@ select
   now()
 from (
   values
-    ('1001', 'MA', 2026, 1, 'KP', 85.50, 1200.00, 0.9800, 0.4500, 0.7200),
-    ('1001', 'MA', 2026, 1, 'AB', 64.25, 900.00, 0.8500, 0.5000, 0.6100),
-    ('1002', 'NB', 2026, 1, 'AB', 72.00, 1100.00, 0.9100, 0.5600, 0.6700),
-    ('1002', 'NB', 2026, 1, 'OH', 58.75, 800.00, 0.7600, 0.4300, 0.5900),
-    ('1003', 'MA', 2026, 2, 'AB', 69.10, 950.00, 0.8800, 0.4700, 0.6300),
-    ('1003', 'MC', 2026, 1, '42', 54.40, 700.00, 0.7300, 0.3900, 0.5200)
-) as seed(group_no, main_code, year, term, sub_code, score, target_value, hgo_share, development_share, size_share)
-join group_definitions group_definition
-  on group_definition.group_no = seed.group_no
+    ('0601', 'MA', 2026, 1, 'KP', 85.50, 120.00, 0.7000, 0.1500, 0.1500),
+    ('0601', 'MA', 2026, 1, 'AB', 64.25, 90.00, 0.6500, 0.2000, 0.1500),
+    ('0101', 'MA', 2026, 2, 'AB', 69.10, 95.00, 0.7200, 0.1300, 0.1500),
+    ('3401', 'NB', 2026, 1, 'AB', 72.00, 110.00, 0.6000, 0.2500, 0.1500),
+    ('3401', 'NB', 2026, 1, 'OH', 58.75, 80.00, 0.5500, 0.3000, 0.1500),
+    ('3501', 'MC', 2026, 1, '42', 54.40, 70.00, 0.6200, 0.2300, 0.1500),
+    ('1601', 'B1', 2025, 2, 'KP', 42.00, 60.00, 0.5800, 0.2700, 0.1500),
+    ('9901', 'K0', 2025, 2, '24', 31.00, 50.00, 0.5000, 0.2500, 0.2500)
+) as seed(branch_code, main_code, year, term, sub_code, score, target_value, hgo_share, development_share, size_share)
+join branches branch
+  on branch.branch_code = seed.branch_code
 join main_product_instances main_instance
   on main_instance.year = seed.year
  and main_instance.term = seed.term
@@ -195,7 +177,7 @@ join product_definitions sub_product
   on sub_product.id = sub_instance.sub_product_id
  and sub_product.product_type = 'Sub'
  and sub_product.code = seed.sub_code
-on conflict (group_id, sub_product_instance_id) do update
+on conflict (branch_id, sub_product_instance_id) do update
 set
   score = excluded.score,
   target_value = excluded.target_value,
@@ -205,6 +187,6 @@ set
   updated_at = now();
 
 insert into audit_logs (action, entity_name, entity_key, description, actor, created_at)
-values ('SeedMockData', 'Database', 'mock-data-v5', 'Ürün, organizasyon ve puan mock verileri yüklendi.', 'seed-script', now());
+values ('SeedMockData', 'Database', 'mock-data-v6', 'Ürün, şube-grup ve performans mock verileri yüklendi.', 'seed-script', now());
 
 commit;

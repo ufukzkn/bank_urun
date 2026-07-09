@@ -9,14 +9,19 @@ public class ScoreService(AppDbContext db) : IScoreService
 {
     public async Task<ScoreIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default)
     {
-        var groups = await db.GroupDefinitions
+        var branches = await db.Branches
             .AsNoTracking()
-            .OrderBy(group => group.GroupNo)
-            .Select(group => new GroupOptionViewModel
+            .Include(branch => branch.Group)
+            .OrderBy(branch => branch.Group.GroupNo)
+            .ThenBy(branch => branch.BranchCode)
+            .Select(branch => new BranchOptionViewModel
             {
-                Id = group.Id,
-                GroupNo = group.GroupNo,
-                Name = group.Name
+                Id = branch.Id,
+                GroupId = branch.GroupId,
+                BranchCode = branch.BranchCode,
+                Name = branch.Name,
+                GroupNo = branch.Group.GroupNo,
+                GroupName = branch.Group.Name
             })
             .ToListAsync(cancellationToken);
 
@@ -41,9 +46,10 @@ public class ScoreService(AppDbContext db) : IScoreService
             })
             .ToListAsync(cancellationToken);
 
-        var scores = await db.GroupProductScores
+        var scores = await db.BranchProductScores
             .AsNoTracking()
-            .Include(score => score.Group)
+            .Include(score => score.Branch)
+                .ThenInclude(branch => branch.Group)
             .Include(score => score.SubProductInstance)
                 .ThenInclude(instance => instance.SubProduct)
             .Include(score => score.SubProductInstance)
@@ -51,35 +57,55 @@ public class ScoreService(AppDbContext db) : IScoreService
                     .ThenInclude(instance => instance.MainProduct)
             .OrderByDescending(score => score.SubProductInstance.MainProductInstance.Year)
             .ThenByDescending(score => score.SubProductInstance.MainProductInstance.Term)
-            .ThenBy(score => score.Group.GroupNo)
+            .ThenBy(score => score.Branch.Group.GroupNo)
+            .ThenBy(score => score.Branch.BranchCode)
             .ThenBy(score => score.SubProductInstance.MainProductInstance.MainProduct.Code)
             .ThenBy(score => score.SubProductInstance.SubProduct.Code)
             .Select(score => new ScoreRowViewModel
             {
                 Id = score.Id,
-                GroupId = score.GroupId,
+                BranchId = score.BranchId,
+                GroupId = score.Branch.GroupId,
                 SubProductInstanceId = score.SubProductInstanceId,
                 Year = score.SubProductInstance.MainProductInstance.Year,
                 Term = score.SubProductInstance.MainProductInstance.Term,
-                GroupNo = score.Group.GroupNo,
-                GroupName = score.Group.Name,
+                GroupNo = score.Branch.Group.GroupNo,
+                GroupName = score.Branch.Group.Name,
+                BranchCode = score.Branch.BranchCode,
+                BranchName = score.Branch.Name,
                 MainProductCode = score.SubProductInstance.MainProductInstance.MainProduct.Code,
                 MainProductName = score.SubProductInstance.MainProductInstance.MainProduct.Name,
                 SubProductCode = score.SubProductInstance.SubProduct.Code,
                 SubProductName = score.SubProductInstance.SubProduct.Name,
                 Score = score.Score,
                 TargetValue = score.TargetValue,
-                HgoShare = score.HgoShare,
-                DevelopmentShare = score.DevelopmentShare,
-                SizeShare = score.SizeShare
+                HgoShare = score.HgoShare * 100,
+                DevelopmentShare = score.DevelopmentShare * 100,
+                SizeShare = score.SizeShare * 100
             })
             .ToListAsync(cancellationToken);
 
+        var branchSuccess = scores
+            .GroupBy(score => new { score.BranchId, score.BranchCode, score.BranchName, score.GroupNo })
+            .Select(group => new BranchSuccessViewModel
+            {
+                BranchId = group.Key.BranchId,
+                BranchCode = group.Key.BranchCode,
+                BranchName = group.Key.BranchName,
+                GroupNo = group.Key.GroupNo,
+                TotalScore = group.Sum(score => score.Score),
+                TotalTarget = group.Sum(score => score.TargetValue)
+            })
+            .OrderByDescending(item => item.SuccessRate)
+            .ThenBy(item => item.BranchCode)
+            .ToList();
+
         return new ScoreIndexViewModel
         {
-            Groups = groups,
+            Branches = branches,
             SubProductInstances = subProductInstances,
-            Scores = scores
+            Scores = scores,
+            BranchSuccess = branchSuccess
         };
     }
 
@@ -87,35 +113,35 @@ public class ScoreService(AppDbContext db) : IScoreService
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         ValidateScoreInput(input);
-        var group = await db.GroupDefinitions.FirstOrDefaultAsync(item => item.Id == input.GroupId, cancellationToken)
-            ?? throw new InvalidOperationException("Grup bulunamadı.");
+        var branch = await db.Branches.Include(item => item.Group).FirstOrDefaultAsync(item => item.Id == input.BranchId, cancellationToken)
+            ?? throw new InvalidOperationException("Şube bulunamadı.");
         var subInstance = await db.SubProductInstances
             .Include(item => item.SubProduct)
             .FirstOrDefaultAsync(item => item.Id == input.SubProductInstanceId, cancellationToken)
             ?? throw new InvalidOperationException("Alt ürün instance kaydı bulunamadı.");
 
-        if (await db.GroupProductScores.AnyAsync(item => item.GroupId == input.GroupId && item.SubProductInstanceId == input.SubProductInstanceId, cancellationToken))
+        if (await db.BranchProductScores.AnyAsync(item => item.BranchId == input.BranchId && item.SubProductInstanceId == input.SubProductInstanceId, cancellationToken))
         {
-            throw new InvalidOperationException("Bu grup ve alt ürün instance için puan satırı zaten var.");
+            throw new InvalidOperationException("Bu şube ve alt ürün instance için puan satırı zaten var.");
         }
 
         var now = DateTimeOffset.UtcNow;
-        var score = new GroupProductScore
+        var score = new BranchProductScore
         {
-            GroupId = input.GroupId,
+            BranchId = input.BranchId,
             SubProductInstanceId = input.SubProductInstanceId,
             Score = input.Score,
             TargetValue = input.TargetValue,
-            HgoShare = input.HgoShare,
-            DevelopmentShare = input.DevelopmentShare,
-            SizeShare = input.SizeShare,
+            HgoShare = ToRatio(input.HgoShare),
+            DevelopmentShare = ToRatio(input.DevelopmentShare),
+            SizeShare = ToRatio(input.SizeShare),
             CreatedAt = now,
             UpdatedAt = now
         };
 
-        db.GroupProductScores.Add(score);
+        db.BranchProductScores.Add(score);
         await db.SaveChangesAsync(cancellationToken);
-        AddAudit("CreateGroupProductScore", "GroupProductScore", score.Id.ToString(), $"{group.GroupNo} - {subInstance.SubProduct.Code} puanı oluşturuldu.", actor);
+        AddAudit("CreateBranchProductScore", "BranchProductScore", score.Id.ToString(), $"{branch.BranchCode} - {subInstance.SubProduct.Code} puanı oluşturuldu.", actor);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -124,12 +150,12 @@ public class ScoreService(AppDbContext db) : IScoreService
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         ValidateScoreInput(input);
-        var score = await db.GroupProductScores.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
+        var score = await db.BranchProductScores.FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
             ?? throw new InvalidOperationException("Puan satırı bulunamadı.");
 
-        if (!await db.GroupDefinitions.AnyAsync(item => item.Id == input.GroupId, cancellationToken))
+        if (!await db.Branches.AnyAsync(item => item.Id == input.BranchId, cancellationToken))
         {
-            throw new InvalidOperationException("Grup bulunamadı.");
+            throw new InvalidOperationException("Şube bulunamadı.");
         }
 
         if (!await db.SubProductInstances.AnyAsync(item => item.Id == input.SubProductInstanceId, cancellationToken))
@@ -137,20 +163,20 @@ public class ScoreService(AppDbContext db) : IScoreService
             throw new InvalidOperationException("Alt ürün instance kaydı bulunamadı.");
         }
 
-        if (await db.GroupProductScores.AnyAsync(item => item.Id != input.Id && item.GroupId == input.GroupId && item.SubProductInstanceId == input.SubProductInstanceId, cancellationToken))
+        if (await db.BranchProductScores.AnyAsync(item => item.Id != input.Id && item.BranchId == input.BranchId && item.SubProductInstanceId == input.SubProductInstanceId, cancellationToken))
         {
-            throw new InvalidOperationException("Bu grup ve alt ürün instance için puan satırı zaten var.");
+            throw new InvalidOperationException("Bu şube ve alt ürün instance için puan satırı zaten var.");
         }
 
-        score.GroupId = input.GroupId;
+        score.BranchId = input.BranchId;
         score.SubProductInstanceId = input.SubProductInstanceId;
         score.Score = input.Score;
         score.TargetValue = input.TargetValue;
-        score.HgoShare = input.HgoShare;
-        score.DevelopmentShare = input.DevelopmentShare;
-        score.SizeShare = input.SizeShare;
+        score.HgoShare = ToRatio(input.HgoShare);
+        score.DevelopmentShare = ToRatio(input.DevelopmentShare);
+        score.SizeShare = ToRatio(input.SizeShare);
         score.UpdatedAt = DateTimeOffset.UtcNow;
-        AddAudit("UpdateGroupProductScore", "GroupProductScore", score.Id.ToString(), "Puan satırı güncellendi.", actor);
+        AddAudit("UpdateBranchProductScore", "BranchProductScore", score.Id.ToString(), "Şube puan satırı güncellendi.", actor);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -158,15 +184,15 @@ public class ScoreService(AppDbContext db) : IScoreService
     public async Task DeleteScoreAsync(ScoreIdInput input, string actor, CancellationToken cancellationToken = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var score = await db.GroupProductScores
-            .Include(item => item.Group)
+        var score = await db.BranchProductScores
+            .Include(item => item.Branch)
             .Include(item => item.SubProductInstance)
                 .ThenInclude(instance => instance.SubProduct)
             .FirstOrDefaultAsync(item => item.Id == input.Id, cancellationToken)
             ?? throw new InvalidOperationException("Puan satırı bulunamadı.");
 
-        AddAudit("DeleteGroupProductScore", "GroupProductScore", score.Id.ToString(), $"{score.Group.GroupNo} - {score.SubProductInstance.SubProduct.Code} puanı silindi.", actor);
-        db.GroupProductScores.Remove(score);
+        AddAudit("DeleteBranchProductScore", "BranchProductScore", score.Id.ToString(), $"{score.Branch.BranchCode} - {score.SubProductInstance.SubProduct.Code} puanı silindi.", actor);
+        db.BranchProductScores.Remove(score);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -178,15 +204,20 @@ public class ScoreService(AppDbContext db) : IScoreService
             throw new InvalidOperationException("Puan ve hedef negatif olamaz.");
         }
 
-        if (!IsShare(input.HgoShare) || !IsShare(input.DevelopmentShare) || !IsShare(input.SizeShare))
+        if (!IsPercent(input.HgoShare) || !IsPercent(input.DevelopmentShare) || !IsPercent(input.SizeShare))
         {
-            throw new InvalidOperationException("Pay değerleri 0 ile 1 arasında olmalı.");
+            throw new InvalidOperationException("Pay değerleri 0 ile 100 arasında olmalı.");
         }
     }
 
-    private static bool IsShare(decimal value)
+    private static bool IsPercent(decimal value)
     {
-        return value is >= 0 and <= 1;
+        return value is >= 0 and <= 100;
+    }
+
+    private static decimal ToRatio(decimal percent)
+    {
+        return percent / 100;
     }
 
     private void AddAudit(string action, string entityName, string entityKey, string description, string actor)

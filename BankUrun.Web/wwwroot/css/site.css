@@ -601,6 +601,126 @@ label span {
   grid-template-columns: 1fr 1fr;
 }
 
+.toggle-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.org-board {
+  display: grid;
+  gap: 12px;
+}
+
+.group-card {
+  background: #ffffff;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.group-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.group-code {
+  color: #00598f;
+  font-size: 0.78rem;
+  font-weight: 850;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.group-card h2 {
+  color: #172033;
+  font-size: 1.06rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.group-meta,
+.performance-flags {
+  align-items: center;
+  color: #657789;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.flag-pill {
+  background: #f2f6fa;
+  border: 1px solid #d9e3ed;
+  border-radius: 999px;
+  color: #718195;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 3px 8px;
+}
+
+.flag-pill.is-on {
+  background: #e4f7f5;
+  border-color: #b9e8e1;
+  color: #08766e;
+}
+
+.inline-edit-panel {
+  background: #f8fbfd;
+  border: 1px solid #e1e9f1;
+  border-radius: 8px;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.inline-edit-panel.compact {
+  margin: 6px 0 10px;
+}
+
+.form-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.branch-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.branch-row {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e5edf4;
+  border-radius: 7px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 9px 10px;
+}
+
+.branch-row strong {
+  color: #00598f;
+  margin-right: 8px;
+}
+
+.branch-row span {
+  color: #27384b;
+}
+
+.branch-edit-form {
+  flex: 1;
+}
+
+.empty-inline {
+  color: #8190a2;
+  padding: 10px 0;
+}
+
 .score-create-panel {
   margin-bottom: 14px;
 }
@@ -641,11 +761,70 @@ label span {
 }
 
 .score-toolbar {
-  grid-template-columns: minmax(260px, 1fr) minmax(110px, 0.25fr) minmax(110px, 0.25fr);
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 0.45fr) minmax(110px, 0.25fr) minmax(110px, 0.25fr);
 }
 
 .score-table {
-  min-width: 1120px;
+  min-width: 1380px;
+}
+
+.performance-panel {
+  margin-bottom: 14px;
+  padding: 14px;
+}
+
+.branch-chart {
+  display: grid;
+  gap: 10px;
+}
+
+.branch-chart-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(160px, 1fr) 72px;
+}
+
+.branch-chart-label strong,
+.branch-chart-label span,
+.branch-chart-label small {
+  display: block;
+  line-height: 1.2;
+}
+
+.branch-chart-label strong {
+  color: #00598f;
+  font-size: 0.86rem;
+}
+
+.branch-chart-label span {
+  color: #172033;
+  font-weight: 750;
+}
+
+.branch-chart-label small {
+  color: #718195;
+}
+
+.branch-chart-track {
+  background: #e8f0f6;
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.branch-chart-fill {
+  background: linear-gradient(90deg, #00598f, #00a6b4);
+  border-radius: inherit;
+  height: 100%;
+  min-width: 4px;
+  transition: width 0.2s ease;
+}
+
+.branch-chart-value {
+  color: #003f67;
+  font-weight: 850;
+  text-align: right;
 }
 
 .score-edit-form {
@@ -679,9 +858,11 @@ label span {
   .table-toolbar,
   .management-grid,
   .links-grid,
+  .toggle-grid,
   .score-fields,
   .score-summary-grid,
-  .two-column-tables {
+  .two-column-tables,
+  .branch-chart-row {
     grid-template-columns: 1fr;
   }
 

@@ -599,7 +599,9 @@ const scoreFilters = Array.from(document.querySelectorAll(".score-filter"));
 const noScoreRows = document.querySelector("#noScoreRows");
 const totalScore = document.querySelector("#totalScore");
 const totalTarget = document.querySelector("#totalTarget");
-const scoreCount = document.querySelector("#scoreCount");
+const totalSuccess = document.querySelector("#totalSuccess");
+const branchChart = document.querySelector("#branchChart");
+const noBranchChartRows = document.querySelector("#noBranchChartRows");
 
 function getScoreActionsRow(row) {
   return row.nextElementSibling?.classList.contains("score-actions-row") ? row.nextElementSibling : null;
@@ -607,14 +609,17 @@ function getScoreActionsRow(row) {
 
 function applyScoreFilters() {
   const search = document.querySelector("#scoreSearch")?.value.trim().toUpperCase() || "";
+  const groupId = document.querySelector("#scoreGroup")?.value.trim() || "";
   const year = document.querySelector("#scoreYear")?.value.trim() || "";
   const term = document.querySelector("#scoreTerm")?.value.trim() || "";
   let visibleCount = 0;
   let scoreSum = 0;
   let targetSum = 0;
+  const branchTotals = new Map();
 
   scoreRows.forEach((row) => {
     const matches = (!search || (row.dataset.search || "").includes(search))
+      && (!groupId || row.dataset.groupId === groupId)
       && (!year || row.dataset.year === year)
       && (!term || row.dataset.term === term);
 
@@ -623,8 +628,18 @@ function applyScoreFilters() {
 
     if (matches) {
       visibleCount += 1;
-      scoreSum += parseLocalizedDecimal(row.dataset.score);
-      targetSum += parseLocalizedDecimal(row.dataset.target);
+      const rowScore = parseLocalizedDecimal(row.dataset.score);
+      const rowTarget = parseLocalizedDecimal(row.dataset.target);
+      scoreSum += rowScore;
+      targetSum += rowTarget;
+
+      const branchId = row.dataset.branchId || "";
+      if (!branchTotals.has(branchId)) {
+        branchTotals.set(branchId, { score: 0, target: 0 });
+      }
+      const total = branchTotals.get(branchId);
+      total.score += rowScore;
+      total.target += rowTarget;
     }
   });
 
@@ -636,15 +651,38 @@ function applyScoreFilters() {
     totalTarget.textContent = targetSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
   }
 
-  if (scoreCount) {
-    scoreCount.textContent = visibleCount.toString();
+  if (totalSuccess) {
+    const success = targetSum === 0 ? 0 : (scoreSum / targetSum) * 100;
+    totalSuccess.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
   }
 
   noScoreRows?.classList.toggle("d-none", visibleCount !== 0 || scoreRows.length === 0);
+  noBranchChartRows?.classList.toggle("d-none", branchTotals.size !== 0 || scoreRows.length === 0);
+
+  branchChart?.querySelectorAll(".branch-chart-row").forEach((row) => {
+    const total = branchTotals.get(row.dataset.branchId || "");
+    const isVisible = Boolean(total);
+    row.classList.toggle("d-none", !isVisible);
+    if (!total) {
+      return;
+    }
+
+    const success = total.target === 0 ? 0 : (total.score / total.target) * 100;
+    const width = Math.min(100, success);
+    const fill = row.querySelector(".branch-chart-fill");
+    const value = row.querySelector(".branch-chart-value");
+    if (fill) {
+      fill.style.width = `${width}%`;
+    }
+    if (value) {
+      value.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
+    }
+  });
 }
 
 scoreFilters.forEach((input) => {
-  input.addEventListener("input", applyScoreFilters);
+  const eventName = input.tagName === "SELECT" ? "change" : "input";
+  input.addEventListener(eventName, applyScoreFilters);
 });
 
 codeMode?.addEventListener("change", toggleManualCode);

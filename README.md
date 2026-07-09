@@ -195,7 +195,7 @@ docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\dt"
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d product_definitions"
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d main_product_instances"
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d sub_product_instances"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d group_product_scores"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d branch_product_scores"
 ```
 
 Tüm şemayı SQL olarak dump etmek için:
@@ -217,9 +217,9 @@ docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
 - Aynı alt ürün birden fazla ana ürün dönemine bağlanabilir.
 - Seçili instance silme sadece dönem/bağlantı satırını kaldırır; tüm tablodan silme tanım satırını ve ilişkilerini kaldırır.
 - Pasifleştirme tanım satırını pasif yapar ve audit log yazar.
-- Grup tanımları `group_definitions`, birim tanımları `unit_definitions`, şubeler `branches` tablosunda tutulur.
-- Şube türü sadece `Karma`, `Kurumsal`, `Ticari` olabilir.
-- Grup-birim ve şube-birim bağlantıları unique ilişki tablolarıyla tutulur.
-- Grup ürün puanları `group_product_scores` tablosunda alt ürün instance'a bağlanır.
-- Puan ve hedef negatif olamaz; HGO, gelişim ve büyüklük payları `0-1` oran formatındadır.
+- Grup tanımları `group_definitions`, şubeler `branches` tablosunda tutulur.
+- Şubeler tek bir gruba `branches.group_id` ile bağlanır.
+- Grup segmenti `Karma`, `Kurumsal`, `Ticari`, `Kobi`, `Diger` değerlerinden biri olur.
+- Şube performans puanları `branch_product_scores` tablosunda alt ürün instance'a bağlanır.
+- Puan ve hedef negatif olamaz; HGO, gelişim ve büyüklük payları DB'de `0-1`, ekranda `0-100` yüzde formatındadır.
 - Halkbank logosu resmi logo sayfasındaki JPG varlığından alınmıştır: https://www.halkbank.com.tr/tr/bankamiz/kurumsal-iletisim/logolarimiz

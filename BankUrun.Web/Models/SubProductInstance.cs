@@ -10,5 +10,5 @@ public class SubProductInstance
 
     public MainProductInstance MainProductInstance { get; set; } = null!;
     public ProductDefinition SubProduct { get; set; } = null!;
-    public ICollection<GroupProductScore> GroupProductScores { get; set; } = new List<GroupProductScore>();
+    public ICollection<BranchProductScore> BranchProductScores { get; set; } = new List<BranchProductScore>();
 }

@@ -2,42 +2,57 @@
 
 @{
     ViewData["Title"] = "Puanlar";
-    string Fmt(decimal value) => value.ToString("0.####");
+    string Fmt(decimal value) => value.ToString("0.##");
+    string Pct(decimal value) => $"% {value:0.##}";
+    var groups = Model.Branches
+        .GroupBy(branch => new { branch.GroupId, branch.GroupNo, branch.GroupName })
+        .OrderBy(group => group.Key.GroupNo)
+        .ToList();
 }
 
 <section class="page-title">
     <div>
-        <h1>Puanlar</h1>
-        <p>Grup bazlı alt ürün puan, hedef ve pay parametreleri.</p>
+        <h1>Şube performansı</h1>
+        <p>Şube bazlı ürün puanı, hedef ve pay parametreleri.</p>
     </div>
 </section>
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success action-alert page-alert" role="alert">@success</div>
+}
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger action-alert page-alert" role="alert">@error</div>
+}
 
 <section class="surface-panel create-panel score-create-panel">
     <div class="panel-heading">
         <div>
             <h2>Puan satırı oluştur</h2>
-            <p>Grup ve alt ürün instance seçerek parametreleri kaydedin.</p>
+            <p>Şube ve alt ürün instance seçerek performans parametresi kaydedin.</p>
         </div>
     </div>
     <form asp-action="CreateScore" method="post" class="stack-form combo-required-form">
         @Html.AntiForgeryToken()
         <div class="form-row">
             <label>
-                <span>Grup</span>
+                <span>Şube</span>
                 <div class="combo generic-combo">
-                    <input class="form-control combobox-input" type="search" placeholder="Grup no veya adı ara" autocomplete="off" data-combo-input />
-                    <div class="combo-menu" role="listbox">
-                        @foreach (var group in Model.Groups)
+                    <input class="form-control combobox-input" type="search" placeholder="Şube kodu, adı veya grup ara" autocomplete="off" data-combo-input />
+                    <div class="combo-menu wide-combo-menu" role="listbox">
+                        @foreach (var branch in Model.Branches)
                         {
-                            <button class="combo-option" type="button" role="option" data-combo-option data-id="@group.Id" data-label="@group.Label">
-                                <strong>@group.GroupNo</strong>
-                                <span>@group.Name</span>
-                                <small>Grup</small>
+                            <button class="combo-option product-combo-option" type="button" role="option" data-combo-option data-id="@branch.Id" data-group-id="@branch.GroupId" data-label="@branch.Label">
+                                <strong>@branch.BranchCode</strong>
+                                <span>@branch.Name</span>
+                                <small>@branch.GroupNo</small>
                             </button>
                         }
-                        <div class="combo-empty">Uygun grup yok</div>
+                        <div class="combo-empty">Uygun şube yok</div>
                     </div>
-                    <input type="hidden" name="GroupId" data-combo-value data-combo-required="Grup seçmelisiniz." />
+                    <input type="hidden" name="BranchId" data-combo-value data-combo-required="Şube seçmelisiniz." />
                 </div>
             </label>
             <label>
@@ -69,30 +84,20 @@
                 <input class="form-control decimal-input" name="TargetValue" inputmode="decimal" value="0" required />
             </label>
             <label>
-                <span>HGO payı</span>
+                <span>HGO payı %</span>
                 <input class="form-control decimal-input" name="HgoShare" inputmode="decimal" value="0" required />
             </label>
             <label>
-                <span>Gelişim payı</span>
+                <span>Gelişim payı %</span>
                 <input class="form-control decimal-input" name="DevelopmentShare" inputmode="decimal" value="0" required />
             </label>
             <label>
-                <span>Büyüklük payı</span>
+                <span>Büyüklük payı %</span>
                 <input class="form-control decimal-input" name="SizeShare" inputmode="decimal" value="0" required />
             </label>
         </div>
         <button class="btn btn-primary" type="submit">Puan oluştur</button>
     </form>
-
-    @if (TempData["Success"] is string success)
-    {
-        <div class="alert alert-success action-alert" role="alert">@success</div>
-    }
-
-    @if (TempData["Error"] is string error)
-    {
-        <div class="alert alert-danger action-alert" role="alert">@error</div>
-    }
 </section>
 
 <section class="score-summary-grid" id="scoreSummary">
@@ -105,8 +110,43 @@
         <strong id="totalTarget">@Fmt(Model.TotalTarget)</strong>
     </div>
     <div class="score-summary-card">
-        <span>Kayıt</span>
-        <strong id="scoreCount">@Model.Scores.Count</strong>
+        <span>Başarı</span>
+        <strong id="totalSuccess">@Pct(Model.SuccessRate)</strong>
+    </div>
+</section>
+
+<section class="surface-panel performance-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Şube başarı sıralaması</h2>
+            <p>Filtre sonucuna göre puan / hedef oranı.</p>
+        </div>
+    </div>
+    <div class="branch-chart" id="branchChart">
+        @if (Model.BranchSuccess.Count == 0)
+        {
+            <div class="empty-inline">Grafik için puan kaydı yok</div>
+        }
+        @foreach (var item in Model.BranchSuccess)
+        {
+            var width = Math.Min(100, item.SuccessRate);
+            <div class="branch-chart-row"
+                 data-branch-id="@item.BranchId"
+                 data-search="@($"{item.BranchCode} {item.BranchName} {item.GroupNo}".ToUpperInvariant())"
+                 data-score="@item.TotalScore"
+                 data-target="@item.TotalTarget">
+                <div class="branch-chart-label">
+                    <strong>@item.BranchCode</strong>
+                    <span>@item.BranchName</span>
+                    <small>@item.GroupNo</small>
+                </div>
+                <div class="branch-chart-track">
+                    <div class="branch-chart-fill" style="width:@Fmt(width).Replace(",", ".")%"></div>
+                </div>
+                <div class="branch-chart-value">@Pct(item.SuccessRate)</div>
+            </div>
+        }
+        <div id="noBranchChartRows" class="empty-inline d-none">Filtreye uygun grafik verisi yok</div>
     </div>
 </section>
 
@@ -114,7 +154,17 @@
     <div class="table-toolbar score-toolbar">
         <label class="toolbar-search">
             <span>Puan listesinde ara</span>
-            <input class="form-control score-filter" type="search" id="scoreSearch" placeholder="Grup, ürün, kod veya dönem" />
+            <input class="form-control score-filter" type="search" id="scoreSearch" placeholder="Grup, şube, ürün, kod veya dönem" />
+        </label>
+        <label>
+            <span>Grup</span>
+            <select class="form-select score-filter" id="scoreGroup">
+                <option value="">Tümü</option>
+                @foreach (var group in groups)
+                {
+                    <option value="@group.Key.GroupId">@group.Key.GroupNo - @group.Key.GroupName</option>
+                }
+            </select>
         </label>
         <label>
             <span>Yıl</span>
@@ -132,14 +182,16 @@
                     <th>Yıl</th>
                     <th>Dönem</th>
                     <th>Grup</th>
-                    <th>Ana kod</th>
-                    <th>Alt kod</th>
-                    <th>Alt ürün adı</th>
+                    <th>Şube</th>
+                    <th>Ana ürün</th>
+                    <th>Alt ürün</th>
                     <th class="text-end">Puan</th>
+                    <th class="text-end">Görüntülenen</th>
                     <th class="text-end">Hedef</th>
                     <th class="text-end">HGO</th>
                     <th class="text-end">Gelişim</th>
                     <th class="text-end">Büyüklük</th>
+                    <th class="text-end">Başarı</th>
                     <th class="text-end">İşlem</th>
                 </tr>
             </thead>
@@ -147,14 +199,16 @@
             @if (Model.Scores.Count == 0)
             {
                 <tr>
-                    <td colspan="12" class="empty-cell">Puan satırı yok</td>
+                    <td colspan="14" class="empty-cell">Puan satırı yok</td>
                 </tr>
             }
             @foreach (var score in Model.Scores)
             {
-                var search = $"{score.Year} {score.Term} {score.GroupNo} {score.GroupName} {score.MainProductCode} {score.MainProductName} {score.SubProductCode} {score.SubProductName}".ToUpperInvariant();
+                var search = $"{score.Year} {score.Term} {score.GroupNo} {score.GroupName} {score.BranchCode} {score.BranchName} {score.MainProductCode} {score.MainProductName} {score.SubProductCode} {score.SubProductName}".ToUpperInvariant();
                 <tr class="score-row"
                     data-search="@search"
+                    data-group-id="@score.GroupId"
+                    data-branch-id="@score.BranchId"
                     data-year="@score.Year"
                     data-term="@score.Term"
                     data-score="@score.Score"
@@ -162,26 +216,28 @@
                     <td>@score.Year</td>
                     <td>@score.Term</td>
                     <td><strong>@score.GroupNo</strong><small>@score.GroupName</small></td>
+                    <td><strong>@score.BranchCode</strong><small>@score.BranchName</small></td>
                     <td><strong>@score.MainProductCode</strong><small>@score.MainProductName</small></td>
-                    <td><strong>@score.SubProductCode</strong></td>
-                    <td>@score.SubProductName</td>
+                    <td><strong>@score.SubProductCode</strong><small>@score.SubProductName</small></td>
                     <td class="text-end">@Fmt(score.Score)</td>
+                    <td class="text-end">@Fmt(score.DisplayedScore)</td>
                     <td class="text-end">@Fmt(score.TargetValue)</td>
-                    <td class="text-end">@Fmt(score.HgoShare)</td>
-                    <td class="text-end">@Fmt(score.DevelopmentShare)</td>
-                    <td class="text-end">@Fmt(score.SizeShare)</td>
+                    <td class="text-end">@Pct(score.HgoShare)</td>
+                    <td class="text-end">@Pct(score.DevelopmentShare)</td>
+                    <td class="text-end">@Pct(score.SizeShare)</td>
+                    <td class="text-end">@Pct(score.SuccessRate)</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id">Düzenle</button>
                     </td>
                 </tr>
                 <tr class="score-actions-row">
-                    <td colspan="12">
+                    <td colspan="14">
                         <div class="collapse" id="score-actions-@score.Id">
                             <div class="actions-panel">
                                 <form asp-action="UpdateScore" method="post" class="inline-form score-edit-form">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="Id" value="@score.Id" />
-                                    <input type="hidden" name="GroupId" value="@score.GroupId" />
+                                    <input type="hidden" name="BranchId" value="@score.BranchId" />
                                     <input type="hidden" name="SubProductInstanceId" value="@score.SubProductInstanceId" />
                                     <label>
                                         <span>Puan</span>
@@ -192,15 +248,15 @@
                                         <input class="form-control form-control-sm decimal-input" name="TargetValue" inputmode="decimal" value="@Fmt(score.TargetValue)" />
                                     </label>
                                     <label>
-                                        <span>HGO</span>
+                                        <span>HGO %</span>
                                         <input class="form-control form-control-sm decimal-input" name="HgoShare" inputmode="decimal" value="@Fmt(score.HgoShare)" />
                                     </label>
                                     <label>
-                                        <span>Gelişim</span>
+                                        <span>Gelişim %</span>
                                         <input class="form-control form-control-sm decimal-input" name="DevelopmentShare" inputmode="decimal" value="@Fmt(score.DevelopmentShare)" />
                                     </label>
                                     <label>
-                                        <span>Büyüklük</span>
+                                        <span>Büyüklük %</span>
                                         <input class="form-control form-control-sm decimal-input" name="SizeShare" inputmode="decimal" value="@Fmt(score.SizeShare)" />
                                     </label>
                                     <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Puan satırını güncellemek istediğinize emin misiniz?">Güncelle</button>
@@ -216,7 +272,7 @@
                 </tr>
             }
             <tr id="noScoreRows" class="empty-row d-none">
-                <td colspan="12" class="empty-cell">Filtreye uygun puan satırı yok</td>
+                <td colspan="14" class="empty-cell">Filtreye uygun puan satırı yok</td>
             </tr>
             </tbody>
         </table>
