@@ -2,16 +2,51 @@
 
 ASP.NET Core MVC + PostgreSQL ile ana ürün, alt ürün ve dönem bazlı bağlantıları yöneten küçük bir web uygulaması.
 
-## Docker ile Çalıştırma
+## Yeni Bilgisayarda Kurulum
+
+Ön koşul:
+
+- `.NET SDK` kurulu olmalı.
+- PostgreSQL için üç seçenek var:
+  - Docker varsa: `docker compose` ile PostgreSQL container.
+  - Docker yoksa/admin yoksa: portable PostgreSQL ZIP.
+  - PostgreSQL zaten kuruluysa: local servis.
+
+Repo'yu aldıktan sonra:
+
+```powershell
+git clone https://github.com/ufukzkn/bank_urun.git
+cd bank_urun
+```
+
+## Docker ile PostgreSQL + Uygulama
+
+Bu yol PostgreSQL'i Docker container olarak başlatır. Uygulama yine `dotnet run` ile lokal çalışır ve `localhost:5432` üzerinden container PostgreSQL'e bağlanır.
 
 ```powershell
 dotnet tool restore
-docker compose up -d
+docker compose up -d postgres
 dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj
 dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
 ```
 
 Uygulama: `http://localhost:5188`
+
+Docker PostgreSQL bağlantı bilgileri:
+
+```text
+Host=localhost
+Port=5432
+Database=bank_urun
+Username=bank_urun
+Password=bank_urun
+```
+
+Docker ile mock veri yüklemek için:
+
+```powershell
+Get-Content scripts\seed-mock-data.sql | docker exec -i bank_urun_postgres psql -U bank_urun -d bank_urun
+```
 
 ## Docker Olmadan Çalıştırma
 
@@ -49,10 +84,11 @@ dotnet tool restore; dotnet tool run dotnet-ef database update --project BankUru
    - Resmi EDB sayfası: https://www.enterprisedb.com/download-postgresql-binaries
    - PostgreSQL 17.x Windows x86-64 ZIP dosyasını indir.
 
-2. Repo klasöründe şu komutu çalıştır:
+2. ZIP dosyası `Downloads` klasöründeyse repo klasöründe şu komutu çalıştır:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgZipPath "$env:USERPROFILE\Downloads\postgresql-17.x-x-windows-x64-binaries.zip" -Seed
+$pgZip = Get-ChildItem "$env:USERPROFILE\Downloads\postgresql-17*-windows-x64-binaries.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgZipPath $pgZip.FullName -Seed
 ```
 
 ZIP dosyasını daha önce açtıysan `-PgRoot` ile klasörü göster:
@@ -79,9 +115,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Stop-PortablePostgres.ps1
 
 ## Mock Veri
 
+Docker ile:
+
 ```powershell
-docker cp scripts\seed-mock-data.sql bank_urun_postgres:/tmp/seed-mock-data.sql
-docker exec bank_urun_postgres psql -U bank_urun -d bank_urun -f /tmp/seed-mock-data.sql
+Get-Content scripts\seed-mock-data.sql | docker exec -i bank_urun_postgres psql -U bank_urun -d bank_urun
 ```
 
 Docker olmadan mock veri yüklemek için:

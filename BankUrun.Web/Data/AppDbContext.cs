@@ -72,7 +72,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(item => item.MainProductInstance)
                 .WithMany(instance => instance.SubProductInstances)
                 .HasForeignKey(item => item.MainProductInstanceId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.SubProduct)
                 .WithMany(product => product.SubProductInstances)
                 .HasForeignKey(item => new { item.SubProductId, item.SubProductType })

@@ -193,6 +193,14 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
                 var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.ProductId && item.Type == ProductType.Main, cancellationToken)
                     ?? throw new InvalidOperationException("Ana ürün tanımı bulunamadı.");
 
+                var linkedSubProductCount = await db.SubProductInstances
+                    .AnyAsync(subInstance => subInstance.MainProductInstance.MainProductId == product.Id, cancellationToken);
+
+                if (linkedSubProductCount)
+                {
+                    throw new InvalidOperationException($"{product.Code} ana ürününe bağlı alt ürünler var. Önce alt ürün instance'larını silmelisiniz.");
+                }
+
                 AddAudit("DeleteMainProductDefinition", "ProductDefinition", product.Id.ToString(), $"{product.Code} ana ürünü tüm instance'larıyla kalıcı silindi.", actor);
                 db.ProductDefinitions.Remove(product);
             }
@@ -202,6 +210,14 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
                     .Include(item => item.MainProduct)
                     .FirstOrDefaultAsync(item => item.Id == input.MainProductInstanceId, cancellationToken)
                     ?? throw new InvalidOperationException("Ana ürün instance kaydı bulunamadı.");
+
+                var hasLinkedSubProducts = await db.SubProductInstances
+                    .AnyAsync(subInstance => subInstance.MainProductInstanceId == instance.Id, cancellationToken);
+
+                if (hasLinkedSubProducts)
+                {
+                    throw new InvalidOperationException($"{instance.MainProduct.Code} {instance.Year}/{instance.Term} kaydına bağlı alt ürünler var. Önce alt ürün instance'larını silmelisiniz.");
+                }
 
                 AddAudit("DeleteMainProductInstance", "MainProductInstance", instance.Id.ToString(), $"{instance.MainProduct.Code} {instance.Year}/{instance.Term} instance kaydı silindi.", actor);
                 db.MainProductInstances.Remove(instance);
