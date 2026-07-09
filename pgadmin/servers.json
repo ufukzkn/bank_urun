@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Bank Urun PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "bank_urun",
+      "Username": "bank_urun",
+      "SSLMode": "prefer"
+    }
+  }
+}

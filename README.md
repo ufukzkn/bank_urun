@@ -21,16 +21,17 @@ cd bank_urun
 
 ## Docker ile PostgreSQL + Uygulama
 
-Bu yol PostgreSQL'i Docker container olarak başlatır. Uygulama yine `dotnet run` ile lokal çalışır ve `localhost:5432` üzerinden container PostgreSQL'e bağlanır.
+Bu yol PostgreSQL'i ve browser tabanlı pgAdmin'i Docker container olarak başlatır. Uygulama yine `dotnet run` ile lokal çalışır ve `localhost:5432` üzerinden container PostgreSQL'e bağlanır.
 
 ```powershell
 dotnet tool restore
-docker compose up -d postgres
+docker compose up -d
 dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj
 dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
 ```
 
 Uygulama: `http://localhost:5188`
+pgAdmin: `http://127.0.0.1:5050`
 
 Docker PostgreSQL bağlantı bilgileri:
 
@@ -41,6 +42,15 @@ Database=bank_urun
 Username=bank_urun
 Password=bank_urun
 ```
+
+pgAdmin genelde direkt açılır. Login ekranı gelirse:
+
+```text
+Email=admin@bankurun.com
+Password=bank_urun
+```
+
+pgAdmin içinde `Bank Urun PostgreSQL` server'ı hazır gelir. Server şifresi sorarsa `bank_urun` yaz.
 
 Docker ile mock veri yüklemek için:
 
@@ -129,6 +139,27 @@ psql -U bank_urun -d bank_urun -f scripts\seed-mock-data.sql
 
 ## pgAdmin Bağlantısı
 
+Browser üzerinden Docker pgAdmin kullanmak için:
+
+```powershell
+docker compose up -d pgadmin
+```
+
+Sonra şu adrese gir:
+
+```text
+http://127.0.0.1:5050
+```
+
+PgAdmin genelde direkt açılır. Login ekranı gelirse:
+
+```text
+Email: admin@bankurun.com
+Password: bank_urun
+```
+
+Server hazır görünür: `Bank Urun PostgreSQL`. Şifre isterse PostgreSQL şifresi: `bank_urun`.
+
 Kendi pgAdmin uygulamanda server eklerken:
 
 - `Servers` üzerinde sağ tıkla, `Register` -> `Server...` seç.
@@ -142,6 +173,29 @@ Kendi pgAdmin uygulamanda server eklerken:
   - `Save password`: açık olabilir.
 
 Not: pgAdmin kendi bilgisayarında uygulama olarak çalışıyorsa host `localhost` olmalı. Sadece başka bir Docker container içinden bağlanırken host adı `postgres` olur.
+
+## Veritabanı Şemasını Görüntüleme
+
+pgAdmin browser içinde:
+
+- `Servers` -> `Bank Urun PostgreSQL` -> `Databases` -> `bank_urun` -> `Schemas` -> `public` -> `Tables`
+- Her tablo için `Columns`, `Constraints`, `Indexes` bölümlerinden yapıyı görebilirsin.
+- Diagram için pgAdmin'de `Tools` -> `ERD Tool` kullanılabilir.
+
+Terminalden hızlı tablo/kolon görünümü:
+
+```powershell
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\dt"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d product_definitions"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d main_product_instances"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d sub_product_instances"
+```
+
+Tüm şemayı SQL olarak dump etmek için:
+
+```powershell
+docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
+```
 
 ## Temel Kurallar
 
