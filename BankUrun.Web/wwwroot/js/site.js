@@ -27,7 +27,7 @@ const goPage = document.querySelector("#goPage");
 const noClientRows = document.querySelector("#noClientRows");
 const productRows = Array.from(document.querySelectorAll(".product-row"));
 const productTableBody = document.querySelector("#productTableBody");
-const sortButtons = Array.from(document.querySelectorAll(".sort-button"));
+const sortButtons = Array.from(document.querySelectorAll("[data-sort]"));
 const actionConfirmToast = document.querySelector("#actionConfirmToast");
 const actionToastBackdrop = document.querySelector("#actionToastBackdrop");
 const toastTitle = document.querySelector("#toastTitle");
@@ -596,32 +596,136 @@ document.querySelectorAll(".live-table-filter").forEach((input) => {
 
 const scoreRows = Array.from(document.querySelectorAll(".score-row"));
 const scoreFilters = Array.from(document.querySelectorAll(".score-filter"));
+const scoreSortButtons = Array.from(document.querySelectorAll("[data-score-sort]"));
 const noScoreRows = document.querySelector("#noScoreRows");
 const totalScore = document.querySelector("#totalScore");
 const totalTarget = document.querySelector("#totalTarget");
 const totalSuccess = document.querySelector("#totalSuccess");
 const branchChart = document.querySelector("#branchChart");
 const noBranchChartRows = document.querySelector("#noBranchChartRows");
+let currentScoreSort = { key: "year", direction: "asc" };
 
 function getScoreActionsRow(row) {
   return row.nextElementSibling?.classList.contains("score-actions-row") ? row.nextElementSibling : null;
 }
 
-function applyScoreFilters() {
+function scoreRowMatchesFilters(row) {
   const search = document.querySelector("#scoreSearch")?.value.trim().toUpperCase() || "";
   const groupId = document.querySelector("#scoreGroup")?.value.trim() || "";
   const year = document.querySelector("#scoreYear")?.value.trim() || "";
   const term = document.querySelector("#scoreTerm")?.value.trim() || "";
+
+  return (!search || (row.dataset.search || "").includes(search))
+    && (!groupId || row.dataset.groupId === groupId)
+    && (!year || row.dataset.year === year)
+    && (!term || row.dataset.term === term);
+}
+
+function getScoreSortValue(row, key) {
+  switch (key) {
+    case "year":
+    case "term":
+    case "score":
+    case "displayed":
+    case "target":
+    case "hgo":
+    case "development":
+    case "size":
+    case "success":
+      return parseLocalizedDecimal(row.dataset[key]);
+    case "group":
+    case "branch":
+    case "main":
+    case "sub":
+      return row.dataset[key] || "";
+    default:
+      return "";
+  }
+}
+
+function compareScoreRows(a, b) {
+  const aValue = getScoreSortValue(a, currentScoreSort.key);
+  const bValue = getScoreSortValue(b, currentScoreSort.key);
+  const direction = currentScoreSort.direction === "asc" ? 1 : -1;
+
+  if (typeof aValue === "number" && typeof bValue === "number") {
+    return (aValue - bValue) * direction;
+  }
+
+  return aValue.localeCompare(bValue, "tr", { numeric: true, sensitivity: "base" }) * direction;
+}
+
+function reorderScoreRows(orderedRows) {
+  const tableBody = orderedRows[0]?.parentElement || document.querySelector(".score-table tbody");
+  if (!tableBody) {
+    return;
+  }
+
+  const emptyRows = Array.from(tableBody.querySelectorAll(".empty-row"));
+  const remainingRows = scoreRows.filter((row) => !orderedRows.includes(row));
+  [...orderedRows, ...remainingRows].forEach((row) => {
+    const actionsRow = getScoreActionsRow(row);
+    tableBody.append(row);
+    if (actionsRow) {
+      tableBody.append(actionsRow);
+    }
+  });
+  emptyRows.forEach((row) => tableBody.append(row));
+}
+
+function updateScoreSortButtons() {
+  scoreSortButtons.forEach((button) => {
+    const isActive = button.dataset.scoreSort === currentScoreSort.key;
+    button.classList.toggle("is-active", isActive);
+    button.classList.toggle("desc", isActive && currentScoreSort.direction === "desc");
+    button.setAttribute("aria-sort", isActive ? (currentScoreSort.direction === "asc" ? "ascending" : "descending") : "none");
+  });
+}
+
+function updateBranchChart(branchTotals) {
+  const chartRows = Array.from(branchChart?.querySelectorAll(".branch-chart-row") || []);
+  chartRows.forEach((row) => {
+    const total = branchTotals.get(row.dataset.branchId || "");
+    const isVisible = Boolean(total);
+    row.classList.toggle("d-none", !isVisible);
+    if (!total) {
+      return;
+    }
+
+    const success = total.target === 0 ? 0 : (total.score / total.target) * 100;
+    const width = Math.min(100, success);
+    const level = success >= 90 ? "good" : success >= 70 ? "watch" : "low";
+    const fill = row.querySelector(".branch-chart-fill");
+    const value = row.querySelector(".branch-chart-value");
+    row.classList.remove("good", "watch", "low");
+    row.classList.add(level);
+    if (fill) {
+      fill.style.width = `${width}%`;
+    }
+    if (value) {
+      value.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
+    }
+    row.dataset.success = success.toString();
+  });
+
+  chartRows
+    .sort((a, b) => parseLocalizedDecimal(b.dataset.success) - parseLocalizedDecimal(a.dataset.success))
+    .forEach((row) => branchChart?.append(row));
+  if (noBranchChartRows) {
+    branchChart?.append(noBranchChartRows);
+  }
+}
+
+function applyScoreFilters() {
   let visibleCount = 0;
   let scoreSum = 0;
   let targetSum = 0;
   const branchTotals = new Map();
+  const visibleRows = scoreRows.filter(scoreRowMatchesFilters).sort(compareScoreRows);
+  reorderScoreRows(visibleRows);
 
   scoreRows.forEach((row) => {
-    const matches = (!search || (row.dataset.search || "").includes(search))
-      && (!groupId || row.dataset.groupId === groupId)
-      && (!year || row.dataset.year === year)
-      && (!term || row.dataset.term === term);
+    const matches = visibleRows.includes(row);
 
     row.classList.toggle("d-none", !matches);
     getScoreActionsRow(row)?.classList.toggle("d-none", !matches);
@@ -658,31 +762,30 @@ function applyScoreFilters() {
 
   noScoreRows?.classList.toggle("d-none", visibleCount !== 0 || scoreRows.length === 0);
   noBranchChartRows?.classList.toggle("d-none", branchTotals.size !== 0 || scoreRows.length === 0);
-
-  branchChart?.querySelectorAll(".branch-chart-row").forEach((row) => {
-    const total = branchTotals.get(row.dataset.branchId || "");
-    const isVisible = Boolean(total);
-    row.classList.toggle("d-none", !isVisible);
-    if (!total) {
-      return;
-    }
-
-    const success = total.target === 0 ? 0 : (total.score / total.target) * 100;
-    const width = Math.min(100, success);
-    const fill = row.querySelector(".branch-chart-fill");
-    const value = row.querySelector(".branch-chart-value");
-    if (fill) {
-      fill.style.width = `${width}%`;
-    }
-    if (value) {
-      value.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
-    }
-  });
+  updateBranchChart(branchTotals);
 }
 
 scoreFilters.forEach((input) => {
   const eventName = input.tagName === "SELECT" ? "change" : "input";
   input.addEventListener(eventName, applyScoreFilters);
+});
+
+scoreSortButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.scoreSort;
+    if (!key) {
+      return;
+    }
+
+    if (currentScoreSort.key === key) {
+      currentScoreSort.direction = currentScoreSort.direction === "asc" ? "desc" : "asc";
+    } else {
+      currentScoreSort = { key, direction: "asc" };
+    }
+
+    updateScoreSortButtons();
+    applyScoreFilters();
+  });
 });
 
 codeMode?.addEventListener("change", toggleManualCode);
@@ -695,5 +798,6 @@ productType?.addEventListener("change", () => {
 toggleManualCode();
 toggleCreateProductFields();
 updateSortButtons();
+updateScoreSortButtons();
 applyClientFilters(true);
 applyScoreFilters();

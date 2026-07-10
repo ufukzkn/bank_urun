@@ -222,4 +222,5 @@ docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
 - Grup segmenti `Karma`, `Kurumsal`, `Ticari`, `Kobi`, `Diger` değerlerinden biri olur.
 - Şube performans puanları `branch_product_scores` tablosunda alt ürün instance'a bağlanır.
 - Puan ve hedef negatif olamaz; HGO, gelişim ve büyüklük payları DB'de `0-1`, ekranda `0-100` yüzde formatındadır.
+- Mock seed 3 grup, 12 şube, 12 ana ürün, 28 alt ürün ve 60+ şube performans puanı oluşturur.
 - Halkbank logosu resmi logo sayfasındaki JPG varlığından alınmıştır: https://www.halkbank.com.tr/tr/bankamiz/kurumsal-iletisim/logolarimiz

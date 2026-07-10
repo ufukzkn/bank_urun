@@ -4,6 +4,9 @@
     ViewData["Title"] = "Puanlar";
     string Fmt(decimal value) => value.ToString("0.##");
     string Pct(decimal value) => $"% {value:0.##}";
+    string Width(decimal value) => Math.Clamp(value, 0, 100).ToString("0.##").Replace(",", ".");
+    string SuccessLevel(decimal value) => value >= 90 ? "good" : value >= 70 ? "watch" : "low";
+    string SuccessText(decimal value) => value >= 90 ? "Güçlü" : value >= 70 ? "İzleme" : "Düşük";
     var groups = Model.Branches
         .GroupBy(branch => new { branch.GroupId, branch.GroupNo, branch.GroupName })
         .OrderBy(group => group.Key.GroupNo)
@@ -179,19 +182,19 @@
         <table class="table product-table score-table">
             <thead>
                 <tr>
-                    <th>Yıl</th>
-                    <th>Dönem</th>
-                    <th>Grup</th>
-                    <th>Şube</th>
-                    <th>Ana ürün</th>
-                    <th>Alt ürün</th>
-                    <th class="text-end">Puan</th>
-                    <th class="text-end">Görüntülenen</th>
-                    <th class="text-end">Hedef</th>
-                    <th class="text-end">HGO</th>
-                    <th class="text-end">Gelişim</th>
-                    <th class="text-end">Büyüklük</th>
-                    <th class="text-end">Başarı</th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="year">Yıl <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="term">Dönem <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="group">Grup <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="branch">Şube <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="main">Ana ürün <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="sub">Alt ürün <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="score">Puan <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="displayed">Görüntülenen <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="target">Hedef <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="hgo">HGO <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="development">Gelişim <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="size">Büyüklük <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="success">Başarı <span></span></button></th>
                     <th class="text-end">İşlem</th>
                 </tr>
             </thead>
@@ -205,35 +208,79 @@
             @foreach (var score in Model.Scores)
             {
                 var search = $"{score.Year} {score.Term} {score.GroupNo} {score.GroupName} {score.BranchCode} {score.BranchName} {score.MainProductCode} {score.MainProductName} {score.SubProductCode} {score.SubProductName}".ToUpperInvariant();
+                var successLevel = SuccessLevel(score.SuccessRate);
                 <tr class="score-row"
                     data-search="@search"
                     data-group-id="@score.GroupId"
                     data-branch-id="@score.BranchId"
                     data-year="@score.Year"
                     data-term="@score.Term"
+                    data-group="@($"{score.GroupNo} {score.GroupName}")"
+                    data-branch="@($"{score.BranchCode} {score.BranchName}")"
+                    data-main="@($"{score.MainProductCode} {score.MainProductName}")"
+                    data-sub="@($"{score.SubProductCode} {score.SubProductName}")"
                     data-score="@score.Score"
-                    data-target="@score.TargetValue">
+                    data-displayed="@score.DisplayedScore"
+                    data-target="@score.TargetValue"
+                    data-hgo="@score.HgoShare"
+                    data-development="@score.DevelopmentShare"
+                    data-size="@score.SizeShare"
+                    data-success="@score.SuccessRate">
                     <td>@score.Year</td>
                     <td>@score.Term</td>
                     <td><strong>@score.GroupNo</strong><small>@score.GroupName</small></td>
-                    <td><strong>@score.BranchCode</strong><small>@score.BranchName</small></td>
+                    <td><strong class="success-name @successLevel">@score.BranchCode</strong><small>@score.BranchName</small></td>
                     <td><strong>@score.MainProductCode</strong><small>@score.MainProductName</small></td>
-                    <td><strong>@score.SubProductCode</strong><small>@score.SubProductName</small></td>
+                    <td><strong class="success-name @successLevel">@score.SubProductCode</strong><small>@score.SubProductName</small></td>
                     <td class="text-end">@Fmt(score.Score)</td>
                     <td class="text-end">@Fmt(score.DisplayedScore)</td>
                     <td class="text-end">@Fmt(score.TargetValue)</td>
                     <td class="text-end">@Pct(score.HgoShare)</td>
                     <td class="text-end">@Pct(score.DevelopmentShare)</td>
                     <td class="text-end">@Pct(score.SizeShare)</td>
-                    <td class="text-end">@Pct(score.SuccessRate)</td>
+                    <td class="text-end"><span class="success-chip @successLevel">@Pct(score.SuccessRate)</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id">Düzenle</button>
+                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id">Detay</button>
                     </td>
                 </tr>
                 <tr class="score-actions-row">
                     <td colspan="14">
                         <div class="collapse" id="score-actions-@score.Id">
                             <div class="actions-panel">
+                                <div class="score-detail-panel @successLevel">
+                                    <div class="score-detail-hero">
+                                        <div>
+                                            <span class="detail-kicker">@score.GroupNo / @score.BranchCode</span>
+                                            <strong>@score.BranchName</strong>
+                                            <small>@score.MainProductCode - @score.SubProductCode @score.SubProductName</small>
+                                        </div>
+                                        <div class="success-dial @successLevel">
+                                            <span>@Pct(score.SuccessRate)</span>
+                                            <small>@SuccessText(score.SuccessRate)</small>
+                                        </div>
+                                    </div>
+                                    <div class="detail-metrics-grid">
+                                        <div class="detail-metric">
+                                            <span>Puan / hedef</span>
+                                            <strong>@Fmt(score.Score) / @Fmt(score.TargetValue)</strong>
+                                            <div class="mini-progress">
+                                                <div style="width:@Width(score.SuccessRate)%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="detail-metric">
+                                            <span>Görüntülenecek puan</span>
+                                            <strong>@Fmt(score.DisplayedScore)</strong>
+                                            <div class="mini-progress muted-progress">
+                                                <div style="width:@Width(score.DisplayedScore)%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="share-stack" aria-label="Pay dağılımı">
+                                        <div class="share hgo" style="width:@Width(score.HgoShare)%">HGO @Pct(score.HgoShare)</div>
+                                        <div class="share development" style="width:@Width(score.DevelopmentShare)%">Gelişim @Pct(score.DevelopmentShare)</div>
+                                        <div class="share size" style="width:@Width(score.SizeShare)%">Büyüklük @Pct(score.SizeShare)</div>
+                                    </div>
+                                </div>
                                 <form asp-action="UpdateScore" method="post" class="inline-form score-edit-form">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="Id" value="@score.Id" />
