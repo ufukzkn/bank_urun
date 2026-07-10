@@ -8,7 +8,7 @@
 <section class="page-title">
     <div>
         <h1>Organizasyon</h1>
-        <p>Gruplar ve bu gruplara bağlı şubeler.</p>
+        <p>Grupları ve bağlı şubeleri tek yerden yönetin.</p>
     </div>
 </section>
 
@@ -22,17 +22,17 @@
     <div class="alert alert-danger action-alert page-alert" role="alert">@error</div>
 }
 
-<section class="management-grid links-grid">
-    <div class="surface-panel create-panel">
+<section class="management-grid links-grid compact-management-grid">
+    <div class="surface-panel create-panel compact-create-panel">
         <div class="panel-heading">
             <div>
                 <h2>Grup oluştur</h2>
-                <p>Segment ve performans kapsamı ile tanımlayın.</p>
+                <p>Segment ve performans kapsamını belirleyin.</p>
             </div>
         </div>
-        <form asp-action="CreateGroup" method="post" class="stack-form">
+        <form asp-action="CreateGroup" method="post" class="stack-form compact-stack-form">
             @Html.AntiForgeryToken()
-            <div class="form-row">
+            <div class="form-row compact-form-row">
                 <label>
                     <span>Grup no</span>
                     <input class="form-control code-input" name="GroupNo" maxlength="24" required />
@@ -51,51 +51,35 @@
                 <span>Grup adı</span>
                 <input class="form-control" name="Name" maxlength="180" required />
             </label>
-            <div class="toggle-grid">
-                <label class="check-line">
-                    <input class="form-check-input" type="checkbox" name="IsActive" value="true" checked />
-                    <input type="hidden" name="IsActive" value="false" />
-                    <span>Aktif</span>
-                </label>
-                <label class="check-line">
-                    <input class="form-check-input" type="checkbox" name="BranchPerformanceEnabled" value="true" checked />
-                    <input type="hidden" name="BranchPerformanceEnabled" value="false" />
-                    <span>Şube performans</span>
-                </label>
-                <label class="check-line">
-                    <input class="form-check-input" type="checkbox" name="MiyPerformanceEnabled" value="true" checked />
-                    <input type="hidden" name="MiyPerformanceEnabled" value="false" />
-                    <span>MİY performans</span>
-                </label>
-                <label class="check-line">
-                    <input class="form-check-input" type="checkbox" name="ScaleEnabled" value="true" checked />
-                    <input type="hidden" name="ScaleEnabled" value="false" />
-                    <span>Ölçek</span>
-                </label>
+            <div class="compact-toggle-grid">
+                <label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label>
+                <label class="check-line"><input class="form-check-input" type="checkbox" name="BranchPerformanceEnabled" value="true" checked /><input type="hidden" name="BranchPerformanceEnabled" value="false" /><span>Şube performans</span></label>
+                <label class="check-line"><input class="form-check-input" type="checkbox" name="MiyPerformanceEnabled" value="true" checked /><input type="hidden" name="MiyPerformanceEnabled" value="false" /><span>MİY performans</span></label>
+                <label class="check-line"><input class="form-check-input" type="checkbox" name="ScaleEnabled" value="true" checked /><input type="hidden" name="ScaleEnabled" value="false" /><span>Ölçek</span></label>
             </div>
             <button class="btn btn-primary" type="submit">Grup oluştur</button>
         </form>
     </div>
 
-    <div class="surface-panel create-panel">
+    <div class="surface-panel create-panel compact-create-panel">
         <div class="panel-heading">
             <div>
                 <h2>Şube oluştur</h2>
-                <p>Şubeyi tek bir gruba bağlayın.</p>
+                <p>Şubeyi bağlı olduğu grupla kaydedin.</p>
             </div>
         </div>
-        <form asp-action="CreateBranch" method="post" class="stack-form">
+        <form asp-action="CreateBranch" method="post" class="stack-form compact-stack-form">
             @Html.AntiForgeryToken()
             <label>
                 <span>Bağlı grup</span>
-                <select class="form-select searchable-native" name="GroupId" required>
+                <select class="form-select" name="GroupId" required>
                     @foreach (var group in Model.Groups.Where(group => group.IsActive))
                     {
                         <option value="@group.Id">@group.Label (@group.GroupSegment)</option>
                     }
                 </select>
             </label>
-            <div class="form-row">
+            <div class="form-row compact-form-row">
                 <label>
                     <span>Şube kodu</span>
                     <input class="form-control code-input" name="BranchCode" maxlength="24" required />
@@ -110,136 +94,215 @@
     </div>
 </section>
 
-<section class="surface-panel table-panel">
-    <div class="table-toolbar simple-toolbar">
-        <label class="toolbar-search">
-            <span>Organizasyon içinde ara</span>
-            <input class="form-control live-table-filter" type="search" data-target=".organization-row" placeholder="Grup no, segment, şube kodu veya adı" />
-        </label>
-    </div>
-
-    <div class="org-board">
-        @foreach (var group in Model.Groups)
-        {
-            var groupBranches = Model.Branches.Where(branch => branch.GroupId == group.Id).ToList();
-            var search = $"{group.GroupNo} {group.Name} {group.GroupSegment} {string.Join(' ', groupBranches.Select(branch => $"{branch.BranchCode} {branch.Name}"))}".ToUpperInvariant();
-            <article class="group-card organization-row" data-search="@search">
-                <div class="group-card-header">
-                    <div>
-                        <div class="group-code">@group.GroupNo</div>
-                        <h2>@group.Name</h2>
-                        <div class="group-meta">
-                            <span class="status-pill neutral">@group.GroupSegment</span>
-                            <span class="status-pill @(group.IsActive ? "active" : "passive")">@(group.IsActive ? "Aktif" : "Pasif")</span>
-                            <span>@group.BranchCount şube</span>
-                        </div>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#group-edit-@group.Id">Düzenle</button>
-                </div>
-
-                <div class="performance-flags">
-                    <span class="flag-pill @(group.BranchPerformanceEnabled ? "is-on" : "")">Şube perf.</span>
-                    <span class="flag-pill @(group.MiyPerformanceEnabled ? "is-on" : "")">MİY perf.</span>
-                    <span class="flag-pill @(group.ScaleEnabled ? "is-on" : "")">Ölçek</span>
-                </div>
-
-                <div class="collapse" id="group-edit-@group.Id">
-                    <div class="inline-edit-panel">
-                        <form asp-action="UpdateGroup" method="post" class="stack-form">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="Id" value="@group.Id" />
-                            <div class="form-row">
-                                <label>
-                                    <span>Grup no</span>
-                                    <input class="form-control code-input" name="GroupNo" value="@group.GroupNo" maxlength="24" required />
-                                </label>
-                                <label>
-                                    <span>Segment</span>
-                                    <select class="form-select" name="GroupSegment">
-                                        @foreach (var segment in Enum.GetValues<GroupSegment>())
-                                        {
-                                            <option value="@segment" selected="@(group.GroupSegment == segment)">@segment</option>
-                                        }
-                                    </select>
-                                </label>
+<section class="organization-tables-grid">
+    <section class="surface-panel table-panel compact-list-panel" data-list="groups">
+        <div class="panel-heading table-panel-heading">
+            <div>
+                <h2>Gruplar</h2>
+                <p>Grup tanımları ve performans kapsamı.</p>
+            </div>
+        </div>
+        <div class="table-toolbar compact-table-toolbar">
+            <label class="toolbar-search">
+                <span>Gruplarda ara</span>
+                <input class="form-control" type="search" data-list-filter="search" placeholder="No, ad veya segment" />
+            </label>
+            <label>
+                <span>Sayfa</span>
+                <select class="form-select" data-list-page-size>
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+            </label>
+        </div>
+        <div class="table-responsive">
+            <table class="table product-table compact-table">
+                <thead>
+                    <tr>
+                        <th><button class="sort-button" type="button" data-list-sort="groupNo">Grup no <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="name">Grup adı <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="segment">Segment <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="active">Durum <span></span></button></th>
+                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="branchCount">Şube <span></span></button></th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Groups.Count == 0)
+                {
+                    <tr class="empty-row"><td colspan="6" class="empty-cell">Grup yok</td></tr>
+                }
+                @foreach (var group in Model.Groups)
+                {
+                    var detailId = $"group-detail-{group.Id}";
+                    var search = $"{group.GroupNo} {group.Name} {group.GroupSegment}".ToUpperInvariant();
+                    <tr class="list-row group-row"
+                        data-detail-id="@detailId"
+                        data-search="@search"
+                        data-group-no="@group.GroupNo"
+                        data-name="@group.Name"
+                        data-segment="@group.GroupSegment"
+                        data-active="@(group.IsActive ? 1 : 0)"
+                        data-branch-count="@group.BranchCount">
+                        <td><strong>@group.GroupNo</strong></td>
+                        <td>@group.Name</td>
+                        <td><span class="status-pill neutral">@group.GroupSegment</span></td>
+                        <td><span class="status-pill @(group.IsActive ? "active" : "passive")">@(group.IsActive ? "Aktif" : "Pasif")</span></td>
+                        <td class="text-end">@group.BranchCount</td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false" aria-controls="@detailId">Detay</button></td>
+                    </tr>
+                    <tr class="list-detail-row" data-detail-for="@detailId">
+                        <td colspan="6">
+                            <div class="collapse" id="@detailId">
+                                <div class="compact-detail-panel">
+                                    <div class="detail-overview">
+                                        <div class="performance-flags">
+                                            <span class="flag-pill @(group.BranchPerformanceEnabled ? "is-on" : "")">Şube perf.</span>
+                                            <span class="flag-pill @(group.MiyPerformanceEnabled ? "is-on" : "")">MİY perf.</span>
+                                            <span class="flag-pill @(group.ScaleEnabled ? "is-on" : "")">Ölçek</span>
+                                        </div>
+                                        <span class="detail-note">@group.BranchCount bağlı şube</span>
+                                    </div>
+                                    <form asp-action="UpdateGroup" method="post" class="compact-edit-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@group.Id" />
+                                        <div class="compact-form-grid">
+                                            <label><span>Grup no</span><input class="form-control form-control-sm code-input" name="GroupNo" value="@group.GroupNo" maxlength="24" required /></label>
+                                            <label><span>Segment</span><select class="form-select form-select-sm" name="GroupSegment">@foreach (var segment in Enum.GetValues<GroupSegment>()) { <option value="@segment" selected="@(group.GroupSegment == segment)">@segment</option> }</select></label>
+                                            <label class="compact-name-field"><span>Grup adı</span><input class="form-control form-control-sm" name="Name" value="@group.Name" maxlength="180" required /></label>
+                                        </div>
+                                        <div class="compact-toggle-grid">
+                                            <label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@group.IsActive" /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label>
+                                            <label class="check-line"><input class="form-check-input" type="checkbox" name="BranchPerformanceEnabled" value="true" checked="@group.BranchPerformanceEnabled" /><input type="hidden" name="BranchPerformanceEnabled" value="false" /><span>Şube performans</span></label>
+                                            <label class="check-line"><input class="form-check-input" type="checkbox" name="MiyPerformanceEnabled" value="true" checked="@group.MiyPerformanceEnabled" /><input type="hidden" name="MiyPerformanceEnabled" value="false" /><span>MİY performans</span></label>
+                                            <label class="check-line"><input class="form-check-input" type="checkbox" name="ScaleEnabled" value="true" checked="@group.ScaleEnabled" /><input type="hidden" name="ScaleEnabled" value="false" /><span>Ölçek</span></label>
+                                        </div>
+                                        <div class="detail-actions">
+                                            <button class="btn btn-sm btn-primary" type="submit" data-confirm="Grubu güncellemek istediğinize emin misiniz?">Güncelle</button>
+                                        </div>
+                                    </form>
+                                    <form asp-action="DeleteGroup" method="post" class="button-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@group.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Grubu silmek istediğinize emin misiniz? Bağlı şube varsa silinmez.">Sil</button>
+                                    </form>
+                                </div>
                             </div>
-                            <label>
-                                <span>Grup adı</span>
-                                <input class="form-control" name="Name" value="@group.Name" maxlength="180" required />
-                            </label>
-                            <div class="toggle-grid">
-                                <label class="check-line">
-                                    <input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@group.IsActive" />
-                                    <input type="hidden" name="IsActive" value="false" />
-                                    <span>Aktif</span>
-                                </label>
-                                <label class="check-line">
-                                    <input class="form-check-input" type="checkbox" name="BranchPerformanceEnabled" value="true" checked="@group.BranchPerformanceEnabled" />
-                                    <input type="hidden" name="BranchPerformanceEnabled" value="false" />
-                                    <span>Şube performans</span>
-                                </label>
-                                <label class="check-line">
-                                    <input class="form-check-input" type="checkbox" name="MiyPerformanceEnabled" value="true" checked="@group.MiyPerformanceEnabled" />
-                                    <input type="hidden" name="MiyPerformanceEnabled" value="false" />
-                                    <span>MİY performans</span>
-                                </label>
-                                <label class="check-line">
-                                    <input class="form-check-input" type="checkbox" name="ScaleEnabled" value="true" checked="@group.ScaleEnabled" />
-                                    <input type="hidden" name="ScaleEnabled" value="false" />
-                                    <span>Ölçek</span>
-                                </label>
-                            </div>
-                            <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Grubu güncellemek istediğinize emin misiniz?">Güncelle</button>
-                        </form>
-                        <div class="form-actions">
-                                <form asp-action="DeleteGroup" method="post" class="button-form">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="Id" value="@group.Id" />
-                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Grubu silmek istediğinize emin misiniz? Bağlı şube varsa silinmez.">Sil</button>
-                                </form>
-                        </div>
-                    </div>
-                </div>
+                        </td>
+                    </tr>
+                }
+                <tr class="empty-row d-none" data-list-empty><td colspan="6" class="empty-cell">Filtreye uygun grup yok</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination-bar" data-list-pagination>
+            <div class="pagination-summary" data-list-summary>Gruplar hazırlanıyor</div>
+            <div class="pager-buttons">
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
+                <span data-list-page-indicator>1 / 1</span>
+                <input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
+            </div>
+        </div>
+    </section>
 
-                <div class="branch-list">
-                    @if (groupBranches.Count == 0)
-                    {
-                        <div class="empty-inline">Bu gruba bağlı şube yok</div>
-                    }
-                    @foreach (var branch in groupBranches)
-                    {
-                        <div class="branch-row">
-                            <div>
-                                <strong>@branch.BranchCode</strong>
-                                <span>@branch.Name</span>
+    <section class="surface-panel table-panel compact-list-panel" data-list="branches">
+        <div class="panel-heading table-panel-heading">
+            <div>
+                <h2>Şubeler</h2>
+                <p>Bağlı grup bilgisiyle şube listesi.</p>
+            </div>
+        </div>
+        <div class="table-toolbar compact-table-toolbar">
+            <label class="toolbar-search">
+                <span>Şubelerde ara</span>
+                <input class="form-control" type="search" data-list-filter="search" placeholder="Kod, ad, grup veya segment" />
+            </label>
+            <label>
+                <span>Sayfa</span>
+                <select class="form-select" data-list-page-size>
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+            </label>
+        </div>
+        <div class="table-responsive">
+            <table class="table product-table compact-table">
+                <thead>
+                    <tr>
+                        <th><button class="sort-button" type="button" data-list-sort="branchCode">Şube kodu <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="name">Şube adı <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="group">Bağlı grup <span></span></button></th>
+                        <th><button class="sort-button" type="button" data-list-sort="segment">Segment <span></span></button></th>
+                        <th class="text-end">İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Branches.Count == 0)
+                {
+                    <tr class="empty-row"><td colspan="5" class="empty-cell">Şube yok</td></tr>
+                }
+                @foreach (var branch in Model.Branches)
+                {
+                    var detailId = $"branch-detail-{branch.Id}";
+                    var search = $"{branch.BranchCode} {branch.Name} {branch.GroupNo} {branch.GroupName} {branch.GroupSegment}".ToUpperInvariant();
+                    <tr class="list-row branch-row"
+                        data-detail-id="@detailId"
+                        data-search="@search"
+                        data-branch-code="@branch.BranchCode"
+                        data-name="@branch.Name"
+                        data-group="@($"{branch.GroupNo} {branch.GroupName}")"
+                        data-segment="@branch.GroupSegment">
+                        <td><strong>@branch.BranchCode</strong></td>
+                        <td>@branch.Name</td>
+                        <td><strong>@branch.GroupNo</strong><small>@branch.GroupName</small></td>
+                        <td><span class="status-pill neutral">@branch.GroupSegment</span></td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false" aria-controls="@detailId">Detay</button></td>
+                    </tr>
+                    <tr class="list-detail-row" data-detail-for="@detailId">
+                        <td colspan="5">
+                            <div class="collapse" id="@detailId">
+                                <div class="compact-detail-panel">
+                                    <form asp-action="UpdateBranch" method="post" class="compact-edit-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@branch.Id" />
+                                        <div class="compact-form-grid branch-edit-grid">
+                                            <label><span>Bağlı grup</span><select class="form-select form-select-sm" name="GroupId">@foreach (var targetGroup in Model.Groups) { <option value="@targetGroup.Id" selected="@(targetGroup.Id == branch.GroupId)">@targetGroup.Label</option> }</select></label>
+                                            <label><span>Şube kodu</span><input class="form-control form-control-sm code-input" name="BranchCode" value="@branch.BranchCode" maxlength="24" required /></label>
+                                            <label class="compact-name-field"><span>Şube adı</span><input class="form-control form-control-sm" name="Name" value="@branch.Name" maxlength="180" required /></label>
+                                        </div>
+                                        <div class="detail-actions"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Şubeyi güncellemek istediğinize emin misiniz?">Güncelle</button></div>
+                                    </form>
+                                    <form asp-action="DeleteBranch" method="post" class="button-form">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@branch.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Şubeyi silmek istediğinize emin misiniz? Puan kayıtları da silinir.">Sil</button>
+                                    </form>
+                                </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#branch-edit-@branch.Id">Düzenle</button>
-                        </div>
-                        <div class="collapse" id="branch-edit-@branch.Id">
-                            <div class="inline-edit-panel compact">
-                                <form asp-action="UpdateBranch" method="post" class="inline-form branch-edit-form">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="Id" value="@branch.Id" />
-                                    <select class="form-select form-select-sm compact-select" name="GroupId">
-                                        @foreach (var targetGroup in Model.Groups)
-                                        {
-                                            <option value="@targetGroup.Id" selected="@(targetGroup.Id == branch.GroupId)">@targetGroup.Label</option>
-                                        }
-                                    </select>
-                                    <input class="form-control form-control-sm code-edit-input wide-code" name="BranchCode" value="@branch.BranchCode" maxlength="24" />
-                                    <input class="form-control form-control-sm" name="Name" value="@branch.Name" maxlength="180" />
-                                    <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Şubeyi güncellemek istediğinize emin misiniz?">Güncelle</button>
-                                </form>
-                                <form asp-action="DeleteBranch" method="post" class="button-form">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="Id" value="@branch.Id" />
-                                    <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Şubeyi silmek istediğinize emin misiniz? Puan kayıtları da silinir.">Sil</button>
-                                </form>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </article>
-        }
-    </div>
+                        </td>
+                    </tr>
+                }
+                <tr class="empty-row d-none" data-list-empty><td colspan="5" class="empty-cell">Filtreye uygun şube yok</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination-bar" data-list-pagination>
+            <div class="pagination-summary" data-list-summary>Şubeler hazırlanıyor</div>
+            <div class="pager-buttons">
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
+                <span data-list-page-indicator>1 / 1</span>
+                <input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
+                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
+            </div>
+        </div>
+    </section>
 </section>

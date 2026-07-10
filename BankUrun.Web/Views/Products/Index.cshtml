@@ -13,8 +13,8 @@
     </div>
 </section>
 
-<section class="workspace-grid">
-    <div class="surface-panel create-panel">
+<section class="workspace-grid compact-workspace-grid">
+    <div class="surface-panel create-panel compact-create-panel">
         <div class="panel-heading">
             <div>
                 <h1>Ürün oluştur</h1>
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <form asp-action="CreateProduct" method="post" class="stack-form">
+        <form asp-action="CreateProduct" method="post" class="stack-form compact-stack-form">
             @Html.AntiForgeryToken()
             <div class="form-row">
                 <label>
@@ -97,38 +97,38 @@
     </div>
 </section>
 
-<section class="surface-panel table-panel">
-    <div class="table-toolbar" id="listFilterForm">
+<section class="surface-panel table-panel compact-list-panel" data-list="products">
+    <div class="table-toolbar compact-table-toolbar" id="listFilterForm">
         <label class="toolbar-search">
             <span>Liste içinde ara</span>
-            <input class="form-control list-filter" type="search" id="filterSearch" placeholder="Kod, ana ürün veya alt ürün adı" />
+            <input class="form-control" type="search" data-list-filter="search" id="filterSearch" placeholder="Kod, ana ürün veya alt ürün adı" />
         </label>
         <label>
             <span>Yıl</span>
-            <input class="form-control list-filter" type="number" id="filterYear" min="2000" max="2100" />
+            <input class="form-control" type="number" data-list-filter="year" id="filterYear" min="2000" max="2100" />
         </label>
         <label>
             <span>Dönem</span>
-            <input class="form-control list-filter" type="number" id="filterTerm" min="1" max="12" />
+            <input class="form-control" type="number" data-list-filter="term" id="filterTerm" min="1" max="12" />
         </label>
         <label>
             <span>Sayfa</span>
-            <select class="form-select list-filter" id="pageSize">
+            <select class="form-select" data-list-page-size id="pageSize">
                 <option value="10">10</option>
                 <option value="25">25</option>
                 <option value="50">50</option>
             </select>
         </label>
         <label class="check-line">
-            <input class="form-check-input list-filter" type="checkbox" id="includeInactive" />
+            <input class="form-check-input" type="checkbox" data-list-filter="includeInactive" id="includeInactive" />
             <span>Pasifler</span>
         </label>
         <label class="check-line">
-            <input class="form-check-input list-filter" type="checkbox" id="showMainProducts" checked />
+            <input class="form-check-input" type="checkbox" data-list-filter="showMainProducts" id="showMainProducts" checked />
             <span>Ana ürünler</span>
         </label>
         <label class="check-line">
-            <input class="form-check-input list-filter" type="checkbox" id="showSubProducts" checked />
+            <input class="form-check-input" type="checkbox" data-list-filter="showSubProducts" id="showSubProducts" checked />
             <span>Alt ürünler</span>
         </label>
     </div>
@@ -137,11 +137,11 @@
         <table class="table product-table">
             <thead>
                 <tr>
-                    <th><button class="sort-button" type="button" data-sort="year">Yıl <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-sort="term">Dönem <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-sort="main">Ana Kod <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-sort="sub">Alt Kod <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-sort="subName">Alt Ürün Adı <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="mainCode">Ana Kod <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="subCode">Alt Kod <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="subName">Alt Ürün Adı <span></span></button></th>
                     <th class="text-end">İşlem</th>
                 </tr>
             </thead>
@@ -157,7 +157,8 @@
                 var row = Model.Rows[rowIndex];
                 var detailsId = $"row-actions-{row.MainProductInstanceId}-{row.SubProductInstanceId ?? 0}-{rowIndex}";
                 var searchText = $"{row.Year} {row.Term} {row.MainProductCode} {row.MainProductName} {row.SubProductCode} {row.SubProductName}".ToUpperInvariant();
-                <tr class="product-row"
+                <tr class="list-row product-row"
+                    data-detail-id="@detailsId"
                     data-year="@row.Year"
                     data-term="@row.Term"
                     data-main-code="@row.MainProductCode"
@@ -193,10 +194,10 @@
                         }
                     </td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">Düzenle</button>
+                        <button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">Detay</button>
                     </td>
                 </tr>
-                <tr class="actions-row" data-actions-for="@detailsId">
+                <tr class="list-detail-row actions-row" data-detail-for="@detailsId">
                     <td colspan="6">
                         <div class="collapse" id="@detailsId">
                             <div class="actions-panel">
@@ -264,7 +265,7 @@
                     </td>
                 </tr>
             }
-            <tr id="noClientRows" class="empty-row d-none">
+            <tr id="noClientRows" class="empty-row d-none" data-list-empty>
                 <td colspan="6" class="empty-cell">Filtreye uygun ürün yok</td>
             </tr>
             </tbody>
@@ -272,15 +273,15 @@
     </div>
 
     <div class="pagination-bar">
-        <div class="pagination-summary" id="paginationSummary">Ürünler hazırlanıyor</div>
+        <div class="pagination-summary" id="paginationSummary" data-list-summary>Ürünler hazırlanıyor</div>
         <div class="pager-buttons">
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" id="firstPage" aria-label="İlk sayfa" title="İlk sayfa">«</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" id="prevPage" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
-            <span id="pageIndicator">1 / 1</span>
-            <input class="form-control form-control-sm page-jump" type="number" id="pageJump" min="1" value="1" aria-label="Sayfa numarası" />
-            <button class="btn btn-sm btn-outline-secondary" type="button" id="goPage">Git</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" id="nextPage" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" id="lastPage" aria-label="Son sayfa" title="Son sayfa">»</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
+            <span id="pageIndicator" data-list-page-indicator>1 / 1</span>
+            <input class="form-control form-control-sm page-jump" type="number" id="pageJump" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
         </div>
     </div>
 </section>

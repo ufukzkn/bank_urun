@@ -30,14 +30,14 @@
     <div class="alert alert-danger action-alert page-alert" role="alert">@error</div>
 }
 
-<section class="surface-panel create-panel score-create-panel">
+<section class="surface-panel create-panel score-create-panel compact-create-panel">
     <div class="panel-heading">
         <div>
             <h2>Puan satırı oluştur</h2>
             <p>Şube ve alt ürün instance seçerek performans parametresi kaydedin.</p>
         </div>
     </div>
-    <form asp-action="CreateScore" method="post" class="stack-form combo-required-form">
+    <form asp-action="CreateScore" method="post" class="stack-form compact-stack-form combo-required-form">
         @Html.AntiForgeryToken()
         <div class="form-row">
             <label>
@@ -118,7 +118,7 @@
     </div>
 </section>
 
-<section class="surface-panel performance-panel">
+<section class="surface-panel performance-panel compact-performance-panel">
     <div class="panel-heading">
         <div>
             <h2>Şube başarı sıralaması</h2>
@@ -153,15 +153,15 @@
     </div>
 </section>
 
-<section class="surface-panel table-panel">
-    <div class="table-toolbar score-toolbar">
+<section class="surface-panel table-panel compact-list-panel" data-list="scores">
+    <div class="table-toolbar score-toolbar compact-table-toolbar">
         <label class="toolbar-search">
             <span>Puan listesinde ara</span>
-            <input class="form-control score-filter" type="search" id="scoreSearch" placeholder="Grup, şube, ürün, kod veya dönem" />
+            <input class="form-control" type="search" data-list-filter="search" id="scoreSearch" placeholder="Grup, şube, ürün, kod veya dönem" />
         </label>
         <label>
             <span>Grup</span>
-            <select class="form-select score-filter" id="scoreGroup">
+            <select class="form-select" data-list-filter="groupId" id="scoreGroup">
                 <option value="">Tümü</option>
                 @foreach (var group in groups)
                 {
@@ -171,30 +171,38 @@
         </label>
         <label>
             <span>Yıl</span>
-            <input class="form-control score-filter" type="number" id="scoreYear" min="2000" max="2100" />
+            <input class="form-control" type="number" data-list-filter="year" id="scoreYear" min="2000" max="2100" />
         </label>
         <label>
             <span>Dönem</span>
-            <input class="form-control score-filter" type="number" id="scoreTerm" min="1" max="12" />
+            <input class="form-control" type="number" data-list-filter="term" id="scoreTerm" min="1" max="12" />
+        </label>
+        <label>
+            <span>Sayfa</span>
+            <select class="form-select" data-list-page-size>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+            </select>
         </label>
     </div>
     <div class="table-responsive">
         <table class="table product-table score-table">
             <thead>
                 <tr>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="year">Yıl <span></span></button></th>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="term">Dönem <span></span></button></th>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="group">Grup <span></span></button></th>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="branch">Şube <span></span></button></th>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="main">Ana ürün <span></span></button></th>
-                    <th><button class="sort-button score-sort-button" type="button" data-score-sort="sub">Alt ürün <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="score">Puan <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="displayed">Görüntülenen <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="target">Hedef <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="hgo">HGO <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="development">Gelişim <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="size">Büyüklük <span></span></button></th>
-                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-score-sort="success">Başarı <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="group">Grup <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="branch">Şube <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="main">Ana ürün <span></span></button></th>
+                    <th><button class="sort-button score-sort-button" type="button" data-list-sort="sub">Alt ürün <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="score">Puan <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="displayed">Görüntülenen <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="target">Hedef <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="hgo">HGO <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="development">Gelişim <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="size">Büyüklük <span></span></button></th>
+                    <th class="text-end"><button class="sort-button score-sort-button justify-content-end" type="button" data-list-sort="success">Başarı <span></span></button></th>
                     <th class="text-end">İşlem</th>
                 </tr>
             </thead>
@@ -209,7 +217,8 @@
             {
                 var search = $"{score.Year} {score.Term} {score.GroupNo} {score.GroupName} {score.BranchCode} {score.BranchName} {score.MainProductCode} {score.MainProductName} {score.SubProductCode} {score.SubProductName}".ToUpperInvariant();
                 var successLevel = SuccessLevel(score.SuccessRate);
-                <tr class="score-row"
+                <tr class="list-row score-row"
+                    data-detail-id="score-actions-@score.Id"
                     data-search="@search"
                     data-group-id="@score.GroupId"
                     data-branch-id="@score.BranchId"
@@ -240,10 +249,10 @@
                     <td class="text-end">@Pct(score.SizeShare)</td>
                     <td class="text-end"><span class="success-chip @successLevel">@Pct(score.SuccessRate)</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id">Detay</button>
+                        <button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#score-actions-@score.Id" aria-expanded="false" aria-controls="score-actions-@score.Id">Detay</button>
                     </td>
                 </tr>
-                <tr class="score-actions-row">
+                <tr class="list-detail-row score-actions-row" data-detail-for="score-actions-@score.Id">
                     <td colspan="14">
                         <div class="collapse" id="score-actions-@score.Id">
                             <div class="actions-panel">
@@ -318,10 +327,22 @@
                     </td>
                 </tr>
             }
-            <tr id="noScoreRows" class="empty-row d-none">
+            <tr id="noScoreRows" class="empty-row d-none" data-list-empty>
                 <td colspan="14" class="empty-cell">Filtreye uygun puan satırı yok</td>
             </tr>
             </tbody>
         </table>
+    </div>
+    <div class="pagination-bar" data-list-pagination>
+        <div class="pagination-summary" data-list-summary>Puanlar hazırlanıyor</div>
+        <div class="pager-buttons">
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
+            <span data-list-page-indicator>1 / 1</span>
+            <input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
+            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
+        </div>
     </div>
 </section>

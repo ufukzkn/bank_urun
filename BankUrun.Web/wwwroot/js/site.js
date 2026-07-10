@@ -8,26 +8,6 @@ const mainProductCombo = document.querySelector("#mainProductCombo");
 const createMainProductSearch = document.querySelector("#createMainProductSearch");
 const createMainProductId = document.querySelector("#createMainProductId");
 const periodFields = document.querySelector("#periodFields");
-
-const filterSearch = document.querySelector("#filterSearch");
-const filterYear = document.querySelector("#filterYear");
-const filterTerm = document.querySelector("#filterTerm");
-const includeInactive = document.querySelector("#includeInactive");
-const showMainProducts = document.querySelector("#showMainProducts");
-const showSubProducts = document.querySelector("#showSubProducts");
-const pageSize = document.querySelector("#pageSize");
-const paginationSummary = document.querySelector("#paginationSummary");
-const pageIndicator = document.querySelector("#pageIndicator");
-const firstPage = document.querySelector("#firstPage");
-const prevPage = document.querySelector("#prevPage");
-const nextPage = document.querySelector("#nextPage");
-const lastPage = document.querySelector("#lastPage");
-const pageJump = document.querySelector("#pageJump");
-const goPage = document.querySelector("#goPage");
-const noClientRows = document.querySelector("#noClientRows");
-const productRows = Array.from(document.querySelectorAll(".product-row"));
-const productTableBody = document.querySelector("#productTableBody");
-const sortButtons = Array.from(document.querySelectorAll("[data-sort]"));
 const actionConfirmToast = document.querySelector("#actionConfirmToast");
 const actionToastBackdrop = document.querySelector("#actionToastBackdrop");
 const toastTitle = document.querySelector("#toastTitle");
@@ -35,10 +15,6 @@ const toastMessage = document.querySelector("#toastMessage");
 const standardToastActions = document.querySelector("#standardToastActions");
 const deleteToastActions = document.querySelector("#deleteToastActions");
 
-let currentPage = 1;
-let filteredRows = [];
-let currentTotalPages = 1;
-let currentSort = { key: "year", direction: "desc" };
 let pendingForm = null;
 let pendingSubmitter = null;
 
@@ -103,11 +79,7 @@ async function refreshSuggestion() {
     return;
   }
 
-  const params = new URLSearchParams({
-    type: productType.value,
-    code,
-  });
-
+  const params = new URLSearchParams({ type: productType.value, code });
   if (productType.value === "Sub" && createMainProductId?.value) {
     params.set("mainProductInstanceId", createMainProductId.value);
   }
@@ -141,18 +113,13 @@ function filterMainProductOptions() {
   }
 
   const query = createMainProductSearch.value.trim().toUpperCase();
-  const options = Array.from(document.querySelectorAll("#mainProductOptions .combo-option"));
   let visibleCount = 0;
-
-  options.forEach((option) => {
+  document.querySelectorAll("#mainProductOptions .combo-option").forEach((option) => {
     const text = option.dataset.label?.toUpperCase() || option.textContent?.toUpperCase() || "";
     const isVisible = !query || text.includes(query);
     option.classList.toggle("d-none", !isVisible);
-    if (isVisible) {
-      visibleCount += 1;
-    }
+    visibleCount += isVisible ? 1 : 0;
   });
-
   mainProductCombo.classList.toggle("has-no-results", visibleCount === 0);
 }
 
@@ -165,199 +132,21 @@ function closeMainProductCombo() {
   mainProductCombo?.classList.remove("is-open");
 }
 
-function selectMainProductOption(option) {
-  if (!option || !createMainProductSearch || !createMainProductId) {
-    return;
-  }
-
-  createMainProductSearch.value = option.dataset.label || "";
-  createMainProductId.value = option.dataset.id || "";
-  closeMainProductCombo();
-  refreshSuggestion();
-}
-
-function getActionsRow(row) {
-  return row.nextElementSibling?.classList.contains("actions-row") ? row.nextElementSibling : null;
-}
-
-function rowMatchesFilters(row) {
-  const search = filterSearch?.value.trim().toUpperCase() || "";
-  const year = filterYear?.value.trim() || "";
-  const term = filterTerm?.value.trim() || "";
-  const hasSub = row.dataset.hasSub === "true";
-  const active = row.dataset.active === "true";
-
-  if (search && !row.dataset.search.includes(search)) {
-    return false;
-  }
-
-  if (year && row.dataset.year !== year) {
-    return false;
-  }
-
-  if (term && row.dataset.term !== term) {
-    return false;
-  }
-
-  if (!includeInactive?.checked && !active) {
-    return false;
-  }
-
-  if (!showMainProducts?.checked && !hasSub) {
-    return false;
-  }
-
-  if (!showSubProducts?.checked && hasSub) {
-    return false;
-  }
-
-  return true;
-}
-
-function hideRowPair(row) {
-  row.classList.add("d-none");
-  getActionsRow(row)?.classList.add("d-none");
-}
-
-function showRowPair(row) {
-  row.classList.remove("d-none");
-  getActionsRow(row)?.classList.remove("d-none");
-}
-
-function getSortValue(row, key) {
-  switch (key) {
-    case "year":
-      return Number(row.dataset.year || 0);
-    case "term":
-      return Number(row.dataset.term || 0);
-    case "main":
-      return row.dataset.mainCode || "";
-    case "sub":
-      return row.dataset.subCode || "";
-    case "subName":
-      return row.dataset.subName || "";
-    default:
-      return "";
-  }
-}
-
-function compareRows(a, b) {
-  const aValue = getSortValue(a, currentSort.key);
-  const bValue = getSortValue(b, currentSort.key);
-  const direction = currentSort.direction === "asc" ? 1 : -1;
-
-  if (typeof aValue === "number" && typeof bValue === "number") {
-    return (aValue - bValue) * direction;
-  }
-
-  return aValue.localeCompare(bValue, "tr", { numeric: true, sensitivity: "base" }) * direction;
-}
-
-function reorderTableRows(orderedRows) {
-  if (!productTableBody) {
-    return;
-  }
-
-  const emptyRows = Array.from(productTableBody.querySelectorAll(".empty-row"));
-  const remainingRows = productRows.filter((row) => !orderedRows.includes(row));
-  [...orderedRows, ...remainingRows].forEach((row) => {
-    const actionsRow = getActionsRow(row);
-    productTableBody.append(row);
-    if (actionsRow) {
-      productTableBody.append(actionsRow);
-    }
-  });
-  emptyRows.forEach((row) => productTableBody.append(row));
-}
-
-function updateSortButtons() {
-  sortButtons.forEach((button) => {
-    const isActive = button.dataset.sort === currentSort.key;
-    button.classList.toggle("is-active", isActive);
-    button.classList.toggle("desc", isActive && currentSort.direction === "desc");
-    button.setAttribute("aria-sort", isActive ? (currentSort.direction === "asc" ? "ascending" : "descending") : "none");
-  });
-}
-
-function applyClientFilters(resetPage = true) {
-  if (resetPage) {
-    currentPage = 1;
-  }
-
-  filteredRows = productRows.filter(rowMatchesFilters).sort(compareRows);
-  reorderTableRows(filteredRows);
-  const size = Number(pageSize?.value || 10);
-  currentTotalPages = Math.max(1, Math.ceil(filteredRows.length / size));
-  currentPage = Math.min(Math.max(1, currentPage), currentTotalPages);
-
-  productRows.forEach(hideRowPair);
-
-  const start = (currentPage - 1) * size;
-  const pageRows = filteredRows.slice(start, start + size);
-  pageRows.forEach(showRowPair);
-
-  const first = filteredRows.length === 0 ? 0 : start + 1;
-  const last = Math.min(start + size, filteredRows.length);
-
-  if (paginationSummary) {
-    paginationSummary.textContent = filteredRows.length === 0
-      ? "0 ürün"
-      : `${filteredRows.length} üründen ${first}-${last} arası gösteriliyor`;
-  }
-
-  if (pageIndicator) {
-    pageIndicator.textContent = `${currentPage} / ${currentTotalPages}`;
-  }
-
-  if (pageJump) {
-    pageJump.max = currentTotalPages.toString();
-    pageJump.value = currentPage.toString();
-  }
-
-  if (firstPage) {
-    firstPage.disabled = currentPage <= 1;
-  }
-
-  if (prevPage) {
-    prevPage.disabled = currentPage <= 1;
-  }
-
-  if (nextPage) {
-    nextPage.disabled = currentPage >= currentTotalPages;
-  }
-
-  if (lastPage) {
-    lastPage.disabled = currentPage >= currentTotalPages;
-  }
-
-  noClientRows?.classList.toggle("d-none", filteredRows.length !== 0 || productRows.length === 0);
-}
-
-function goToPage(page) {
-  currentPage = Math.min(Math.max(1, page), currentTotalPages);
-  applyClientFilters(false);
-}
-
 function getToast() {
-  if (!actionConfirmToast || !window.bootstrap?.Toast) {
-    return null;
-  }
-
-  return window.bootstrap.Toast.getOrCreateInstance(actionConfirmToast, { autohide: false });
+  return actionConfirmToast && window.bootstrap?.Toast
+    ? window.bootstrap.Toast.getOrCreateInstance(actionConfirmToast, { autohide: false })
+    : null;
 }
 
 function showActionToast(form, submitter, message, isDelete) {
   pendingForm = form;
   pendingSubmitter = submitter;
-
   if (toastTitle) {
     toastTitle.textContent = isDelete ? "Silme işlemi" : "İşlemi onayla";
   }
-
   if (toastMessage) {
     toastMessage.textContent = message || "Bu işlemi yapmak istediğinize emin misiniz?";
   }
-
   standardToastActions?.classList.toggle("d-none", isDelete);
   deleteToastActions?.classList.toggle("d-none", !isDelete);
   actionToastBackdrop?.classList.add("is-visible");
@@ -384,7 +173,6 @@ function submitPendingForm(deleteScope) {
 document.querySelectorAll("form").forEach((form) => {
   form.addEventListener("submit", (event) => {
     normalizeDecimalInputs(form);
-
     const missingCombo = Array.from(form.querySelectorAll("[data-combo-required]"))
       .find((input) => !input.value);
     if (missingCombo) {
@@ -400,22 +188,18 @@ document.querySelectorAll("form").forEach((form) => {
 
     const submitter = event.submitter;
     const message = submitter?.dataset.confirm || form.dataset.confirm;
-    if (!message) {
-      return;
+    if (message) {
+      event.preventDefault();
+      showActionToast(form, submitter, message, submitter?.dataset.actionType === "delete");
     }
-
-    event.preventDefault();
-    showActionToast(form, submitter, message, submitter?.dataset.actionType === "delete");
   });
 });
 
-document.querySelectorAll("[data-toast-cancel]").forEach((button) => {
-  button.addEventListener("click", () => {
-    pendingForm = null;
-    pendingSubmitter = null;
-    getToast()?.hide();
-  });
-});
+document.querySelectorAll("[data-toast-cancel]").forEach((button) => button.addEventListener("click", () => {
+  pendingForm = null;
+  pendingSubmitter = null;
+  getToast()?.hide();
+}));
 
 actionToastBackdrop?.addEventListener("click", () => {
   pendingForm = null;
@@ -423,16 +207,8 @@ actionToastBackdrop?.addEventListener("click", () => {
   getToast()?.hide();
 });
 
-document.querySelector("[data-toast-confirm]")?.addEventListener("click", () => {
-  submitPendingForm();
-});
-
-document.querySelectorAll("[data-delete-scope]").forEach((button) => {
-  button.addEventListener("click", () => {
-    submitPendingForm(button.dataset.deleteScope);
-  });
-});
-
+document.querySelector("[data-toast-confirm]")?.addEventListener("click", () => submitPendingForm());
+document.querySelectorAll("[data-delete-scope]").forEach((button) => button.addEventListener("click", () => submitPendingForm(button.dataset.deleteScope)));
 actionConfirmToast?.addEventListener("hidden.bs.toast", () => {
   pendingForm = null;
   pendingSubmitter = null;
@@ -446,85 +222,52 @@ createMainProductSearch?.addEventListener("input", () => {
     createMainProductId.value = "";
   }
   openMainProductCombo();
-  filterMainProductOptions();
   refreshSuggestion();
 });
-
 createMainProductSearch?.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeMainProductCombo();
   }
 });
-
-document.querySelectorAll("#mainProductOptions .combo-option").forEach((option) => {
-  option.addEventListener("click", () => selectMainProductOption(option));
-});
+document.querySelectorAll("#mainProductOptions .combo-option").forEach((option) => option.addEventListener("click", () => {
+  createMainProductSearch.value = option.dataset.label || "";
+  createMainProductId.value = option.dataset.id || "";
+  closeMainProductCombo();
+  refreshSuggestion();
+}));
 
 document.querySelectorAll(".generic-combo").forEach((combo) => {
   const input = combo.querySelector("[data-combo-input]");
   const value = combo.querySelector("[data-combo-value]");
   const options = Array.from(combo.querySelectorAll("[data-combo-option]"));
-
-  function filterOptions() {
+  const filterOptions = () => {
     const query = input?.value.trim().toUpperCase() || "";
     let visibleCount = 0;
     options.forEach((option) => {
       const text = (option.dataset.label || option.textContent || "").toUpperCase();
       const isVisible = !query || text.includes(query);
       option.classList.toggle("d-none", !isVisible);
-      if (isVisible) {
-        visibleCount += 1;
-      }
+      visibleCount += isVisible ? 1 : 0;
     });
     combo.classList.toggle("has-no-results", visibleCount === 0);
-  }
-
-  input?.addEventListener("focus", () => {
-    combo.classList.add("is-open");
-    filterOptions();
-  });
-
-  input?.addEventListener("click", () => {
-    combo.classList.add("is-open");
-    filterOptions();
-  });
-
-  input?.addEventListener("input", () => {
-    if (value) {
-      value.value = "";
-    }
-    combo.classList.add("is-open");
-    filterOptions();
-  });
-
-  input?.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      combo.classList.remove("is-open");
-    }
-  });
-
-  options.forEach((option) => {
-    option.addEventListener("click", () => {
-      if (input) {
-        input.value = option.dataset.label || "";
-      }
-      if (value) {
-        value.value = option.dataset.id || "";
-      }
-      combo.classList.remove("is-open");
-    });
-  });
+  };
+  input?.addEventListener("focus", () => { combo.classList.add("is-open"); filterOptions(); });
+  input?.addEventListener("click", () => { combo.classList.add("is-open"); filterOptions(); });
+  input?.addEventListener("input", () => { if (value) value.value = ""; combo.classList.add("is-open"); filterOptions(); });
+  input?.addEventListener("keydown", (event) => { if (event.key === "Escape") combo.classList.remove("is-open"); });
+  options.forEach((option) => option.addEventListener("click", () => {
+    if (input) input.value = option.dataset.label || "";
+    if (value) value.value = option.dataset.id || "";
+    combo.classList.remove("is-open");
+  }));
 });
 
 document.addEventListener("click", (event) => {
   if (mainProductCombo && !mainProductCombo.contains(event.target)) {
     closeMainProductCombo();
   }
-
   document.querySelectorAll(".generic-combo.is-open").forEach((combo) => {
-    if (!combo.contains(event.target)) {
-      combo.classList.remove("is-open");
-    }
+    if (!combo.contains(event.target)) combo.classList.remove("is-open");
   });
 });
 
@@ -536,256 +279,230 @@ createMainProductSearch?.closest("form")?.addEventListener("submit", (event) => 
   }
 });
 
-let filterTimer;
-document.querySelectorAll(".list-filter").forEach((input) => {
-  const eventName = input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input";
-  input.addEventListener(eventName, () => {
-    clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => applyClientFilters(true), 180);
+function detailRowFor(row) {
+  const detailId = row.dataset.detailId;
+  return detailId ? document.querySelector(`[data-detail-for="${detailId}"]`) : null;
+}
+
+function closeDetail(row) {
+  detailRowFor(row)?.querySelectorAll(".collapse.show").forEach((element) => {
+    window.bootstrap?.Collapse.getOrCreateInstance(element, { toggle: false }).hide();
   });
-});
+}
 
-sortButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const key = button.dataset.sort;
-    if (!key) {
-      return;
-    }
-
-    if (currentSort.key === key) {
-      currentSort.direction = currentSort.direction === "asc" ? "desc" : "asc";
-    } else {
-      currentSort = {
-        key,
-        direction: key === "year" || key === "term" ? "desc" : "asc",
-      };
-    }
-
-    updateSortButtons();
-    applyClientFilters(true);
-  });
-});
-
-firstPage?.addEventListener("click", () => goToPage(1));
-
-prevPage?.addEventListener("click", () => goToPage(currentPage - 1));
-
-nextPage?.addEventListener("click", () => goToPage(currentPage + 1));
-
-lastPage?.addEventListener("click", () => goToPage(currentTotalPages));
-
-goPage?.addEventListener("click", () => {
-  goToPage(Number(pageJump?.value || 1));
-});
-
-pageJump?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    goToPage(Number(pageJump.value || 1));
+function setupList(root, options) {
+  if (!root) {
+    return null;
   }
-});
 
-document.querySelectorAll(".live-table-filter").forEach((input) => {
-  input.addEventListener("input", () => {
-    const query = input.value.trim().toUpperCase();
-    document.querySelectorAll(input.dataset.target || "").forEach((row) => {
-      row.classList.toggle("d-none", query && !(row.dataset.search || "").includes(query));
+  const rows = Array.from(root.querySelectorAll(".list-row"));
+  const tableBody = root.querySelector("tbody");
+  const emptyRows = Array.from(root.querySelectorAll(".empty-row"));
+  const emptyState = root.querySelector("[data-list-empty]");
+  const summary = root.querySelector("[data-list-summary]");
+  const indicator = root.querySelector("[data-list-page-indicator]");
+  const jump = root.querySelector("[data-list-page-jump]");
+  const pageSize = root.querySelector("[data-list-page-size]");
+  const filters = Array.from(root.querySelectorAll("[data-list-filter]"));
+  const sortButtons = Array.from(root.querySelectorAll("[data-list-sort]"));
+  const pageButtons = Array.from(root.querySelectorAll("[data-list-page]"));
+  const state = { page: 1, totalPages: 1, sort: { ...options.defaultSort } };
+
+  const filterValue = (name) => {
+    const input = filters.find((item) => item.dataset.listFilter === name);
+    return input?.type === "checkbox" ? input.checked : (input?.value.trim() || "");
+  };
+  const sortValue = (row, key) => options.numericKeys.includes(key)
+    ? parseLocalizedDecimal(row.dataset[key])
+    : (row.dataset[key] || "");
+  const compare = (a, b) => {
+    const aValue = sortValue(a, state.sort.key);
+    const bValue = sortValue(b, state.sort.key);
+    const multiplier = state.sort.direction === "asc" ? 1 : -1;
+    return typeof aValue === "number" && typeof bValue === "number"
+      ? (aValue - bValue) * multiplier
+      : aValue.localeCompare(bValue, "tr", { numeric: true, sensitivity: "base" }) * multiplier;
+  };
+  const updateSortState = () => {
+    sortButtons.forEach((button) => {
+      const isActive = button.dataset.listSort === state.sort.key;
+      button.classList.toggle("is-active", isActive);
+      button.classList.toggle("desc", isActive && state.sort.direction === "desc");
+      button.setAttribute("aria-sort", isActive ? (state.sort.direction === "asc" ? "ascending" : "descending") : "none");
     });
+  };
+  const reorder = (orderedRows) => {
+    if (!tableBody) return;
+    const remainingRows = rows.filter((row) => !orderedRows.includes(row));
+    [...orderedRows, ...remainingRows].forEach((row) => {
+      tableBody.append(row);
+      const detail = detailRowFor(row);
+      if (detail) tableBody.append(detail);
+    });
+    emptyRows.forEach((row) => tableBody.append(row));
+  };
+  const apply = (resetPage = true) => {
+    if (resetPage) state.page = 1;
+    const matchingRows = rows.filter((row) => options.matches(row, filterValue)).sort(compare);
+    reorder(matchingRows);
+    const size = Number(pageSize?.value || 10);
+    state.totalPages = Math.max(1, Math.ceil(matchingRows.length / size));
+    state.page = Math.min(Math.max(1, state.page), state.totalPages);
+    const start = (state.page - 1) * size;
+    const pageRows = matchingRows.slice(start, start + size);
+
+    rows.forEach((row) => {
+      const isVisible = pageRows.includes(row);
+      row.classList.toggle("d-none", !isVisible);
+      detailRowFor(row)?.classList.toggle("d-none", !isVisible);
+      if (!isVisible) closeDetail(row);
+    });
+
+    const first = matchingRows.length === 0 ? 0 : start + 1;
+    const last = Math.min(start + size, matchingRows.length);
+    if (summary) {
+      summary.textContent = matchingRows.length === 0
+        ? `0 ${options.label}`
+        : `${matchingRows.length} ${options.label} içinden ${first}-${last} gösteriliyor`;
+    }
+    if (indicator) indicator.textContent = `${state.page} / ${state.totalPages}`;
+    if (jump) {
+      jump.max = state.totalPages.toString();
+      jump.value = state.page.toString();
+    }
+    pageButtons.forEach((button) => {
+      const action = button.dataset.listPage;
+      button.disabled = (action === "first" || action === "previous") ? state.page <= 1
+        : (action === "next" || action === "last") ? state.page >= state.totalPages
+          : false;
+    });
+    emptyState?.classList.toggle("d-none", matchingRows.length !== 0 || rows.length === 0);
+    options.afterApply?.(matchingRows);
+  };
+  const changePage = (page) => {
+    state.page = Math.min(Math.max(1, page), state.totalPages);
+    apply(false);
+  };
+
+  filters.forEach((input) => {
+    input.addEventListener(input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input", () => apply(true));
   });
-});
-
-const scoreRows = Array.from(document.querySelectorAll(".score-row"));
-const scoreFilters = Array.from(document.querySelectorAll(".score-filter"));
-const scoreSortButtons = Array.from(document.querySelectorAll("[data-score-sort]"));
-const noScoreRows = document.querySelector("#noScoreRows");
-const totalScore = document.querySelector("#totalScore");
-const totalTarget = document.querySelector("#totalTarget");
-const totalSuccess = document.querySelector("#totalSuccess");
-const branchChart = document.querySelector("#branchChart");
-const noBranchChartRows = document.querySelector("#noBranchChartRows");
-let currentScoreSort = { key: "year", direction: "asc" };
-
-function getScoreActionsRow(row) {
-  return row.nextElementSibling?.classList.contains("score-actions-row") ? row.nextElementSibling : null;
-}
-
-function scoreRowMatchesFilters(row) {
-  const search = document.querySelector("#scoreSearch")?.value.trim().toUpperCase() || "";
-  const groupId = document.querySelector("#scoreGroup")?.value.trim() || "";
-  const year = document.querySelector("#scoreYear")?.value.trim() || "";
-  const term = document.querySelector("#scoreTerm")?.value.trim() || "";
-
-  return (!search || (row.dataset.search || "").includes(search))
-    && (!groupId || row.dataset.groupId === groupId)
-    && (!year || row.dataset.year === year)
-    && (!term || row.dataset.term === term);
-}
-
-function getScoreSortValue(row, key) {
-  switch (key) {
-    case "year":
-    case "term":
-    case "score":
-    case "displayed":
-    case "target":
-    case "hgo":
-    case "development":
-    case "size":
-    case "success":
-      return parseLocalizedDecimal(row.dataset[key]);
-    case "group":
-    case "branch":
-    case "main":
-    case "sub":
-      return row.dataset[key] || "";
-    default:
-      return "";
-  }
-}
-
-function compareScoreRows(a, b) {
-  const aValue = getScoreSortValue(a, currentScoreSort.key);
-  const bValue = getScoreSortValue(b, currentScoreSort.key);
-  const direction = currentScoreSort.direction === "asc" ? 1 : -1;
-
-  if (typeof aValue === "number" && typeof bValue === "number") {
-    return (aValue - bValue) * direction;
-  }
-
-  return aValue.localeCompare(bValue, "tr", { numeric: true, sensitivity: "base" }) * direction;
-}
-
-function reorderScoreRows(orderedRows) {
-  const tableBody = orderedRows[0]?.parentElement || document.querySelector(".score-table tbody");
-  if (!tableBody) {
-    return;
-  }
-
-  const emptyRows = Array.from(tableBody.querySelectorAll(".empty-row"));
-  const remainingRows = scoreRows.filter((row) => !orderedRows.includes(row));
-  [...orderedRows, ...remainingRows].forEach((row) => {
-    const actionsRow = getScoreActionsRow(row);
-    tableBody.append(row);
-    if (actionsRow) {
-      tableBody.append(actionsRow);
+  sortButtons.forEach((button) => button.addEventListener("click", () => {
+    const key = button.dataset.listSort;
+    if (!key) return;
+    state.sort = state.sort.key === key
+      ? { key, direction: state.sort.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: options.descendingKeys.includes(key) ? "desc" : "asc" };
+    updateSortState();
+    rows.forEach(closeDetail);
+    apply(true);
+  }));
+  pageButtons.forEach((button) => button.addEventListener("click", () => {
+    const action = button.dataset.listPage;
+    if (action === "first") changePage(1);
+    if (action === "previous") changePage(state.page - 1);
+    if (action === "next") changePage(state.page + 1);
+    if (action === "last") changePage(state.totalPages);
+    if (action === "jump") changePage(Number(jump?.value || 1));
+  }));
+  jump?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      changePage(Number(jump.value || 1));
     }
   });
-  emptyRows.forEach((row) => tableBody.append(row));
+  updateSortState();
+  apply(true);
+  return { apply };
 }
 
-function updateScoreSortButtons() {
-  scoreSortButtons.forEach((button) => {
-    const isActive = button.dataset.scoreSort === currentScoreSort.key;
-    button.classList.toggle("is-active", isActive);
-    button.classList.toggle("desc", isActive && currentScoreSort.direction === "desc");
-    button.setAttribute("aria-sort", isActive ? (currentScoreSort.direction === "asc" ? "ascending" : "descending") : "none");
+function updateBranchChart(visibleRows) {
+  const totals = new Map();
+  visibleRows.forEach((row) => {
+    const key = row.dataset.branchId || "";
+    const total = totals.get(key) || { score: 0, target: 0 };
+    total.score += parseLocalizedDecimal(row.dataset.score);
+    total.target += parseLocalizedDecimal(row.dataset.target);
+    totals.set(key, total);
   });
-}
 
-function updateBranchChart(branchTotals) {
-  const chartRows = Array.from(branchChart?.querySelectorAll(".branch-chart-row") || []);
+  const scoreSum = Array.from(totals.values()).reduce((sum, item) => sum + item.score, 0);
+  const targetSum = Array.from(totals.values()).reduce((sum, item) => sum + item.target, 0);
+  const success = targetSum === 0 ? 0 : scoreSum / targetSum * 100;
+  document.querySelector("#totalScore")?.replaceChildren(document.createTextNode(scoreSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 })));
+  document.querySelector("#totalTarget")?.replaceChildren(document.createTextNode(targetSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 })));
+  document.querySelector("#totalSuccess")?.replaceChildren(document.createTextNode(`% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`));
+
+  const chart = document.querySelector("#branchChart");
+  const emptyChart = document.querySelector("#noBranchChartRows");
+  const chartRows = Array.from(chart?.querySelectorAll(".branch-chart-row") || []);
   chartRows.forEach((row) => {
-    const total = branchTotals.get(row.dataset.branchId || "");
-    const isVisible = Boolean(total);
-    row.classList.toggle("d-none", !isVisible);
-    if (!total) {
-      return;
-    }
-
-    const success = total.target === 0 ? 0 : (total.score / total.target) * 100;
-    const width = Math.min(100, success);
-    const level = success >= 90 ? "good" : success >= 70 ? "watch" : "low";
-    const fill = row.querySelector(".branch-chart-fill");
-    const value = row.querySelector(".branch-chart-value");
+    const total = totals.get(row.dataset.branchId || "");
+    row.classList.toggle("d-none", !total);
+    if (!total) return;
+    const rate = total.target === 0 ? 0 : total.score / total.target * 100;
+    const level = rate >= 90 ? "good" : rate >= 70 ? "watch" : "low";
     row.classList.remove("good", "watch", "low");
     row.classList.add(level);
-    if (fill) {
-      fill.style.width = `${width}%`;
-    }
-    if (value) {
-      value.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
-    }
-    row.dataset.success = success.toString();
+    row.dataset.success = rate.toString();
+    const fill = row.querySelector(".branch-chart-fill");
+    if (fill) fill.style.width = `${Math.min(100, rate)}%`;
+    const value = row.querySelector(".branch-chart-value");
+    if (value) value.textContent = `% ${rate.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
   });
-
-  chartRows
-    .sort((a, b) => parseLocalizedDecimal(b.dataset.success) - parseLocalizedDecimal(a.dataset.success))
-    .forEach((row) => branchChart?.append(row));
-  if (noBranchChartRows) {
-    branchChart?.append(noBranchChartRows);
+  chartRows.sort((a, b) => parseLocalizedDecimal(b.dataset.success) - parseLocalizedDecimal(a.dataset.success)).forEach((row) => chart?.append(row));
+  if (emptyChart) {
+    chart?.append(emptyChart);
+    emptyChart.classList.toggle("d-none", totals.size !== 0 || chartRows.length === 0);
   }
 }
 
-function applyScoreFilters() {
-  let visibleCount = 0;
-  let scoreSum = 0;
-  let targetSum = 0;
-  const branchTotals = new Map();
-  const visibleRows = scoreRows.filter(scoreRowMatchesFilters).sort(compareScoreRows);
-  reorderScoreRows(visibleRows);
-
-  scoreRows.forEach((row) => {
-    const matches = visibleRows.includes(row);
-
-    row.classList.toggle("d-none", !matches);
-    getScoreActionsRow(row)?.classList.toggle("d-none", !matches);
-
-    if (matches) {
-      visibleCount += 1;
-      const rowScore = parseLocalizedDecimal(row.dataset.score);
-      const rowTarget = parseLocalizedDecimal(row.dataset.target);
-      scoreSum += rowScore;
-      targetSum += rowTarget;
-
-      const branchId = row.dataset.branchId || "";
-      if (!branchTotals.has(branchId)) {
-        branchTotals.set(branchId, { score: 0, target: 0 });
-      }
-      const total = branchTotals.get(branchId);
-      total.score += rowScore;
-      total.target += rowTarget;
-    }
-  });
-
-  if (totalScore) {
-    totalScore.textContent = scoreSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
-  }
-
-  if (totalTarget) {
-    totalTarget.textContent = targetSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
-  }
-
-  if (totalSuccess) {
-    const success = targetSum === 0 ? 0 : (scoreSum / targetSum) * 100;
-    totalSuccess.textContent = `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
-  }
-
-  noScoreRows?.classList.toggle("d-none", visibleCount !== 0 || scoreRows.length === 0);
-  noBranchChartRows?.classList.toggle("d-none", branchTotals.size !== 0 || scoreRows.length === 0);
-  updateBranchChart(branchTotals);
-}
-
-scoreFilters.forEach((input) => {
-  const eventName = input.tagName === "SELECT" ? "change" : "input";
-  input.addEventListener(eventName, applyScoreFilters);
+setupList(document.querySelector('[data-list="products"]'), {
+  defaultSort: { key: "year", direction: "desc" },
+  descendingKeys: ["year", "term"],
+  numericKeys: ["year", "term"],
+  label: "ürün",
+  matches: (row, value) => {
+    const search = value("search").toUpperCase();
+    const hasSub = row.dataset.hasSub === "true";
+    return (!search || (row.dataset.search || "").includes(search))
+      && (!value("year") || row.dataset.year === value("year"))
+      && (!value("term") || row.dataset.term === value("term"))
+      && (value("includeInactive") || row.dataset.active === "true")
+      && (value("showMainProducts") || hasSub)
+      && (value("showSubProducts") || !hasSub);
+  },
 });
 
-scoreSortButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const key = button.dataset.scoreSort;
-    if (!key) {
-      return;
-    }
+setupList(document.querySelector('[data-list="groups"]'), {
+  defaultSort: { key: "groupNo", direction: "asc" },
+  descendingKeys: ["branchCount", "active"],
+  numericKeys: ["branchCount", "active"],
+  label: "grup",
+  matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
+});
 
-    if (currentScoreSort.key === key) {
-      currentScoreSort.direction = currentScoreSort.direction === "asc" ? "desc" : "asc";
-    } else {
-      currentScoreSort = { key, direction: "asc" };
-    }
+setupList(document.querySelector('[data-list="branches"]'), {
+  defaultSort: { key: "branchCode", direction: "asc" },
+  descendingKeys: [],
+  numericKeys: [],
+  label: "şube",
+  matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
+});
 
-    updateScoreSortButtons();
-    applyScoreFilters();
-  });
+setupList(document.querySelector('[data-list="scores"]'), {
+  defaultSort: { key: "year", direction: "asc" },
+  descendingKeys: [],
+  numericKeys: ["year", "term", "score", "displayed", "target", "hgo", "development", "size", "success"],
+  label: "puan satırı",
+  matches: (row, value) => {
+    const search = value("search").toUpperCase();
+    return (!search || (row.dataset.search || "").includes(search))
+      && (!value("groupId") || row.dataset.groupId === value("groupId"))
+      && (!value("year") || row.dataset.year === value("year"))
+      && (!value("term") || row.dataset.term === value("term"));
+  },
+  afterApply: updateBranchChart,
 });
 
 codeMode?.addEventListener("change", toggleManualCode);
@@ -797,7 +514,3 @@ productType?.addEventListener("change", () => {
 
 toggleManualCode();
 toggleCreateProductFields();
-updateSortButtons();
-updateScoreSortButtons();
-applyClientFilters(true);
-applyScoreFilters();
