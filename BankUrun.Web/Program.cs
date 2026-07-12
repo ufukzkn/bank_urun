@@ -14,6 +14,7 @@ builder.Services.AddScoped<IProductCodeService, ProductCodeService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
+builder.Services.AddScoped<IPerformanceWorkspaceService, PerformanceWorkspaceService>();
 
 var app = builder.Build();
 
@@ -42,7 +43,7 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Products}/{action=Index}/{id?}")
+    pattern: "{controller=Performance}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 

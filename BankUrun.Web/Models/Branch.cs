@@ -11,4 +11,5 @@ public class Branch
 
     public GroupDefinition Group { get; set; } = null!;
     public ICollection<BranchProductScore> BranchProductScores { get; set; } = new List<BranchProductScore>();
+    public ICollection<BranchProductMetricResult> MetricResults { get; set; } = new List<BranchProductMetricResult>();
 }

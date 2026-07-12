@@ -10,22 +10,24 @@
     <link rel="stylesheet" href="~/BankUrun.Web.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header class="app-header">
-        <div class="container app-header-inner">
-            <a class="brand-mark" asp-controller="Products" asp-action="Index" aria-label="Ana sayfa">
+    @{ var controller = ViewContext.RouteData.Values["controller"]?.ToString(); }
+    <div class="app-frame">
+        <aside class="app-sidebar">
+            <a class="brand-mark" asp-controller="Performance" asp-action="Index" aria-label="Performans Merkezi">
                 <img src="~/img/halkbank-logo.jpg" alt="Halkbank" />
             </a>
             <nav class="app-nav" aria-label="Ana menü">
-                <a class="app-nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Products" ? "is-active" : "")" asp-controller="Products" asp-action="Index">Ürünler</a>
-                <a class="app-nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Organization" ? "is-active" : "")" asp-controller="Organization" asp-action="Index">Organizasyon</a>
-                <a class="app-nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Scores" ? "is-active" : "")" asp-controller="Scores" asp-action="Index">Puanlar</a>
+                <a class="app-nav-link @(controller == "Performance" ? "is-active" : "")" asp-controller="Performance" asp-action="Index">Performans Merkezi</a>
+                <a class="app-nav-link @(controller == "Products" ? "is-active" : "")" asp-controller="Products" asp-action="Index">Ürün Kataloğu</a>
+                <a class="app-nav-link @(controller == "Organization" ? "is-active" : "")" asp-controller="Organization" asp-action="Index">Organizasyon</a>
             </nav>
+            <div class="sidebar-note">Dönemsel ürün, grup ve şube performansı</div>
+        </aside>
+        <div class="app-main">
+            <main class="app-shell" role="main">
+                @RenderBody()
+            </main>
         </div>
-    </header>
-    <div class="container app-shell">
-        <main role="main">
-            @RenderBody()
-        </main>
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

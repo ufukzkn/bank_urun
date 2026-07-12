@@ -1,0 +1,290 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.PerformanceIndexViewModel
+
+@{
+    ViewData["Title"] = "Performans Merkezi";
+    string Fmt(decimal value) => value.ToString("0.##");
+    string Pct(decimal value) => $"% {value:0.##}";
+    string SuccessLevel(decimal value) => value >= 90 ? "good" : value >= 70 ? "watch" : "low";
+    var years = Model.Products.Select(product => product.Year).Distinct().OrderDescending().ToList();
+    var terms = Model.Products.Select(product => product.Term).Distinct().Order().ToList();
+    var totalPotential = Model.Results.Sum(result => result.AllocatedScore);
+    var totalEarned = Model.Results.Sum(result => result.EarnedScore);
+    var totalSuccess = totalPotential == 0 ? 0 : totalEarned / totalPotential * 100;
+    var missingCount = Model.Results.Count(result => result.IsMissing);
+}
+
+<section class="performance-page-header">
+    <div>
+        <h1>Performans Merkezi</h1>
+        <p>Ürün kurallarını tanımlayın, şube gerçekleşmelerini girin ve sonucu tek bağlamda izleyin.</p>
+    </div>
+    <span class="workspace-status">Yetkili çalışma alanı</span>
+</section>
+
+@if (TempData["Success"] is string success)
+{
+    <div class="alert alert-success action-alert page-alert" role="alert">@success</div>
+}
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger action-alert page-alert" role="alert">@error</div>
+}
+
+<section class="performance-context surface-panel" aria-label="Performans bağlamı">
+    <label>
+        <span>Yıl</span>
+        <select class="form-select" id="performanceYear">
+            <option value="">Tüm yıllar</option>
+            @foreach (var year in years)
+            {
+                <option value="@year">@year</option>
+            }
+        </select>
+    </label>
+    <label>
+        <span>Dönem</span>
+        <select class="form-select" id="performanceTerm">
+            <option value="">Tüm dönemler</option>
+            @foreach (var term in terms)
+            {
+                <option value="@term">@term. Dönem</option>
+            }
+        </select>
+    </label>
+    <label>
+        <span>Grup</span>
+        <select class="form-select" id="performanceGroup">
+            <option value="">Tüm gruplar</option>
+            @foreach (var group in Model.Groups)
+            {
+                <option value="@group.Id">@group.Label</option>
+            }
+        </select>
+    </label>
+    <label>
+        <span>Şube</span>
+        <select class="form-select" id="performanceBranch">
+            <option value="">Tüm şubeler</option>
+            @foreach (var branch in Model.Branches)
+            {
+                <option value="@branch.Id" data-group-id="@branch.GroupId">@branch.Label</option>
+            }
+        </select>
+    </label>
+</section>
+
+<nav class="performance-tabs" aria-label="Performans görünümleri">
+    <button class="performance-tab is-active" type="button" data-performance-tab="overview">Genel Bakış</button>
+    <button class="performance-tab" type="button" data-performance-tab="parameters">Parametreler</button>
+    <button class="performance-tab" type="button" data-performance-tab="results">Şube Sonuçları</button>
+    <button class="performance-tab" type="button" data-performance-tab="analysis">Analiz</button>
+</nav>
+
+<section data-performance-view="overview">
+    <div class="performance-kpi-grid">
+        <div class="performance-kpi-card"><span>Hedef puan</span><strong id="performancePotential">@Fmt(totalPotential)</strong></div>
+        <div class="performance-kpi-card"><span>Kazanılan puan</span><strong id="performanceEarned">@Fmt(totalEarned)</strong></div>
+        <div class="performance-kpi-card"><span>Başarı</span><strong id="performanceSuccess">@Pct(totalSuccess)</strong></div>
+        <div class="performance-kpi-card warning"><span>Eksik gerçekleşme</span><strong id="performanceMissing">@missingCount</strong></div>
+    </div>
+
+    <section class="performance-overview-grid">
+        <div class="surface-panel performance-insight-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Şube başarı sıralaması</h2>
+                    <p>Seçili bağlamdaki kazanılan puan / hedef puan oranı.</p>
+                </div>
+            </div>
+            <div class="performance-branch-chart" id="performanceBranchChart"></div>
+            <div class="empty-inline d-none" id="performanceBranchChartEmpty">Seçili bağlamda sonuç yok</div>
+        </div>
+        <div class="surface-panel performance-insight-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Çalışma önceliği</h2>
+                    <p>Eksik veri ve düşük başarı için hızlı yönlendirme.</p>
+                </div>
+            </div>
+            <div class="priority-list" id="performancePriorities"></div>
+        </div>
+    </section>
+</section>
+
+<section class="d-none" data-performance-view="parameters">
+    <section class="surface-panel create-panel compact-create-panel performance-create-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>Yeni ürün performans kuralı</h2>
+                <p>Grup, dönemsel alt ürün ve toplam puan seçildiğinde beş segment için başlangıç dağılımı oluşturulur.</p>
+            </div>
+        </div>
+        <form asp-action="CreateParameter" method="post" class="compact-parameter-create-form">
+            @Html.AntiForgeryToken()
+            <label>
+                <span>Grup</span>
+                <select class="form-select" name="GroupId" required>
+                    @foreach (var group in Model.Groups)
+                    {
+                        <option value="@group.Id">@group.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Alt ürün instance</span>
+                <select class="form-select" name="SubProductInstanceId" required>
+                    @foreach (var product in Model.Products)
+                    {
+                        <option value="@product.Id">@product.Label</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Toplam puan</span>
+                <input class="form-control decimal-input" name="TotalScore" inputmode="decimal" value="100" required />
+            </label>
+            <button class="btn btn-primary" type="submit">Kural oluştur</button>
+        </form>
+    </section>
+
+    <section class="surface-panel table-panel compact-list-panel" data-list="performanceParameters">
+        <div class="table-toolbar performance-list-toolbar">
+            <label class="toolbar-search">
+                <span>Parametrelerde ara</span>
+                <input class="form-control" type="search" data-list-filter="search" placeholder="Grup, ana ürün veya alt ürün" />
+            </label>
+            <label>
+                <span>Sayfa</span>
+                <select class="form-select" data-list-page-size><option value="10">10</option><option value="25">25</option><option value="50">50</option></select>
+            </label>
+        </div>
+        <div class="table-responsive">
+            <table class="table product-table performance-parameter-table">
+                <thead><tr>
+                    <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="product">Ürün <span></span></button></th>
+                    <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="totalScore">Toplam puan <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="active">Durum <span></span></button></th>
+                    <th class="text-end">İşlem</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Parameters.Count == 0)
+                {
+                    <tr class="empty-row"><td colspan="7" class="empty-cell">Performans parametresi yok</td></tr>
+                }
+                @foreach (var parameter in Model.Parameters)
+                {
+                    var detailId = $"parameter-detail-{parameter.Id}";
+                    var search = $"{parameter.Year} {parameter.Term} {parameter.GroupNo} {parameter.GroupName} {parameter.MainProductCode} {parameter.MainProductName} {parameter.SubProductCode} {parameter.SubProductName}".ToUpperInvariant();
+                    <tr class="list-row performance-parameter-row" data-detail-id="@detailId" data-search="@search" data-year="@parameter.Year" data-term="@parameter.Term" data-group-id="@parameter.GroupId" data-group="@($"{parameter.GroupNo} {parameter.GroupName}")" data-product="@($"{parameter.MainProductCode} {parameter.SubProductCode} {parameter.SubProductName}")" data-total-score="@parameter.TotalScore" data-active="@(parameter.IsActive ? 1 : 0)">
+                        <td>@parameter.Year</td><td>@parameter.Term</td>
+                        <td><strong>@parameter.GroupNo</strong><small>@parameter.GroupName</small></td>
+                        <td><strong>@parameter.MainProductCode / @parameter.SubProductCode</strong><small>@parameter.SubProductName</small></td>
+                        <td class="text-end">@Fmt(parameter.TotalScore)</td>
+                        <td><span class="status-pill @(parameter.IsActive ? "active" : "passive")">@(parameter.IsActive ? "Aktif" : "Pasif")</span></td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false" aria-controls="@detailId">Detay</button></td>
+                    </tr>
+                    <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="7"><div class="collapse" id="@detailId"><div class="performance-parameter-detail">
+                        <form asp-action="UpdateParameter" method="post" class="parameter-editor-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Id" value="@parameter.Id" />
+                            <div class="parameter-editor-heading">
+                                <label><span>Toplam puan</span><input class="form-control form-control-sm decimal-input" name="TotalScore" inputmode="decimal" value="@Fmt(parameter.TotalScore)" required /></label>
+                                <label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@parameter.IsActive" /><input type="hidden" name="IsActive" value="false" /><span>Aktif kural</span></label>
+                            </div>
+                            <div class="table-responsive"><table class="table segment-editor-table"><thead><tr><th>Segment</th><th>Sıra</th><th>Hedef %</th><th>Büyüklük %</th><th>Ölçek %</th><th>Puan</th><th>HGO %</th><th>Gelişim %</th><th>Büyüklük %</th></tr></thead><tbody>
+                            @for (var index = 0; index < parameter.Rules.Count; index++)
+                            {
+                                var rule = parameter.Rules[index];
+                                <tr>
+                                    <td><strong>@rule.PerformanceSegment</strong><input type="hidden" name="Rules[@index].Id" value="@rule.Id" /><input type="hidden" name="Rules[@index].PerformanceSegment" value="@rule.PerformanceSegment" /></td>
+                                    <td><input class="form-control form-control-sm" type="number" name="Rules[@index].SortOrder" value="@rule.SortOrder" min="1" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].TargetShare" value="@Fmt(rule.TargetShare)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].SizeShare" value="@Fmt(rule.SizeShare)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].ScaleShare" value="@Fmt(rule.ScaleShare)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].AllocatedScore" value="@Fmt(rule.AllocatedScore)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].HgoWeight" value="@Fmt(rule.HgoWeight)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].DevelopmentWeight" value="@Fmt(rule.DevelopmentWeight)" inputmode="decimal" /></td>
+                                    <td><input class="form-control form-control-sm decimal-input" name="Rules[@index].SizeWeight" value="@Fmt(rule.SizeWeight)" inputmode="decimal" /></td>
+                                </tr>
+                            }
+                            </tbody></table></div>
+                            <div class="detail-actions"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Parametre ve segment dağılımını güncellemek istediğinize emin misiniz?">Dağılımı kaydet</button></div>
+                        </form>
+                        <form asp-action="DeleteParameter" method="post" class="button-form">
+                            @Html.AntiForgeryToken()<input type="hidden" name="Id" value="@parameter.Id" />
+                            <button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Bu parametreye bağlı segment kuralları ve şube gerçekleşmeleri silinecek. Emin misiniz?">Kuralı sil</button>
+                        </form>
+                    </div></div></td></tr>
+                }
+                <tr class="empty-row d-none" data-list-empty><td colspan="7" class="empty-cell">Filtreye uygun parametre yok</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <partial name="_ListPager" />
+    </section>
+</section>
+
+<section class="d-none" data-performance-view="results">
+    <section class="surface-panel table-panel compact-list-panel" data-list="performanceResults">
+        <div class="table-toolbar performance-list-toolbar results-toolbar">
+            <label class="toolbar-search"><span>Şube sonuçlarında ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Şube, ürün veya segment" /></label>
+            <label><span>Durum</span><select class="form-select" data-list-filter="missing"><option value="">Tümü</option><option value="true">Eksik gerçekleşme</option><option value="false">Girildi</option></select></label>
+            <label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+        </div>
+        <div class="table-responsive"><table class="table product-table performance-results-table"><thead><tr>
+            <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+            <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+            <th><button class="sort-button" type="button" data-list-sort="branch">Şube <span></span></button></th>
+            <th><button class="sort-button" type="button" data-list-sort="product">Ürün <span></span></button></th>
+            <th><button class="sort-button" type="button" data-list-sort="segment">Segment <span></span></button></th>
+            <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="earned">Puan <span></span></button></th>
+            <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="success">Başarı <span></span></button></th>
+            <th>Durum</th><th class="text-end">İşlem</th>
+        </tr></thead><tbody>
+        @if (Model.Results.Count == 0)
+        {
+            <tr class="empty-row"><td colspan="9" class="empty-cell">Aktif performans sonucu yok</td></tr>
+        }
+        @foreach (var result in Model.Results)
+        {
+            var detailId = $"result-detail-{result.BranchId}-{result.RuleId}";
+            var search = $"{result.Year} {result.Term} {result.GroupNo} {result.GroupName} {result.BranchCode} {result.BranchName} {result.MainProductCode} {result.MainProductName} {result.SubProductCode} {result.SubProductName} {result.PerformanceSegment}".ToUpperInvariant();
+            var level = SuccessLevel(result.WeightedAchievement);
+            <tr class="list-row performance-result-row" data-detail-id="@detailId" data-search="@search" data-year="@result.Year" data-term="@result.Term" data-group-id="@result.GroupId" data-group="@result.GroupNo" data-branch-id="@result.BranchId" data-branch="@($"{result.BranchCode} {result.BranchName}")" data-product="@($"{result.MainProductCode} {result.SubProductCode} {result.SubProductName}")" data-segment="@result.PerformanceSegment" data-earned="@result.EarnedScore" data-allocated="@result.AllocatedScore" data-success="@result.WeightedAchievement" data-missing="@(result.IsMissing ? "true" : "false")">
+                <td>@result.Year</td><td>@result.Term</td>
+                <td><strong class="success-name @level">@result.BranchCode</strong><small>@result.BranchName</small></td>
+                <td><strong>@result.MainProductCode / @result.SubProductCode</strong><small>@result.SubProductName</small></td>
+                <td>@result.PerformanceSegment</td>
+                <td class="text-end">@Fmt(result.EarnedScore) / @Fmt(result.AllocatedScore)</td>
+                <td class="text-end"><span class="success-chip @level">@Pct(result.WeightedAchievement)</span></td>
+                <td><span class="status-pill @(result.IsMissing ? "passive" : "active")">@(result.IsMissing ? "Eksik" : "Girildi")</span></td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false" aria-controls="@detailId">Detay</button></td>
+            </tr>
+            <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="9"><div class="collapse" id="@detailId"><div class="performance-result-detail @level">
+                <div class="result-explanation"><strong>@result.PerformanceSegment</strong><span>HGO, gelişim ve büyüklük gerçekleşmeleri ağırlıklandırılarak bu segment puanı hesaplanır.</span><b data-metric-preview>@Fmt(result.EarnedScore) / @Fmt(result.AllocatedScore) puan</b></div>
+                <form asp-action="SaveMetricResult" method="post" class="metric-result-form" data-metric-form data-allocated-score="@result.AllocatedScore">
+                    @Html.AntiForgeryToken()<input type="hidden" name="BranchId" value="@result.BranchId" /><input type="hidden" name="RuleId" value="@result.RuleId" />
+                    <label><span>HGO gerçekleşme %</span><input class="form-control form-control-sm decimal-input metric-input" name="HgoAchievement" value="@Fmt(result.HgoAchievement)" inputmode="decimal" data-weight="@Fmt(result.HgoWeight)" /></label>
+                    <label><span>Gelişim gerçekleşme %</span><input class="form-control form-control-sm decimal-input metric-input" name="DevelopmentAchievement" value="@Fmt(result.DevelopmentAchievement)" inputmode="decimal" data-weight="@Fmt(result.DevelopmentWeight)" /></label>
+                    <label><span>Büyüklük gerçekleşme %</span><input class="form-control form-control-sm decimal-input metric-input" name="SizeAchievement" value="@Fmt(result.SizeAchievement)" inputmode="decimal" data-weight="@Fmt(result.SizeWeight)" /></label>
+                    <button class="btn btn-sm btn-primary" type="submit" data-confirm="Şube gerçekleşmesini güncellemek istediğinize emin misiniz?">Gerçekleşmeyi kaydet</button>
+                </form>
+            </div></div></td></tr>
+        }
+        <tr class="empty-row d-none" data-list-empty><td colspan="9" class="empty-cell">Filtreye uygun şube sonucu yok</td></tr>
+        </tbody></table></div>
+        <partial name="_ListPager" />
+    </section>
+</section>
+
+<section class="d-none" data-performance-view="analysis">
+    <section class="performance-overview-grid analysis-grid">
+        <div class="surface-panel performance-insight-panel"><div class="panel-heading"><div><h2>Ürün başarı dağılımı</h2><p>Seçili bağlamda ürünlerin kazanılan puan oranı.</p></div></div><div class="performance-product-chart" id="performanceProductChart"></div><div class="empty-inline d-none" id="performanceProductChartEmpty">Seçili bağlamda ürün sonucu yok</div></div>
+        <div class="surface-panel performance-insight-panel"><div class="panel-heading"><div><h2>Hesaplama notu</h2><p>Puan oluşumunu her sonuç satırında takip edin.</p></div></div><div class="calculation-note"><strong>Ağırlıklı başarı</strong><span>HGO x HGO ağırlığı + gelişim x gelişim ağırlığı + büyüklük x büyüklük ağırlığı</span><strong>Segment puanı</strong><span>Tahsis edilen puan x başarı oranı; tahsis edilen puanı aşmaz.</span></div></div>
+    </section>
+</section>

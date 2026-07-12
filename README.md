@@ -35,9 +35,10 @@ pgAdmin: `http://127.0.0.1:5050`
 
 Sayfalar:
 
+- `http://localhost:5188/` - Performans Merkezi
 - `http://localhost:5188/Products`
 - `http://localhost:5188/Organization`
-- `http://localhost:5188/Scores`
+- `http://localhost:5188/Scores` - Performans Merkezi'ne yönlendirilir
 
 Docker PostgreSQL bağlantı bilgileri:
 
@@ -196,6 +197,9 @@ docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d product
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d main_product_instances"
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d sub_product_instances"
 docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d branch_product_scores"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d group_product_parameters"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d group_product_segment_rules"
+docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d branch_product_metric_results"
 ```
 
 Tüm şemayı SQL olarak dump etmek için:
@@ -220,7 +224,9 @@ docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
 - Grup tanımları `group_definitions`, şubeler `branches` tablosunda tutulur.
 - Şubeler tek bir gruba `branches.group_id` ile bağlanır.
 - Grup segmenti `Karma`, `Kurumsal`, `Ticari`, `Kobi`, `Diger` değerlerinden biri olur.
-- Şube performans puanları `branch_product_scores` tablosunda alt ürün instance'a bağlanır.
-- Puan ve hedef negatif olamaz; HGO, gelişim ve büyüklük payları DB'de `0-1`, ekranda `0-100` yüzde formatındadır.
-- Mock seed 3 grup, 12 şube, 12 ana ürün, 28 alt ürün ve 60+ şube performans puanı oluşturur.
+- Eski şube puanları `branch_product_scores` tablosunda korunur; yeni Performans Merkezi bu tabloyu değiştirmez.
+- Grup seviyesindeki ürün kuralı `group_product_parameters`, segment dağılımı `group_product_segment_rules`, şube gerçekleşmeleri `branch_product_metric_results` tablosunda tutulur.
+- Performans segmentleri `Kurumsal`, `Ticari`, `Kobi`, `Bireysel`, `Diger` değerlerinden oluşur ve grup segmentinden bağımsızdır.
+- Segment puanı, HGO/gelişim/büyüklük gerçekleşmelerinin ağırlıklı başarısıyla hesaplanır; kazanılan puan tahsis edilen segment puanını aşmaz.
+- Mock seed 3 grup, 12 şube, 12 ana ürün, 28 alt ürün, 9 ürün performans parametresi, 45 segment kuralı ve 180 şube gerçekleşmesi oluşturur.
 - Halkbank logosu resmi logo sayfasındaki JPG varlığından alınmıştır: https://www.halkbank.com.tr/tr/bankamiz/kurumsal-iletisim/logolarimiz

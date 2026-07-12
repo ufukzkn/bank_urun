@@ -258,7 +258,161 @@ set
   size_share = excluded.size_share,
   updated_at = now();
 
+with parameter_seed(group_no, main_code, year, term, sub_code, total_score) as (
+  values
+    ('1001', 'B1', 2026, 2, 'KP', 24.00),
+    ('1001', 'MA', 2026, 2, 'AB', 18.00),
+    ('1001', 'KR', 2026, 2, 'AB', 16.00),
+    ('1002', 'K0', 2026, 2, 'CD', 22.00),
+    ('1002', 'MA', 2026, 2, 'KP', 20.00),
+    ('1002', 'MC', 2026, 2, '42', 16.00),
+    ('1003', 'NB', 2026, 2, 'AB', 20.00),
+    ('1003', 'SG', 2026, 2, 'OH', 16.00),
+    ('1003', 'YP', 2026, 2, 'VB', 18.00)
+)
+insert into group_product_parameters (
+  group_id,
+  sub_product_instance_id,
+  total_score,
+  is_active,
+  created_at,
+  updated_at
+)
+select
+  group_definition.id,
+  sub_instance.id,
+  parameter_seed.total_score,
+  true,
+  now(),
+  now()
+from parameter_seed
+join group_definitions group_definition
+  on group_definition.group_no = parameter_seed.group_no
+join product_definitions main_product
+  on main_product.product_type = 'Main'
+ and main_product.code = parameter_seed.main_code
+join main_product_instances main_instance
+  on main_instance.main_product_id = main_product.id
+ and main_instance.year = parameter_seed.year
+ and main_instance.term = parameter_seed.term
+join product_definitions sub_product
+  on sub_product.product_type = 'Sub'
+ and sub_product.code = parameter_seed.sub_code
+join sub_product_instances sub_instance
+  on sub_instance.main_product_instance_id = main_instance.id
+ and sub_instance.sub_product_id = sub_product.id
+on conflict (group_id, sub_product_instance_id) do update
+set total_score = excluded.total_score,
+    is_active = true,
+    updated_at = now();
+
+with rule_seed(performance_segment, sort_order, target_share, size_share, scale_share, allocation_share) as (
+  values
+    ('Kurumsal', 1, 0.25, 0.20, 0.10, 0.25),
+    ('Ticari', 2, 0.25, 0.20, 0.10, 0.25),
+    ('Kobi', 3, 0.20, 0.20, 0.05, 0.20),
+    ('Bireysel', 4, 0.20, 0.20, 0.05, 0.20),
+    ('Diger', 5, 0.10, 0.20, 0.00, 0.10)
+)
+insert into group_product_segment_rules (
+  group_product_parameter_id,
+  performance_segment,
+  sort_order,
+  target_share,
+  size_share,
+  scale_share,
+  allocated_score,
+  hgo_weight,
+  development_weight,
+  size_weight,
+  created_at,
+  updated_at
+)
+select
+  parameter.id,
+  rule_seed.performance_segment,
+  rule_seed.sort_order,
+  rule_seed.target_share,
+  rule_seed.size_share,
+  rule_seed.scale_share,
+  round((parameter.total_score * rule_seed.allocation_share)::numeric, 2),
+  0.7000,
+  0.1500,
+  0.1500,
+  now(),
+  now()
+from group_product_parameters parameter
+cross join rule_seed
+on conflict (group_product_parameter_id, performance_segment) do update
+set sort_order = excluded.sort_order,
+    target_share = excluded.target_share,
+    size_share = excluded.size_share,
+    scale_share = excluded.scale_share,
+    allocated_score = excluded.allocated_score,
+    hgo_weight = excluded.hgo_weight,
+    development_weight = excluded.development_weight,
+    size_weight = excluded.size_weight,
+    updated_at = now();
+
+with ranked_rules as (
+  select
+    rule.id as rule_id,
+    parameter.group_id,
+    row_number() over (order by parameter.id, rule.sort_order) as rule_rank
+  from group_product_segment_rules rule
+  join group_product_parameters parameter
+    on parameter.id = rule.group_product_parameter_id
+),
+ranked_branches as (
+  select
+    branch.id as branch_id,
+    branch.group_id,
+    row_number() over (order by branch.branch_code) as branch_rank
+  from branches branch
+)
+insert into branch_product_metric_results (
+  branch_id,
+  group_product_segment_rule_id,
+  hgo_achievement,
+  development_achievement,
+  size_achievement,
+  created_at,
+  updated_at
+)
+select
+  branch.branch_id,
+  rule.rule_id,
+  case ((branch.branch_rank + rule.rule_rank) % 5)
+    when 0 then 1.15
+    when 1 then 0.98
+    when 2 then 0.86
+    when 3 then 0.72
+    else 0.58
+  end,
+  case ((branch.branch_rank * 2 + rule.rule_rank) % 4)
+    when 0 then 1.05
+    when 1 then 0.92
+    when 2 then 0.78
+    else 0.64
+  end,
+  case ((branch.branch_rank + rule.rule_rank * 3) % 4)
+    when 0 then 1.10
+    when 1 then 0.95
+    when 2 then 0.80
+    else 0.66
+  end,
+  now(),
+  now()
+from ranked_rules rule
+join ranked_branches branch
+  on branch.group_id = rule.group_id
+on conflict (branch_id, group_product_segment_rule_id) do update
+set hgo_achievement = excluded.hgo_achievement,
+    development_achievement = excluded.development_achievement,
+    size_achievement = excluded.size_achievement,
+    updated_at = now();
+
 insert into audit_logs (action, entity_name, entity_key, description, actor, created_at)
-values ('SeedMockData', 'Database', 'mock-data-v7', 'Zengin ürün, şube ve performans mock verileri yüklendi.', 'seed-script', now());
+values ('SeedMockData', 'Database', 'mock-data-v8', 'Performans merkezi için ürün parametresi, segment ve şube gerçekleşme mock verileri yüklendi.', 'seed-script', now());
 
 commit;

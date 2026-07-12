@@ -514,3 +514,212 @@ productType?.addEventListener("change", () => {
 
 toggleManualCode();
 toggleCreateProductFields();
+
+const performanceYear = document.querySelector("#performanceYear");
+const performanceTerm = document.querySelector("#performanceTerm");
+const performanceGroup = document.querySelector("#performanceGroup");
+const performanceBranch = document.querySelector("#performanceBranch");
+const performanceResultRows = Array.from(document.querySelectorAll(".performance-result-row"));
+let performanceParameterList = null;
+let performanceResultList = null;
+
+function performanceContextMatches(row) {
+  return (!performanceYear?.value || row.dataset.year === performanceYear.value)
+    && (!performanceTerm?.value || row.dataset.term === performanceTerm.value)
+    && (!performanceGroup?.value || row.dataset.groupId === performanceGroup.value)
+    && (!performanceBranch?.value || row.dataset.branchId === performanceBranch.value);
+}
+
+function performanceLevel(success) {
+  return success >= 90 ? "good" : success >= 70 ? "watch" : "low";
+}
+
+function clearChildren(element) {
+  while (element?.firstChild) {
+    element.removeChild(element.firstChild);
+  }
+}
+
+function createPerformanceChartRow(item, chartType) {
+  const row = document.createElement("div");
+  const level = performanceLevel(item.success);
+  row.className = `performance-chart-row ${level}`;
+
+  const label = document.createElement("div");
+  label.className = "performance-chart-label";
+  const code = document.createElement("strong");
+  code.textContent = item.code;
+  const name = document.createElement("span");
+  name.textContent = item.name;
+  const caption = document.createElement("small");
+  caption.textContent = chartType === "branch" ? item.group : item.caption;
+  label.append(code, name, caption);
+
+  const track = document.createElement("div");
+  track.className = "performance-chart-track";
+  const fill = document.createElement("div");
+  fill.className = "performance-chart-fill";
+  fill.style.width = `${Math.min(100, Math.max(0, item.success))}%`;
+  track.append(fill);
+
+  const value = document.createElement("div");
+  value.className = "performance-chart-value";
+  value.textContent = `% ${item.success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
+  row.append(label, track, value);
+  return row;
+}
+
+function updatePerformanceWorkspace() {
+  if (!performanceResultRows.length) {
+    return;
+  }
+
+  const selectedBranch = performanceBranch?.selectedOptions[0];
+  if (selectedBranch?.dataset.groupId && performanceGroup && !performanceGroup.value) {
+    performanceGroup.value = selectedBranch.dataset.groupId;
+  }
+
+  const activeGroup = performanceGroup?.value || "";
+  performanceBranch?.querySelectorAll("option[data-group-id]").forEach((option) => {
+    const isAllowed = !activeGroup || option.dataset.groupId === activeGroup;
+    option.disabled = !isAllowed;
+    option.hidden = !isAllowed;
+  });
+  if (performanceBranch?.value && performanceBranch.selectedOptions[0]?.disabled) {
+    performanceBranch.value = "";
+  }
+
+  performanceParameterList?.apply(true);
+  performanceResultList?.apply(true);
+  const matching = performanceResultRows.filter(performanceContextMatches);
+  const potential = matching.reduce((sum, row) => sum + parseLocalizedDecimal(row.dataset.allocated), 0);
+  const earned = matching.reduce((sum, row) => sum + parseLocalizedDecimal(row.dataset.earned), 0);
+  const success = potential === 0 ? 0 : earned / potential * 100;
+  const missing = matching.filter((row) => row.dataset.missing === "true").length;
+
+  const setText = (selector, value) => {
+    const element = document.querySelector(selector);
+    if (element) element.textContent = value;
+  };
+  setText("#performancePotential", potential.toLocaleString("tr-TR", { maximumFractionDigits: 2 }));
+  setText("#performanceEarned", earned.toLocaleString("tr-TR", { maximumFractionDigits: 2 }));
+  setText("#performanceSuccess", `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`);
+  setText("#performanceMissing", missing.toString());
+
+  const branches = new Map();
+  const products = new Map();
+  matching.forEach((row) => {
+    const branchKey = row.dataset.branchId || "";
+    const productKey = row.dataset.product || "";
+    const branch = branches.get(branchKey) || { code: row.dataset.branch?.split(" ")[0] || "", name: row.dataset.branch?.replace(/^\S+\s*/, "") || "", group: row.dataset.group || "", earned: 0, potential: 0, missing: 0 };
+    branch.earned += parseLocalizedDecimal(row.dataset.earned);
+    branch.potential += parseLocalizedDecimal(row.dataset.allocated);
+    branch.missing += row.dataset.missing === "true" ? 1 : 0;
+    branches.set(branchKey, branch);
+    const product = products.get(productKey) || { code: row.dataset.product?.split(" ")[0] || "", name: row.dataset.product?.replace(/^\S+\s*/, "") || "", caption: row.dataset.segment || "", earned: 0, potential: 0 };
+    product.earned += parseLocalizedDecimal(row.dataset.earned);
+    product.potential += parseLocalizedDecimal(row.dataset.allocated);
+    products.set(productKey, product);
+  });
+
+  const branchItems = Array.from(branches.values()).map((item) => ({ ...item, success: item.potential === 0 ? 0 : item.earned / item.potential * 100 }))
+    .sort((a, b) => b.success - a.success || a.code.localeCompare(b.code, "tr"));
+  const productItems = Array.from(products.values()).map((item) => ({ ...item, success: item.potential === 0 ? 0 : item.earned / item.potential * 100 }))
+    .sort((a, b) => b.success - a.success || a.code.localeCompare(b.code, "tr"));
+
+  const branchChart = document.querySelector("#performanceBranchChart");
+  const branchEmpty = document.querySelector("#performanceBranchChartEmpty");
+  clearChildren(branchChart);
+  branchItems.forEach((item) => branchChart?.append(createPerformanceChartRow(item, "branch")));
+  branchEmpty?.classList.toggle("d-none", branchItems.length !== 0);
+
+  const productChart = document.querySelector("#performanceProductChart");
+  const productEmpty = document.querySelector("#performanceProductChartEmpty");
+  clearChildren(productChart);
+  productItems.forEach((item) => productChart?.append(createPerformanceChartRow(item, "product")));
+  productEmpty?.classList.toggle("d-none", productItems.length !== 0);
+
+  const priorities = document.querySelector("#performancePriorities");
+  clearChildren(priorities);
+  const priorityItems = branchItems
+    .filter((item) => item.missing > 0 || item.success < 70)
+    .sort((a, b) => (b.missing - a.missing) || (a.success - b.success))
+    .slice(0, 5);
+  priorityItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `priority-item ${item.success < 70 ? "low" : ""}`;
+    const copy = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = `${item.code} ${item.name}`;
+    const caption = document.createElement("span");
+    caption.textContent = item.missing > 0 ? `${item.missing} eksik gerçekleşme` : "Başarı oranı izleme eşiğinin altında";
+    copy.append(strong, caption);
+    const score = document.createElement("b");
+    score.textContent = `% ${item.success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
+    row.append(copy, score);
+    priorities?.append(row);
+  });
+  if (!priorityItems.length && priorities) {
+    const empty = document.createElement("div");
+    empty.className = "empty-inline";
+    empty.textContent = "Öncelikli eksik veya düşük başarı kaydı yok";
+    priorities.append(empty);
+  }
+}
+
+function setupPerformanceWorkspace() {
+  const parameterRoot = document.querySelector('[data-list="performanceParameters"]');
+  const resultRoot = document.querySelector('[data-list="performanceResults"]');
+  if (!parameterRoot && !resultRoot) {
+    return;
+  }
+
+  performanceParameterList = setupList(parameterRoot, {
+    defaultSort: { key: "year", direction: "desc" },
+    descendingKeys: ["year", "term", "totalScore"],
+    numericKeys: ["year", "term", "totalScore", "active"],
+    label: "parametre",
+    matches: (row, value) => {
+      const search = value("search").toUpperCase();
+      return performanceContextMatches(row)
+        && (!search || (row.dataset.search || "").includes(search));
+    }
+  });
+
+  performanceResultList = setupList(resultRoot, {
+    defaultSort: { key: "year", direction: "desc" },
+    descendingKeys: ["year", "term", "earned", "success"],
+    numericKeys: ["year", "term", "earned", "allocated", "success"],
+    label: "şube sonucu",
+    matches: (row, value) => {
+      const search = value("search").toUpperCase();
+      const missing = value("missing");
+      return performanceContextMatches(row)
+        && (!search || (row.dataset.search || "").includes(search))
+        && (!missing || row.dataset.missing === missing);
+    }
+  });
+
+  [performanceYear, performanceTerm, performanceGroup, performanceBranch].forEach((input) => input?.addEventListener("change", updatePerformanceWorkspace));
+  document.querySelectorAll("[data-performance-tab]").forEach((button) => button.addEventListener("click", () => {
+    const target = button.dataset.performanceTab;
+    document.querySelectorAll("[data-performance-tab]").forEach((tab) => tab.classList.toggle("is-active", tab === button));
+    document.querySelectorAll("[data-performance-view]").forEach((view) => view.classList.toggle("d-none", view.dataset.performanceView !== target));
+  }));
+
+  document.querySelectorAll("[data-metric-form]").forEach((form) => {
+    const preview = form.closest(".performance-result-detail")?.querySelector("[data-metric-preview]");
+    const updatePreview = () => {
+      const inputs = Array.from(form.querySelectorAll(".metric-input"));
+      const weighted = inputs.reduce((sum, input) => sum + parseLocalizedDecimal(input.value) * parseLocalizedDecimal(input.dataset.weight) / 100, 0);
+      const allocated = parseLocalizedDecimal(form.dataset.allocatedScore);
+      const earned = Math.min(allocated, allocated * weighted / 100);
+      if (preview) preview.textContent = `${earned.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} / ${allocated.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} puan`;
+    };
+    form.querySelectorAll(".metric-input").forEach((input) => input.addEventListener("input", updatePreview));
+  });
+
+  updatePerformanceWorkspace();
+}
+
+setupPerformanceWorkspace();
