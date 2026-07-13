@@ -1,0 +1,120 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.DashboardSnapshotViewModel
+
+@functions {
+    private static string Number(decimal value) => value.ToString("N2");
+    private static string Optional(decimal? value) => value?.ToString("N2") ?? "-";
+    private static string Level(decimal value) => value >= 90 ? "good" : value >= 70 ? "watch" : "low";
+    private static string Calculation(MainProductCalculationType? type) => type switch
+    {
+        MainProductCalculationType.Average => "Ortalamalı",
+        MainProductCalculationType.Cumulative => "Kümülatif",
+        _ => "Parametre yok"
+    };
+}
+
+@if (Model.BranchId == 0)
+{
+    <div class="surface-panel dashboard-empty-state">Dashboard için şube kaydı bulunamadı.</div>
+    return;
+}
+
+<div class="dashboard-snapshot-heading">
+    <div>
+        <span class="dashboard-context-code">@Model.BranchCode</span>
+        <h2>@Model.BranchName</h2>
+        <p>@Model.GroupNo - @Model.GroupName · @Model.GroupSegment · @Model.Year / @Model.Term. Dönem</p>
+    </div>
+    <span class="dashboard-success-chip @Level(Model.SuccessPercent)">% @Number(Model.SuccessPercent)</span>
+</div>
+
+<div class="dashboard-kpi-grid">
+    <article class="dashboard-kpi-card">
+        <span>Kazanılan puan</span>
+        <strong>@Number(Model.EarnedScore)</strong>
+        <small>@Number(Model.EligibleScore) hesaplanabilir puan üzerinden</small>
+    </article>
+    <article class="dashboard-kpi-card">
+        <span>Toplam kriter</span>
+        <strong>@Number(Model.AssignedScore)</strong>
+        <small>@Model.ActiveProductCount aktif ana ürün</small>
+    </article>
+    <article class="dashboard-kpi-card @Level(Model.SuccessPercent)">
+        <span>Başarı oranı</span>
+        <strong>% @Number(Model.SuccessPercent)</strong>
+        <small>Puan / hesaplanabilir kriter</small>
+    </article>
+    <article class="dashboard-kpi-card">
+        <span>Şube sırası</span>
+        <strong>@(Model.BranchRank?.ToString() ?? "-")</strong>
+        <small>@Model.RankedBranchCount şube içinde</small>
+    </article>
+    <article class="dashboard-kpi-card @(Model.PendingProductCount > 0 ? "watch" : "good")">
+        <span>Batch kapsamı</span>
+        <strong>@Model.CompleteProductCount / @Model.ActiveProductCount</strong>
+        <small>@Model.PendingProductCount ürün veri bekliyor</small>
+    </article>
+</div>
+
+<div class="dashboard-analysis-grid">
+    <section class="surface-panel dashboard-chart-panel">
+        <div class="panel-heading dashboard-panel-heading">
+            <div><h2>Şube başarı sıralaması</h2><p>Hesaplanabilir kriter puanı üzerinden ilk 10 şube.</p></div>
+        </div>
+        <div class="dashboard-ranking-chart">
+            @foreach (var branch in Model.BranchRanking)
+            {
+                var width = Math.Clamp(branch.SuccessPercent, 0, 100);
+                <div class="dashboard-ranking-row @Level(branch.SuccessPercent) @(branch.IsSelected ? "is-selected" : "")">
+                    <span class="dashboard-rank">@(branch.Rank?.ToString() ?? "-")</span>
+                    <div class="dashboard-ranking-label"><strong>@branch.BranchCode</strong><span>@branch.BranchName</span><small>@branch.GroupSegment · @branch.PendingProductCount bekleyen</small></div>
+                    <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
+                    <strong class="dashboard-bar-value">% @Number(branch.SuccessPercent)</strong>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="surface-panel dashboard-chart-panel">
+        <div class="panel-heading dashboard-panel-heading">
+            <div><h2>Aylık H/G seyri</h2><p>Batch gelen ana ürünlerin aylık ortalama gerçekleşme oranı.</p></div>
+        </div>
+        <div class="dashboard-month-chart">
+            @foreach (var month in Model.Months)
+            {
+                var height = month.AverageHgPercent.HasValue ? Math.Clamp(month.AverageHgPercent.Value, 4, 100) : 0;
+                <div class="dashboard-month-column">
+                    <div class="dashboard-month-value">@(month.AverageHgPercent.HasValue ? $"% {Number(month.AverageHgPercent.Value)}" : "-")</div>
+                    <div class="dashboard-month-track"><div class="dashboard-month-fill @(month.AverageHgPercent.HasValue ? Level(month.AverageHgPercent.Value) : "empty")" style="height:@height.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
+                    <strong>@month.MonthName</strong>
+                    <small>@month.CompleteProductCount ürün</small>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+<section class="surface-panel dashboard-products-panel">
+    <div class="panel-heading dashboard-panel-heading">
+        <div><h2>Ana ürün performansı</h2><p>Alt ürünlerin etkisi ana ürün sonuçlarına yansımış dönemsel görünüm.</p></div>
+    </div>
+    <div class="dashboard-product-chart">
+        @foreach (var product in Model.Products)
+        {
+            var ratio = product.HgRatioPercent ?? 0;
+            var width = Math.Clamp(ratio, 0, 100);
+            var level = product.HasCompleteBatchData ? Level(ratio) : "pending";
+            <article class="dashboard-product-row @level">
+                <div class="dashboard-product-name"><strong>@product.ProductCode</strong><span>@product.ProductName</span><small>@Calculation(product.CalculationType)</small></div>
+                <div class="dashboard-product-score"><span>@Optional(product.TotalScore) puan</span><small>@Optional(product.CriterionScore) kriter</small></div>
+                <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
+                <div class="dashboard-product-result">
+                    @if (!product.HasParameter) { <span class="status-pill passive">Parametre yok</span> }
+                    else if (!product.IsActive) { <span class="status-pill passive">Pasif</span> }
+                    else if (!product.HasCompleteBatchData) { <span class="status-pill warning">Batch bekliyor</span> }
+                    else { <strong>% @Optional(product.HgRatioPercent)</strong><small>Ürün #@product.ProductRank · Segment #@product.SegmentRank</small> }
+                </div>
+            </article>
+        }
+    </div>
+</section>

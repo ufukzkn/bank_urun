@@ -2,19 +2,19 @@
 @model BankUrun.Web.ViewModels.ProductIndexViewModel
 
 @{
-    ViewData["Title"] = "Ürünler";
+    ViewData["Title"] = "Ürün Kataloğu";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
 }
 
 <section class="page-title">
     <div>
-        <h1>Ürünler</h1>
+        <h1>Ürün Kataloğu</h1>
         <p>Ana ürün, alt ürün ve dönem bağlantıları.</p>
     </div>
 </section>
 
 <section class="workspace-grid compact-workspace-grid">
-    <div class="surface-panel create-panel compact-create-panel">
+    <div class="surface-panel create-panel compact-create-panel product-create-panel" data-product-create>
         <div class="panel-heading">
             <div>
                 <h1>Ürün oluştur</h1>
@@ -24,14 +24,12 @@
 
         <form asp-action="CreateProduct" method="post" class="stack-form compact-stack-form">
             @Html.AntiForgeryToken()
-            <div class="form-row">
-                <label>
-                    <span>Tip</span>
-                    <select class="form-select" name="Type" id="productType">
-                        <option value="@ProductType.Main">Ana ürün</option>
-                        <option value="@ProductType.Sub">Alt ürün</option>
-                    </select>
-                </label>
+            <div class="creation-type-picker" role="group" aria-label="Oluşturulacak ürün türü">
+                <button class="is-active" type="button" data-product-create-type="Main" aria-pressed="true">Ana ürün</button>
+                <button type="button" data-product-create-type="Sub" aria-pressed="false">Alt ürün</button>
+            </div>
+            <input type="hidden" name="Type" id="productType" value="@ProductType.Main" />
+            <div class="form-row single-control-row">
                 <label>
                     <span>Kod</span>
                     <select class="form-select" name="CodeMode" id="codeMode">
@@ -78,7 +76,7 @@
                 </label>
                 <label>
                     <span>Dönem</span>
-                    <input class="form-control" type="number" name="Term" min="1" max="12" value="1" required />
+                    <select class="form-select" name="Term" required><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select>
                 </label>
             </div>
 
@@ -109,11 +107,12 @@
         </label>
         <label>
             <span>Dönem</span>
-            <input class="form-control" type="number" data-list-filter="term" id="filterTerm" min="1" max="12" />
+            <input class="form-control" type="number" data-list-filter="term" id="filterTerm" min="1" max="2" />
         </label>
         <label>
             <span>Sayfa</span>
             <select class="form-select" data-list-page-size id="pageSize">
+                <option value="5">5</option>
                 <option value="10">10</option>
                 <option value="25">25</option>
                 <option value="50">50</option>

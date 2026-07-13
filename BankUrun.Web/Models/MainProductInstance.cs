@@ -11,4 +11,5 @@ public class MainProductInstance
 
     public ProductDefinition MainProduct { get; set; } = null!;
     public ICollection<SubProductInstance> SubProductInstances { get; set; } = new List<SubProductInstance>();
+    public MainProductParameter? Parameter { get; set; }
 }

@@ -10,6 +10,5 @@ public class Branch
     public DateTimeOffset UpdatedAt { get; set; }
 
     public GroupDefinition Group { get; set; } = null!;
-    public ICollection<BranchProductScore> BranchProductScores { get; set; } = new List<BranchProductScore>();
-    public ICollection<BranchProductMetricResult> MetricResults { get; set; } = new List<BranchProductMetricResult>();
+    public ICollection<BranchMainProductMonthlyMetric> MonthlyMetrics { get; set; } = new List<BranchMainProductMonthlyMetric>();
 }

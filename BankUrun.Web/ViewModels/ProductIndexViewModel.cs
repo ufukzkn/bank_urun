@@ -57,7 +57,7 @@ public class CreateProductInput
     [Range(2000, 2100)]
     public int? Year { get; set; }
 
-    [Range(1, 12)]
+    [Range(1, 2)]
     public int? Term { get; set; }
 
     public int? MainProductInstanceId { get; set; }

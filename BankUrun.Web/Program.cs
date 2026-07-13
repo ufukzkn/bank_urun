@@ -13,8 +13,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IProductCodeService, ProductCodeService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
-builder.Services.AddScoped<IScoreService, ScoreService>();
-builder.Services.AddScoped<IPerformanceWorkspaceService, PerformanceWorkspaceService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IMainProductPeriodCalculator, MainProductPeriodCalculator>();
+builder.Services.AddScoped<IParameterManagementService, ParameterManagementService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 var app = builder.Build();
 
@@ -35,6 +37,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthorization();
@@ -43,7 +46,7 @@ app.MapStaticAssets();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Performance}/{action=Index}/{id?}")
+    pattern: "{controller=Dashboard}/{action=Index}/{id?}")
     .WithStaticAssets();
 
 

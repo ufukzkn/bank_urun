@@ -1,0 +1,103 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.ParameterPageViewModel
+
+@functions {
+    private static string Number(decimal? value) => value?.ToString("N2") ?? "-";
+    private static string Rank(int? value) => value?.ToString() ?? "-";
+    private static string CalculationLabel(MainProductCalculationType? type) => type switch
+    {
+        MainProductCalculationType.Average => "Ortalamalı",
+        MainProductCalculationType.Cumulative => "Kümülatif",
+        _ => "Tanımlanmadı"
+    };
+}
+
+@if (Model.Rows.Count == 0)
+{
+    <tr class="empty-row"><td colspan="11" class="empty-cell">Seçili bağlamda ürün bulunamadı.</td></tr>
+}
+
+@foreach (var row in Model.Rows)
+{
+    var detailId = $"parameter-detail-{row.BranchId}-{row.MainProductInstanceId}";
+    <tr class="parameter-row" data-detail-id="@detailId">
+        <td><strong>@row.MainProductCode</strong><small>@row.MainProductName</small></td>
+        <td>
+            <span class="status-pill @(row.ParameterId.HasValue ? "neutral" : "passive")">@CalculationLabel(row.CalculationType)</span>
+            @if (row.ParameterId.HasValue && !row.IsActive) { <small>Pasif parametre</small> }
+        </td>
+        <td class="text-end numeric-cell">@Number(row.CriterionScore)</td>
+        <td class="text-end numeric-cell">@Number(row.PeriodTarget)</td>
+        <td class="text-end numeric-cell">
+            @if (row.HasCompleteBatchData) { @Number(row.PeriodActual) }
+            else { <span class="batch-waiting">Batch verisi bekleniyor</span> }
+        </td>
+        <td class="text-end numeric-cell">@(row.HgRatio.HasValue ? $"% {Number(row.HgRatio)}" : "-")</td>
+        <td class="text-end numeric-cell">@Number(row.HgoScore)</td>
+        <td class="text-end numeric-cell"><strong>@Number(row.TotalScore)</strong></td>
+        <td class="text-end numeric-cell">@Rank(row.ProductRank)</td>
+        <td class="text-end numeric-cell">@Rank(row.SegmentRank)</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+    </tr>
+    <tr class="list-detail-row parameter-detail-row" data-detail-for="@detailId">
+        <td colspan="11">
+            <div class="collapse" id="@detailId">
+                <div class="parameter-detail-panel">
+                    <div class="parameter-rule-editor">
+                        <div class="detail-section-heading">
+                            <h3>Ürün kuralı</h3>
+                            <p>@row.Year / @row.Term dönemindeki tüm şubeler için geçerlidir.</p>
+                        </div>
+                        <form asp-controller="Parameters" asp-action="SaveParameter" method="post" class="parameter-rule-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Id" value="@(row.ParameterId ?? 0)" />
+                            <input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" />
+                            <label><span>Hesaplama türü</span><select class="form-select form-select-sm" name="CalculationType"><option value="Average" selected="@(row.CalculationType is null or MainProductCalculationType.Average)">Ortalamalı</option><option value="Cumulative" selected="@(row.CalculationType == MainProductCalculationType.Cumulative)">Kümülatif</option></select></label>
+                            <label><span>Kriter puanı</span><input class="form-control form-control-sm numeric-input" type="number" name="CriterionScore" value="@(row.CriterionScore ?? 0)" min="0" step="0.01" required /></label>
+                            <label class="check-line parameter-active-toggle"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@(row.ParameterId is null || row.IsActive)" /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label>
+                            <div class="detail-command-row">
+                                <button class="btn btn-sm btn-primary" type="submit" data-confirm="Ürün kuralını kaydetmek istediğinize emin misiniz?">@(row.ParameterId.HasValue ? "Güncelle" : "Parametre oluştur")</button>
+                                @if (row.ParameterId.HasValue) { <button class="btn btn-sm btn-outline-danger" type="submit" form="delete-parameter-@row.ParameterId" data-confirm="Bu parametreyi ve bağlı aylık hedefleri silmek istediğinize emin misiniz?">Sil</button> }
+                            </div>
+                        </form>
+                        @if (row.ParameterId.HasValue)
+                        {
+                            <form id="delete-parameter-@row.ParameterId" asp-controller="Parameters" asp-action="DeleteParameter" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@row.ParameterId" /></form>
+                        }
+                    </div>
+                    <div class="monthly-metrics-editor">
+                        <div class="detail-section-heading">
+                            <h3>Aylık kırılım</h3>
+                            <p>Hedef düzenlenebilir; gerçekleşme batch kaynağından salt okunur gelir.</p>
+                        </div>
+                        @if (row.ParameterId.HasValue)
+                        {
+                            <form asp-controller="Parameters" asp-action="UpdateTargets" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ParameterId" value="@row.ParameterId" />
+                                <input type="hidden" name="BranchId" value="@row.BranchId" />
+                                <div class="monthly-metric-grid">
+                                    @for (var index = 0; index < row.Months.Count; index++)
+                                    {
+                                        var month = row.Months[index];
+                                        <div class="month-metric-card @(month.IsIncludedInCalculation ? "is-included" : "")">
+                                            <div class="month-metric-heading"><strong>@month.MonthName</strong>@if (month.IsIncludedInCalculation) { <span>Hesapta</span> } else if (month.IsBatchExpected) { <span class="is-waiting">Batch bekliyor</span> }</div>
+                                            <input type="hidden" name="Months[@index].Month" value="@month.Month" />
+                                            <label><span>Hedef</span><input class="form-control form-control-sm numeric-input" type="number" name="Months[@index].TargetValue" value="@month.TargetValue" min="0" step="0.01" required /></label>
+                                            <div class="readonly-metric"><span>Gerçekleşme</span><strong>@Number(month.ActualValue)</strong><small>@(month.ActualAsOfDate?.ToString("dd.MM.yyyy") ?? "Veri yok")</small></div>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="detail-command-row monthly-save-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Bu şubenin aylık hedeflerini güncellemek istediğinize emin misiniz?">Hedefleri güncelle</button></div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="inline-empty-state">Aylık hedef girmek için önce ürün parametresini oluşturun.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </td>
+    </tr>
+}

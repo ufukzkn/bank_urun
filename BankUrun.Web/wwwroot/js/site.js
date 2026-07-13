@@ -50,7 +50,7 @@ function toggleCreateProductFields() {
   createMainProductWrap.classList.toggle("is-visible", isSubProduct);
   periodFields?.classList.toggle("d-none", isSubProduct);
   createMainProductSearch.required = isSubProduct;
-  periodFields?.querySelectorAll("input").forEach((input) => {
+  periodFields?.querySelectorAll("input, select").forEach((input) => {
     input.disabled = isSubProduct;
     input.required = !isSubProduct;
   });
@@ -170,29 +170,29 @@ function submitPendingForm(deleteScope) {
   pendingForm.requestSubmit(pendingSubmitter);
 }
 
-document.querySelectorAll("form").forEach((form) => {
-  form.addEventListener("submit", (event) => {
-    normalizeDecimalInputs(form);
-    const missingCombo = Array.from(form.querySelectorAll("[data-combo-required]"))
-      .find((input) => !input.value);
-    if (missingCombo) {
-      event.preventDefault();
-      alert(missingCombo.dataset.comboRequired || "Seçim yapmalısınız.");
-      return;
-    }
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  normalizeDecimalInputs(form);
+  const missingCombo = Array.from(form.querySelectorAll("[data-combo-required]"))
+    .find((input) => !input.value);
+  if (missingCombo) {
+    event.preventDefault();
+    alert(missingCombo.dataset.comboRequired || "Seçim yapmalısınız.");
+    return;
+  }
 
-    if (form.dataset.toastConfirmed === "true") {
-      delete form.dataset.toastConfirmed;
-      return;
-    }
+  if (form.dataset.toastConfirmed === "true") {
+    delete form.dataset.toastConfirmed;
+    return;
+  }
 
-    const submitter = event.submitter;
-    const message = submitter?.dataset.confirm || form.dataset.confirm;
-    if (message) {
-      event.preventDefault();
-      showActionToast(form, submitter, message, submitter?.dataset.actionType === "delete");
-    }
-  });
+  const submitter = event.submitter;
+  const message = submitter?.dataset.confirm || form.dataset.confirm;
+  if (message) {
+    event.preventDefault();
+    showActionToast(form, submitter, message, submitter?.dataset.actionType === "delete");
+  }
 });
 
 document.querySelectorAll("[data-toast-cancel]").forEach((button) => button.addEventListener("click", () => {
@@ -257,7 +257,10 @@ document.querySelectorAll(".generic-combo").forEach((combo) => {
   input?.addEventListener("keydown", (event) => { if (event.key === "Escape") combo.classList.remove("is-open"); });
   options.forEach((option) => option.addEventListener("click", () => {
     if (input) input.value = option.dataset.label || "";
-    if (value) value.value = option.dataset.id || "";
+    if (value) {
+      value.value = option.dataset.id || "";
+      value.dispatchEvent(new Event("change", { bubbles: true }));
+    }
     combo.classList.remove("is-open");
   }));
 });
@@ -290,9 +293,125 @@ function closeDetail(row) {
   });
 }
 
+function setupRemoteList(root, options) {
+  const tableBody = root.querySelector("[data-remote-list-body]");
+  const summary = root.querySelector("[data-list-summary]");
+  const indicator = root.querySelector("[data-list-page-indicator]");
+  const jump = root.querySelector("[data-list-page-jump]");
+  const pageSize = root.querySelector("[data-list-page-size]");
+  const filters = Array.from(root.querySelectorAll("[data-list-filter]"));
+  const sortButtons = Array.from(root.querySelectorAll("[data-list-sort]"));
+  const pageButtons = Array.from(root.querySelectorAll("[data-list-page]"));
+  const state = {
+    page: Number(root.dataset.listPage || 1),
+    totalPages: Number(root.dataset.listTotalPages || 1),
+    totalCount: Number(root.dataset.listTotalCount || 0),
+    sort: { ...options.defaultSort }
+  };
+  let requestController = null;
+  let debounceTimer = null;
+
+  const filterValue = (name) => {
+    const input = filters.find((item) => item.dataset.listFilter === name);
+    return input?.type === "checkbox" ? input.checked : (input?.value.trim() || "");
+  };
+  const updateSortState = () => {
+    sortButtons.forEach((button) => {
+      const isActive = button.dataset.listSort === state.sort.key;
+      button.classList.toggle("is-active", isActive);
+      button.classList.toggle("desc", isActive && state.sort.direction === "desc");
+      button.setAttribute("aria-sort", isActive ? (state.sort.direction === "asc" ? "ascending" : "descending") : "none");
+    });
+  };
+  const updatePager = () => {
+    const size = Number(pageSize?.value || 10);
+    const first = state.totalCount === 0 ? 0 : (state.page - 1) * size + 1;
+    const last = Math.min(state.page * size, state.totalCount);
+    if (summary) {
+      summary.textContent = state.totalCount === 0
+        ? `0 ${options.label}`
+        : `${state.totalCount} ${options.label} içinden ${first}-${last} gösteriliyor`;
+    }
+    if (indicator) indicator.textContent = `${state.page} / ${state.totalPages}`;
+    if (jump) {
+      jump.max = state.totalPages.toString();
+      jump.value = state.page.toString();
+    }
+    pageButtons.forEach((button) => {
+      const action = button.dataset.listPage;
+      button.disabled = (action === "first" || action === "previous") ? state.page <= 1
+        : (action === "next" || action === "last") ? state.page >= state.totalPages
+          : false;
+    });
+  };
+  const load = async (resetPage = true) => {
+    if (resetPage) state.page = 1;
+    requestController?.abort();
+    requestController = new AbortController();
+    root.classList.add("is-loading");
+    try {
+      const result = await options.remote({ state, filterValue, signal: requestController.signal });
+      if (tableBody) tableBody.innerHTML = result.html;
+      state.page = result.page;
+      state.totalPages = result.totalPages;
+      state.totalCount = result.totalCount;
+      updatePager();
+    } catch (error) {
+      if (error.name !== "AbortError" && tableBody) {
+        tableBody.innerHTML = `<tr class="empty-row"><td colspan="${options.colspan || 9}" class="empty-cell">Liste yüklenemedi. Lütfen yeniden deneyin.</td></tr>`;
+      }
+    } finally {
+      root.classList.remove("is-loading");
+    }
+  };
+  const changePage = (page) => {
+    state.page = Math.min(Math.max(1, page), state.totalPages);
+    return load(false);
+  };
+
+  filters.forEach((input) => {
+    const eventName = input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input";
+    input.addEventListener(eventName, () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => load(true), eventName === "input" ? 250 : 0);
+    });
+  });
+  pageSize?.addEventListener("change", () => load(true));
+  sortButtons.forEach((button) => button.addEventListener("click", () => {
+    const key = button.dataset.listSort;
+    if (!key) return;
+    state.sort = state.sort.key === key
+      ? { key, direction: state.sort.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: options.descendingKeys.includes(key) ? "desc" : "asc" };
+    updateSortState();
+    load(true);
+  }));
+  pageButtons.forEach((button) => button.addEventListener("click", () => {
+    const action = button.dataset.listPage;
+    if (action === "first") changePage(1);
+    if (action === "previous") changePage(state.page - 1);
+    if (action === "next") changePage(state.page + 1);
+    if (action === "last") changePage(state.totalPages);
+    if (action === "jump") changePage(Number(jump?.value || 1));
+  }));
+  jump?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      changePage(Number(jump.value || 1));
+    }
+  });
+  updateSortState();
+  updatePager();
+  return { apply: load };
+}
+
 function setupList(root, options) {
   if (!root) {
     return null;
+  }
+
+  if (options.remote) {
+    return setupRemoteList(root, options);
   }
 
   const rows = Array.from(root.querySelectorAll(".list-row"));
@@ -387,6 +506,7 @@ function setupList(root, options) {
   filters.forEach((input) => {
     input.addEventListener(input.tagName === "SELECT" || input.type === "checkbox" ? "change" : "input", () => apply(true));
   });
+  pageSize?.addEventListener("change", () => apply(true));
   sortButtons.forEach((button) => button.addEventListener("click", () => {
     const key = button.dataset.listSort;
     if (!key) return;
@@ -414,47 +534,6 @@ function setupList(root, options) {
   updateSortState();
   apply(true);
   return { apply };
-}
-
-function updateBranchChart(visibleRows) {
-  const totals = new Map();
-  visibleRows.forEach((row) => {
-    const key = row.dataset.branchId || "";
-    const total = totals.get(key) || { score: 0, target: 0 };
-    total.score += parseLocalizedDecimal(row.dataset.score);
-    total.target += parseLocalizedDecimal(row.dataset.target);
-    totals.set(key, total);
-  });
-
-  const scoreSum = Array.from(totals.values()).reduce((sum, item) => sum + item.score, 0);
-  const targetSum = Array.from(totals.values()).reduce((sum, item) => sum + item.target, 0);
-  const success = targetSum === 0 ? 0 : scoreSum / targetSum * 100;
-  document.querySelector("#totalScore")?.replaceChildren(document.createTextNode(scoreSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 })));
-  document.querySelector("#totalTarget")?.replaceChildren(document.createTextNode(targetSum.toLocaleString("tr-TR", { maximumFractionDigits: 4 })));
-  document.querySelector("#totalSuccess")?.replaceChildren(document.createTextNode(`% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`));
-
-  const chart = document.querySelector("#branchChart");
-  const emptyChart = document.querySelector("#noBranchChartRows");
-  const chartRows = Array.from(chart?.querySelectorAll(".branch-chart-row") || []);
-  chartRows.forEach((row) => {
-    const total = totals.get(row.dataset.branchId || "");
-    row.classList.toggle("d-none", !total);
-    if (!total) return;
-    const rate = total.target === 0 ? 0 : total.score / total.target * 100;
-    const level = rate >= 90 ? "good" : rate >= 70 ? "watch" : "low";
-    row.classList.remove("good", "watch", "low");
-    row.classList.add(level);
-    row.dataset.success = rate.toString();
-    const fill = row.querySelector(".branch-chart-fill");
-    if (fill) fill.style.width = `${Math.min(100, rate)}%`;
-    const value = row.querySelector(".branch-chart-value");
-    if (value) value.textContent = `% ${rate.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
-  });
-  chartRows.sort((a, b) => parseLocalizedDecimal(b.dataset.success) - parseLocalizedDecimal(a.dataset.success)).forEach((row) => chart?.append(row));
-  if (emptyChart) {
-    chart?.append(emptyChart);
-    emptyChart.classList.toggle("d-none", totals.size !== 0 || chartRows.length === 0);
-  }
 }
 
 setupList(document.querySelector('[data-list="products"]'), {
@@ -490,20 +569,118 @@ setupList(document.querySelector('[data-list="branches"]'), {
   matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
 });
 
-setupList(document.querySelector('[data-list="scores"]'), {
-  defaultSort: { key: "year", direction: "asc" },
-  descendingKeys: [],
-  numericKeys: ["year", "term", "score", "displayed", "target", "hgo", "development", "size", "success"],
-  label: "puan satırı",
-  matches: (row, value) => {
-    const search = value("search").toUpperCase();
-    return (!search || (row.dataset.search || "").includes(search))
-      && (!value("groupId") || row.dataset.groupId === value("groupId"))
-      && (!value("year") || row.dataset.year === value("year"))
-      && (!value("term") || row.dataset.term === value("term"));
-  },
-  afterApply: updateBranchChart,
-});
+const parameterRoot = document.querySelector('[data-list="parameters"]');
+if (parameterRoot) {
+  const branchValue = parameterRoot.querySelector('[data-list-filter="branchId"]');
+  const branchInput = branchValue?.closest(".generic-combo")?.querySelector("[data-combo-input]");
+  const yearValue = parameterRoot.querySelector('[data-list-filter="year"]');
+  const termValue = parameterRoot.querySelector('[data-list-filter="term"]');
+  const storageKey = "bankurun.parameter-context";
+
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(storageKey) || "null");
+    const storedBranch = parameterRoot.querySelector(`[data-combo-option][data-id="${stored?.branchId || ""}"]`);
+    if (storedBranch && branchValue && branchInput) {
+      branchValue.value = storedBranch.dataset.id || "";
+      branchInput.value = storedBranch.dataset.label || "";
+    }
+    if (stored?.year && yearValue?.querySelector(`option[value="${stored.year}"]`)) yearValue.value = stored.year;
+    if (stored?.term && termValue?.querySelector(`option[value="${stored.term}"]`)) termValue.value = stored.term;
+  } catch {
+    window.sessionStorage.removeItem(storageKey);
+  }
+
+  const saveContext = () => window.sessionStorage.setItem(storageKey, JSON.stringify({
+    branchId: branchValue?.value || "",
+    year: yearValue?.value || "",
+    term: termValue?.value || ""
+  }));
+  [branchValue, yearValue, termValue].forEach((input) => input?.addEventListener("change", saveContext));
+
+  const parameterList = setupList(parameterRoot, {
+    defaultSort: { key: "product", direction: "asc" },
+    descendingKeys: ["criterion", "target", "actual", "ratio", "hgo", "total"],
+    numericKeys: [],
+    label: "ana ürün",
+    colspan: 11,
+    remote: async ({ state, filterValue, signal }) => {
+      const params = new URLSearchParams({
+        BranchId: filterValue("branchId"),
+        Year: filterValue("year"),
+        Term: filterValue("term"),
+        Search: filterValue("search"),
+        CalculationType: filterValue("calculationType"),
+        SortKey: state.sort.key,
+        SortDirection: state.sort.direction,
+        Page: state.page.toString(),
+        PageSize: parameterRoot.querySelector("[data-list-page-size]")?.value || "10"
+      });
+      const response = await fetch(`${parameterRoot.dataset.rowsUrl}?${params}`, { signal });
+      if (!response.ok) throw new Error("Parametre listesi yüklenemedi.");
+      return {
+        html: await response.text(),
+        totalCount: Number(response.headers.get("X-Total-Count") || 0),
+        totalPages: Number(response.headers.get("X-Total-Pages") || 1),
+        page: Number(response.headers.get("X-Page") || 1)
+      };
+    }
+  });
+  parameterList?.apply(true);
+}
+
+const dashboardRoot = document.querySelector("[data-dashboard]");
+if (dashboardRoot) {
+  const branchValue = dashboardRoot.querySelector('[data-dashboard-filter="branchId"]');
+  const branchInput = branchValue?.closest(".generic-combo")?.querySelector("[data-combo-input]");
+  const yearValue = dashboardRoot.querySelector('[data-dashboard-filter="year"]');
+  const termValue = dashboardRoot.querySelector('[data-dashboard-filter="term"]');
+  const snapshot = dashboardRoot.querySelector("[data-dashboard-snapshot]");
+  const storageKey = "bankurun.dashboard-context";
+  let requestController = null;
+
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(storageKey) || "null");
+    const storedBranch = dashboardRoot.querySelector(`[data-combo-option][data-id="${stored?.branchId || ""}"]`);
+    if (storedBranch && branchValue && branchInput) {
+      branchValue.value = storedBranch.dataset.id || "";
+      branchInput.value = storedBranch.dataset.label || "";
+    }
+    if (stored?.year && yearValue?.querySelector(`option[value="${stored.year}"]`)) yearValue.value = stored.year;
+    if (stored?.term && termValue?.querySelector(`option[value="${stored.term}"]`)) termValue.value = stored.term;
+  } catch {
+    window.sessionStorage.removeItem(storageKey);
+  }
+
+  const refreshDashboard = async () => {
+    requestController?.abort();
+    requestController = new AbortController();
+    dashboardRoot.classList.add("is-loading");
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      branchId: branchValue?.value || "",
+      year: yearValue?.value || "",
+      term: termValue?.value || ""
+    }));
+    const params = new URLSearchParams({
+      branchId: branchValue?.value || "",
+      year: yearValue?.value || "",
+      term: termValue?.value || ""
+    });
+    try {
+      const response = await fetch(`${dashboardRoot.dataset.snapshotUrl}?${params}`, { signal: requestController.signal });
+      if (!response.ok) throw new Error("Dashboard yüklenemedi.");
+      if (snapshot) snapshot.innerHTML = await response.text();
+    } catch (error) {
+      if (error.name !== "AbortError" && snapshot) {
+        snapshot.innerHTML = '<div class="surface-panel dashboard-empty-state">Dashboard verisi yüklenemedi. Lütfen yeniden deneyin.</div>';
+      }
+    } finally {
+      dashboardRoot.classList.remove("is-loading");
+    }
+  };
+
+  [branchValue, yearValue, termValue].forEach((input) => input?.addEventListener("change", refreshDashboard));
+  refreshDashboard();
+}
 
 codeMode?.addEventListener("change", toggleManualCode);
 manualCode?.addEventListener("input", refreshSuggestion);
@@ -515,211 +692,62 @@ productType?.addEventListener("change", () => {
 toggleManualCode();
 toggleCreateProductFields();
 
-const performanceYear = document.querySelector("#performanceYear");
-const performanceTerm = document.querySelector("#performanceTerm");
-const performanceGroup = document.querySelector("#performanceGroup");
-const performanceBranch = document.querySelector("#performanceBranch");
-const performanceResultRows = Array.from(document.querySelectorAll(".performance-result-row"));
-let performanceParameterList = null;
-let performanceResultList = null;
+function setupOrganizationCreate() {
+  const root = document.querySelector("[data-organization-create]");
+  if (!root) return;
 
-function performanceContextMatches(row) {
-  return (!performanceYear?.value || row.dataset.year === performanceYear.value)
-    && (!performanceTerm?.value || row.dataset.term === performanceTerm.value)
-    && (!performanceGroup?.value || row.dataset.groupId === performanceGroup.value)
-    && (!performanceBranch?.value || row.dataset.branchId === performanceBranch.value);
-}
-
-function performanceLevel(success) {
-  return success >= 90 ? "good" : success >= 70 ? "watch" : "low";
-}
-
-function clearChildren(element) {
-  while (element?.firstChild) {
-    element.removeChild(element.firstChild);
-  }
-}
-
-function createPerformanceChartRow(item, chartType) {
-  const row = document.createElement("div");
-  const level = performanceLevel(item.success);
-  row.className = `performance-chart-row ${level}`;
-
-  const label = document.createElement("div");
-  label.className = "performance-chart-label";
-  const code = document.createElement("strong");
-  code.textContent = item.code;
-  const name = document.createElement("span");
-  name.textContent = item.name;
-  const caption = document.createElement("small");
-  caption.textContent = chartType === "branch" ? item.group : item.caption;
-  label.append(code, name, caption);
-
-  const track = document.createElement("div");
-  track.className = "performance-chart-track";
-  const fill = document.createElement("div");
-  fill.className = "performance-chart-fill";
-  fill.style.width = `${Math.min(100, Math.max(0, item.success))}%`;
-  track.append(fill);
-
-  const value = document.createElement("div");
-  value.className = "performance-chart-value";
-  value.textContent = `% ${item.success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
-  row.append(label, track, value);
-  return row;
-}
-
-function updatePerformanceWorkspace() {
-  if (!performanceResultRows.length) {
-    return;
-  }
-
-  const selectedBranch = performanceBranch?.selectedOptions[0];
-  if (selectedBranch?.dataset.groupId && performanceGroup && !performanceGroup.value) {
-    performanceGroup.value = selectedBranch.dataset.groupId;
-  }
-
-  const activeGroup = performanceGroup?.value || "";
-  performanceBranch?.querySelectorAll("option[data-group-id]").forEach((option) => {
-    const isAllowed = !activeGroup || option.dataset.groupId === activeGroup;
-    option.disabled = !isAllowed;
-    option.hidden = !isAllowed;
-  });
-  if (performanceBranch?.value && performanceBranch.selectedOptions[0]?.disabled) {
-    performanceBranch.value = "";
-  }
-
-  performanceParameterList?.apply(true);
-  performanceResultList?.apply(true);
-  const matching = performanceResultRows.filter(performanceContextMatches);
-  const potential = matching.reduce((sum, row) => sum + parseLocalizedDecimal(row.dataset.allocated), 0);
-  const earned = matching.reduce((sum, row) => sum + parseLocalizedDecimal(row.dataset.earned), 0);
-  const success = potential === 0 ? 0 : earned / potential * 100;
-  const missing = matching.filter((row) => row.dataset.missing === "true").length;
-
-  const setText = (selector, value) => {
-    const element = document.querySelector(selector);
-    if (element) element.textContent = value;
-  };
-  setText("#performancePotential", potential.toLocaleString("tr-TR", { maximumFractionDigits: 2 }));
-  setText("#performanceEarned", earned.toLocaleString("tr-TR", { maximumFractionDigits: 2 }));
-  setText("#performanceSuccess", `% ${success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`);
-  setText("#performanceMissing", missing.toString());
-
-  const branches = new Map();
-  const products = new Map();
-  matching.forEach((row) => {
-    const branchKey = row.dataset.branchId || "";
-    const productKey = row.dataset.product || "";
-    const branch = branches.get(branchKey) || { code: row.dataset.branch?.split(" ")[0] || "", name: row.dataset.branch?.replace(/^\S+\s*/, "") || "", group: row.dataset.group || "", earned: 0, potential: 0, missing: 0 };
-    branch.earned += parseLocalizedDecimal(row.dataset.earned);
-    branch.potential += parseLocalizedDecimal(row.dataset.allocated);
-    branch.missing += row.dataset.missing === "true" ? 1 : 0;
-    branches.set(branchKey, branch);
-    const product = products.get(productKey) || { code: row.dataset.product?.split(" ")[0] || "", name: row.dataset.product?.replace(/^\S+\s*/, "") || "", caption: row.dataset.segment || "", earned: 0, potential: 0 };
-    product.earned += parseLocalizedDecimal(row.dataset.earned);
-    product.potential += parseLocalizedDecimal(row.dataset.allocated);
-    products.set(productKey, product);
-  });
-
-  const branchItems = Array.from(branches.values()).map((item) => ({ ...item, success: item.potential === 0 ? 0 : item.earned / item.potential * 100 }))
-    .sort((a, b) => b.success - a.success || a.code.localeCompare(b.code, "tr"));
-  const productItems = Array.from(products.values()).map((item) => ({ ...item, success: item.potential === 0 ? 0 : item.earned / item.potential * 100 }))
-    .sort((a, b) => b.success - a.success || a.code.localeCompare(b.code, "tr"));
-
-  const branchChart = document.querySelector("#performanceBranchChart");
-  const branchEmpty = document.querySelector("#performanceBranchChartEmpty");
-  clearChildren(branchChart);
-  branchItems.forEach((item) => branchChart?.append(createPerformanceChartRow(item, "branch")));
-  branchEmpty?.classList.toggle("d-none", branchItems.length !== 0);
-
-  const productChart = document.querySelector("#performanceProductChart");
-  const productEmpty = document.querySelector("#performanceProductChartEmpty");
-  clearChildren(productChart);
-  productItems.forEach((item) => productChart?.append(createPerformanceChartRow(item, "product")));
-  productEmpty?.classList.toggle("d-none", productItems.length !== 0);
-
-  const priorities = document.querySelector("#performancePriorities");
-  clearChildren(priorities);
-  const priorityItems = branchItems
-    .filter((item) => item.missing > 0 || item.success < 70)
-    .sort((a, b) => (b.missing - a.missing) || (a.success - b.success))
-    .slice(0, 5);
-  priorityItems.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = `priority-item ${item.success < 70 ? "low" : ""}`;
-    const copy = document.createElement("div");
-    const strong = document.createElement("strong");
-    strong.textContent = `${item.code} ${item.name}`;
-    const caption = document.createElement("span");
-    caption.textContent = item.missing > 0 ? `${item.missing} eksik gerçekleşme` : "Başarı oranı izleme eşiğinin altında";
-    copy.append(strong, caption);
-    const score = document.createElement("b");
-    score.textContent = `% ${item.success.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
-    row.append(copy, score);
-    priorities?.append(row);
-  });
-  if (!priorityItems.length && priorities) {
-    const empty = document.createElement("div");
-    empty.className = "empty-inline";
-    empty.textContent = "Öncelikli eksik veya düşük başarı kaydı yok";
-    priorities.append(empty);
-  }
-}
-
-function setupPerformanceWorkspace() {
-  const parameterRoot = document.querySelector('[data-list="performanceParameters"]');
-  const resultRoot = document.querySelector('[data-list="performanceResults"]');
-  if (!parameterRoot && !resultRoot) {
-    return;
-  }
-
-  performanceParameterList = setupList(parameterRoot, {
-    defaultSort: { key: "year", direction: "desc" },
-    descendingKeys: ["year", "term", "totalScore"],
-    numericKeys: ["year", "term", "totalScore", "active"],
-    label: "parametre",
-    matches: (row, value) => {
-      const search = value("search").toUpperCase();
-      return performanceContextMatches(row)
-        && (!search || (row.dataset.search || "").includes(search));
-    }
-  });
-
-  performanceResultList = setupList(resultRoot, {
-    defaultSort: { key: "year", direction: "desc" },
-    descendingKeys: ["year", "term", "earned", "success"],
-    numericKeys: ["year", "term", "earned", "allocated", "success"],
-    label: "şube sonucu",
-    matches: (row, value) => {
-      const search = value("search").toUpperCase();
-      const missing = value("missing");
-      return performanceContextMatches(row)
-        && (!search || (row.dataset.search || "").includes(search))
-        && (!missing || row.dataset.missing === missing);
-    }
-  });
-
-  [performanceYear, performanceTerm, performanceGroup, performanceBranch].forEach((input) => input?.addEventListener("change", updatePerformanceWorkspace));
-  document.querySelectorAll("[data-performance-tab]").forEach((button) => button.addEventListener("click", () => {
-    const target = button.dataset.performanceTab;
-    document.querySelectorAll("[data-performance-tab]").forEach((tab) => tab.classList.toggle("is-active", tab === button));
-    document.querySelectorAll("[data-performance-view]").forEach((view) => view.classList.toggle("d-none", view.dataset.performanceView !== target));
+  root.querySelectorAll("[data-organization-create-type]").forEach((button) => button.addEventListener("click", () => {
+    const type = button.dataset.organizationCreateType;
+    root.querySelectorAll("[data-organization-create-type]").forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-pressed", active.toString());
+    });
+    root.querySelectorAll("[data-organization-create-form]").forEach((form) => {
+      const active = form.dataset.organizationCreateForm === type;
+      form.classList.toggle("d-none", !active);
+      form.querySelectorAll("input, select").forEach((input) => input.disabled = !active);
+    });
   }));
-
-  document.querySelectorAll("[data-metric-form]").forEach((form) => {
-    const preview = form.closest(".performance-result-detail")?.querySelector("[data-metric-preview]");
-    const updatePreview = () => {
-      const inputs = Array.from(form.querySelectorAll(".metric-input"));
-      const weighted = inputs.reduce((sum, input) => sum + parseLocalizedDecimal(input.value) * parseLocalizedDecimal(input.dataset.weight) / 100, 0);
-      const allocated = parseLocalizedDecimal(form.dataset.allocatedScore);
-      const earned = Math.min(allocated, allocated * weighted / 100);
-      if (preview) preview.textContent = `${earned.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} / ${allocated.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} puan`;
-    };
-    form.querySelectorAll(".metric-input").forEach((input) => input.addEventListener("input", updatePreview));
-  });
-
-  updatePerformanceWorkspace();
 }
 
-setupPerformanceWorkspace();
+function setupProductCreate() {
+  const root = document.querySelector("[data-product-create]");
+  if (!root || !productType) return;
+  root.querySelectorAll("[data-product-create-type]").forEach((button) => button.addEventListener("click", () => {
+    productType.value = button.dataset.productCreateType || "Main";
+    root.querySelectorAll("[data-product-create-type]").forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-pressed", active.toString());
+    });
+    refreshSuggestion();
+    toggleCreateProductFields();
+  }));
+}
+
+function setupAutomaticNumbers() {
+  document.querySelectorAll("[data-number-mode]").forEach((root) => {
+    const modeInput = root.querySelector("[data-number-mode-input]");
+    const numberInput = root.querySelector("[data-number-input]");
+    root.querySelectorAll("[data-number-mode-value]").forEach((button) => button.addEventListener("click", () => {
+      const isAutomatic = button.dataset.numberModeValue === "true";
+      root.querySelectorAll("[data-number-mode-value]").forEach((item) => {
+        const active = item === button;
+        item.classList.toggle("is-active", active);
+        item.setAttribute("aria-pressed", active.toString());
+      });
+      if (modeInput) modeInput.value = isAutomatic.toString();
+      if (numberInput) {
+        numberInput.readOnly = isAutomatic;
+        numberInput.required = !isAutomatic;
+        numberInput.value = isAutomatic ? (numberInput.dataset.autoValue || "") : "";
+        if (!isAutomatic) numberInput.focus();
+      }
+    }));
+  });
+}
+
+setupOrganizationCreate();
+setupProductCreate();
+setupAutomaticNumbers();

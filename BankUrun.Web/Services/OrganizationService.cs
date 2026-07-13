@@ -47,14 +47,18 @@ public class OrganizationService(AppDbContext db) : IOrganizationService
         return new OrganizationIndexViewModel
         {
             Groups = groups,
-            Branches = branches
+            Branches = branches,
+            NextGroupNo = NextNumber(groups.Select(group => group.GroupNo)),
+            NextBranchCode = NextNumber(branches.Select(branch => branch.BranchCode))
         };
     }
 
     public async Task CreateGroupAsync(GroupInput input, string actor, CancellationToken cancellationToken = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var groupNo = NormalizeCode(input.GroupNo);
+        var groupNo = input.GenerateNumberAutomatically
+            ? await NextGroupNoAsync(cancellationToken)
+            : NormalizeCode(input.GroupNo);
         await EnsureGroupNoAvailableAsync(groupNo, null, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var group = new GroupDefinition
@@ -124,7 +128,9 @@ public class OrganizationService(AppDbContext db) : IOrganizationService
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var group = await db.GroupDefinitions.FirstOrDefaultAsync(item => item.Id == input.GroupId, cancellationToken)
             ?? throw new InvalidOperationException("Bağlı grup bulunamadı.");
-        var branchCode = NormalizeCode(input.BranchCode);
+        var branchCode = input.GenerateNumberAutomatically
+            ? await NextBranchCodeAsync(cancellationToken)
+            : NormalizeCode(input.BranchCode);
         await EnsureBranchCodeAvailableAsync(branchCode, null, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var branch = new Branch
@@ -190,6 +196,28 @@ public class OrganizationService(AppDbContext db) : IOrganizationService
         {
             throw new InvalidOperationException($"{branchCode} kodlu şube zaten var.");
         }
+    }
+
+    private async Task<string> NextGroupNoAsync(CancellationToken cancellationToken)
+    {
+        return NextNumber(await db.GroupDefinitions.AsNoTracking().Select(item => item.GroupNo).ToListAsync(cancellationToken));
+    }
+
+    private async Task<string> NextBranchCodeAsync(CancellationToken cancellationToken)
+    {
+        return NextNumber(await db.Branches.AsNoTracking().Select(item => item.BranchCode).ToListAsync(cancellationToken));
+    }
+
+    private static string NextNumber(IEnumerable<string> values)
+    {
+        var numericValues = values
+            .Select(value => long.TryParse(value, out var number) ? (long?)number : null)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToList();
+        var next = numericValues.Count == 0 ? 1 : numericValues.Max() + 1;
+        var width = Math.Max(4, values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Length).DefaultIfEmpty(4).Max());
+        return next.ToString($"D{width}");
     }
 
     private static string NormalizeCode(string value)

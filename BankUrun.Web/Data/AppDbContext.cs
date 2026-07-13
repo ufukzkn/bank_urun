@@ -10,10 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SubProductInstance> SubProductInstances => Set<SubProductInstance>();
     public DbSet<GroupDefinition> GroupDefinitions => Set<GroupDefinition>();
     public DbSet<Branch> Branches => Set<Branch>();
-    public DbSet<BranchProductScore> BranchProductScores => Set<BranchProductScore>();
-    public DbSet<GroupProductParameter> GroupProductParameters => Set<GroupProductParameter>();
-    public DbSet<GroupProductSegmentRule> GroupProductSegmentRules => Set<GroupProductSegmentRule>();
-    public DbSet<BranchProductMetricResult> BranchProductMetricResults => Set<BranchProductMetricResult>();
+    public DbSet<MainProductParameter> MainProductParameters => Set<MainProductParameter>();
+    public DbSet<BranchMainProductMonthlyMetric> BranchMainProductMonthlyMetrics => Set<BranchMainProductMonthlyMetric>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -149,114 +147,57 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             });
         });
 
-        modelBuilder.Entity<BranchProductScore>(entity =>
+        modelBuilder.Entity<MainProductParameter>(entity =>
         {
-            entity.ToTable("branch_product_scores");
-            entity.HasKey(score => score.Id);
-            entity.Property(score => score.Id).HasColumnName("id");
-            entity.Property(score => score.BranchId).HasColumnName("branch_id");
-            entity.Property(score => score.SubProductInstanceId).HasColumnName("sub_product_instance_id");
-            entity.Property(score => score.Score).HasColumnName("score").HasColumnType("numeric(18,2)").IsRequired();
-            entity.Property(score => score.TargetValue).HasColumnName("target_value").HasColumnType("numeric(18,2)").IsRequired();
-            entity.Property(score => score.HgoShare).HasColumnName("hgo_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(score => score.DevelopmentShare).HasColumnName("development_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(score => score.SizeShare).HasColumnName("size_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(score => score.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
-            entity.Property(score => score.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(score => new { score.BranchId, score.SubProductInstanceId }).IsUnique();
-            entity.HasOne(score => score.Branch)
-                .WithMany(branch => branch.BranchProductScores)
-                .HasForeignKey(score => score.BranchId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(score => score.SubProductInstance)
-                .WithMany(instance => instance.BranchProductScores)
-                .HasForeignKey(score => score.SubProductInstanceId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.ToTable(table =>
-            {
-                table.HasCheckConstraint("ck_branch_product_scores_score_non_negative", "score >= 0");
-                table.HasCheckConstraint("ck_branch_product_scores_target_non_negative", "target_value >= 0");
-                table.HasCheckConstraint("ck_branch_product_scores_hgo_share_range", "hgo_share between 0 and 1");
-                table.HasCheckConstraint("ck_branch_product_scores_development_share_range", "development_share between 0 and 1");
-                table.HasCheckConstraint("ck_branch_product_scores_size_share_range", "size_share between 0 and 1");
-            });
-        });
-
-        modelBuilder.Entity<GroupProductParameter>(entity =>
-        {
-            entity.ToTable("group_product_parameters");
+            entity.ToTable("main_product_parameters");
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).HasColumnName("id");
-            entity.Property(item => item.GroupId).HasColumnName("group_id");
-            entity.Property(item => item.SubProductInstanceId).HasColumnName("sub_product_instance_id");
-            entity.Property(item => item.TotalScore).HasColumnName("total_score").HasColumnType("numeric(18,2)").IsRequired();
+            entity.Property(item => item.MainProductInstanceId).HasColumnName("main_product_instance_id");
+            entity.Property(item => item.CalculationType).HasColumnName("calculation_type").HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.Property(item => item.CriterionScore).HasColumnName("criterion_score").HasColumnType("numeric(18,2)").IsRequired();
             entity.Property(item => item.IsActive).HasColumnName("is_active").HasDefaultValue(true);
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(item => new { item.GroupId, item.SubProductInstanceId }).IsUnique();
-            entity.HasOne(item => item.Group)
-                .WithMany(group => group.ProductParameters)
-                .HasForeignKey(item => item.GroupId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(item => item.SubProductInstance)
-                .WithMany(instance => instance.GroupProductParameters)
-                .HasForeignKey(item => item.SubProductInstanceId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.ToTable(table => table.HasCheckConstraint("ck_group_product_parameters_total_score", "total_score >= 0"));
-        });
-
-        modelBuilder.Entity<GroupProductSegmentRule>(entity =>
-        {
-            entity.ToTable("group_product_segment_rules");
-            entity.HasKey(item => item.Id);
-            entity.Property(item => item.Id).HasColumnName("id");
-            entity.Property(item => item.GroupProductParameterId).HasColumnName("group_product_parameter_id");
-            entity.Property(item => item.PerformanceSegment).HasColumnName("performance_segment").HasConversion<string>().HasMaxLength(20).IsRequired();
-            entity.Property(item => item.SortOrder).HasColumnName("sort_order");
-            entity.Property(item => item.TargetShare).HasColumnName("target_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.SizeShare).HasColumnName("size_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.ScaleShare).HasColumnName("scale_share").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.AllocatedScore).HasColumnName("allocated_score").HasColumnType("numeric(18,2)").IsRequired();
-            entity.Property(item => item.HgoWeight).HasColumnName("hgo_weight").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.DevelopmentWeight).HasColumnName("development_weight").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.SizeWeight).HasColumnName("size_weight").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
-            entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(item => new { item.GroupProductParameterId, item.PerformanceSegment }).IsUnique();
-            entity.HasOne(item => item.GroupProductParameter)
-                .WithMany(parameter => parameter.SegmentRules)
-                .HasForeignKey(item => item.GroupProductParameterId)
+            entity.HasIndex(item => item.MainProductInstanceId).IsUnique();
+            entity.HasOne(item => item.MainProductInstance)
+                .WithOne(instance => instance.Parameter)
+                .HasForeignKey<MainProductParameter>(item => item.MainProductInstanceId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
-                table.HasCheckConstraint("ck_group_product_segment_rules_segment", "performance_segment in ('Kurumsal', 'Ticari', 'Kobi', 'Bireysel', 'Diger')");
-                table.HasCheckConstraint("ck_group_product_segment_rules_scores", "allocated_score >= 0");
-                table.HasCheckConstraint("ck_group_product_segment_rules_ratios", "target_share between 0 and 1 and size_share between 0 and 1 and scale_share between 0 and 1 and hgo_weight between 0 and 1 and development_weight between 0 and 1 and size_weight between 0 and 1");
+                table.HasCheckConstraint("ck_main_product_parameters_calculation_type", "calculation_type in ('Average', 'Cumulative')");
+                table.HasCheckConstraint("ck_main_product_parameters_criterion_score", "criterion_score >= 0");
             });
         });
 
-        modelBuilder.Entity<BranchProductMetricResult>(entity =>
+        modelBuilder.Entity<BranchMainProductMonthlyMetric>(entity =>
         {
-            entity.ToTable("branch_product_metric_results");
+            entity.ToTable("branch_main_product_monthly_metrics");
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).HasColumnName("id");
             entity.Property(item => item.BranchId).HasColumnName("branch_id");
-            entity.Property(item => item.GroupProductSegmentRuleId).HasColumnName("group_product_segment_rule_id");
-            entity.Property(item => item.HgoAchievement).HasColumnName("hgo_achievement").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.DevelopmentAchievement).HasColumnName("development_achievement").HasColumnType("numeric(9,4)").IsRequired();
-            entity.Property(item => item.SizeAchievement).HasColumnName("size_achievement").HasColumnType("numeric(9,4)").IsRequired();
+            entity.Property(item => item.MainProductParameterId).HasColumnName("main_product_parameter_id");
+            entity.Property(item => item.Month).HasColumnName("month").IsRequired();
+            entity.Property(item => item.TargetValue).HasColumnName("target_value").HasColumnType("numeric(18,2)").IsRequired();
+            entity.Property(item => item.ActualValue).HasColumnName("actual_value").HasColumnType("numeric(18,2)");
+            entity.Property(item => item.ActualAsOfDate).HasColumnName("actual_as_of_date").HasColumnType("date");
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(item => new { item.BranchId, item.GroupProductSegmentRuleId }).IsUnique();
+            entity.HasIndex(item => new { item.BranchId, item.MainProductParameterId, item.Month }).IsUnique();
             entity.HasOne(item => item.Branch)
-                .WithMany(branch => branch.MetricResults)
+                .WithMany(branch => branch.MonthlyMetrics)
                 .HasForeignKey(item => item.BranchId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(item => item.GroupProductSegmentRule)
-                .WithMany(rule => rule.MetricResults)
-                .HasForeignKey(item => item.GroupProductSegmentRuleId)
+            entity.HasOne(item => item.MainProductParameter)
+                .WithMany(parameter => parameter.MonthlyMetrics)
+                .HasForeignKey(item => item.MainProductParameterId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.ToTable(table => table.HasCheckConstraint("ck_branch_product_metric_results_non_negative", "hgo_achievement >= 0 and development_achievement >= 0 and size_achievement >= 0"));
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_month", "month between 1 and 12");
+                table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_values", "target_value >= 0 and (actual_value is null or actual_value >= 0)");
+                table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_actual_pair", "(actual_value is null and actual_as_of_date is null) or (actual_value is not null and actual_as_of_date is not null)");
+            });
         });
     }
 }

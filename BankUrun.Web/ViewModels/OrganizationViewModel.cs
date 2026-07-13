@@ -7,6 +7,8 @@ public class OrganizationIndexViewModel
 {
     public IReadOnlyList<GroupRowViewModel> Groups { get; set; } = [];
     public IReadOnlyList<BranchRowViewModel> Branches { get; set; } = [];
+    public string NextGroupNo { get; set; } = "0001";
+    public string NextBranchCode { get; set; } = "0001";
 }
 
 public class GroupRowViewModel
@@ -39,9 +41,10 @@ public class GroupInput
 {
     public int Id { get; set; }
 
-    [Required]
     [StringLength(24, MinimumLength = 1)]
     public string GroupNo { get; set; } = string.Empty;
+
+    public bool GenerateNumberAutomatically { get; set; }
 
     [Required]
     [StringLength(180, MinimumLength = 2)]
@@ -63,9 +66,10 @@ public class BranchInput
     [Range(1, int.MaxValue)]
     public int GroupId { get; set; }
 
-    [Required]
     [StringLength(24, MinimumLength = 1)]
     public string BranchCode { get; set; } = string.Empty;
+
+    public bool GenerateNumberAutomatically { get; set; }
 
     [Required]
     [StringLength(180, MinimumLength = 2)]
