@@ -1,0 +1,15 @@
+.git
+.github
+.vs
+.vscode
+.idea
+**/bin
+**/obj
+.data
+.tools
+TestResults
+*.user
+*.suo
+*.log
+*.tmp
+docker-compose.override.yml

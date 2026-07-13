@@ -1,46 +1,47 @@
-# Bank Ürün Yönetimi
+# Şube Performans Dashboard ve Parametre Yönetimi
 
-ASP.NET Core MVC + PostgreSQL ile ana ürün, alt ürün ve dönem bazlı bağlantıları yöneten küçük bir web uygulaması.
+ASP.NET Core MVC ve PostgreSQL ile şube, yıl ve yarıyıl bağlamında ana ürün performansını görüntüleyen ve ana ürün parametrelerini yöneten örnek iç operasyon uygulaması.
 
-## Yeni Bilgisayarda Kurulum
+Uygulamanın varsayılan ekranı ayrı bir salt okunur `/Dashboard` görünümüdür. Ana ürünün hesaplama tipi, kriter puanı ve aylık hedefleri ayrı `/Parameters` ekranından yönetilir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
 
-Ön koşul:
+## Docker ile Tek Komut Kurulum
 
-- `.NET SDK` kurulu olmalı.
-- PostgreSQL için üç seçenek var:
-  - Docker varsa: `docker compose` ile PostgreSQL container.
-  - Docker yoksa/admin yoksa: portable PostgreSQL ZIP.
-  - PostgreSQL zaten kuruluysa: local servis.
-
-Repo'yu aldıktan sonra:
+Gereken tek ön koşul Docker Desktop veya Docker Engine + Compose eklentisidir.
 
 ```powershell
 git clone https://github.com/ufukzkn/bank_urun.git
 cd bank_urun
+docker compose up -d --build
 ```
 
-## Docker ile PostgreSQL + Uygulama
+Bu komut PostgreSQL 17, web uygulaması ve browser pgAdmin'i başlatır. Web uygulaması açılırken EF Core migration'larını kendisi uygular; yalnız ilk kurulumda mock verisini yükler. Bunun için ayrıca çalışan `migrate` veya `seed` container'ı bulunmaz.
 
-Bu yol PostgreSQL'i ve browser tabanlı pgAdmin'i Docker container olarak başlatır. Uygulama yine `dotnet run` ile lokal çalışır ve `localhost:5432` üzerinden container PostgreSQL'e bağlanır.
+- Dashboard: `http://localhost:5188/Dashboard`
+- Parametreler: `http://localhost:5188/Parameters`
+- pgAdmin: `http://localhost:5050`
+- PostgreSQL: `localhost:5432`
+
+Servisleri ve logları yönetmek için:
 
 ```powershell
-dotnet tool restore
-docker compose up -d
-dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj
-dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
+docker compose logs -f web
+docker compose down
+docker compose up -d --build pgadmin
 ```
 
-Uygulama: `http://localhost:5188`
-pgAdmin: `http://127.0.0.1:5050`
+Veritabanı dahil bütün Docker volume'larını sıfırlamak için:
 
-Sayfalar:
+```powershell
+docker compose down -v
+```
 
-- `http://localhost:5188/` - Performans Merkezi
-- `http://localhost:5188/Products`
-- `http://localhost:5188/Organization`
-- `http://localhost:5188/Scores` - Performans Merkezi'ne yönlendirilir
+> `docker compose down -v` PostgreSQL verisini ve pgAdmin ayar volume'unu kalıcı olarak siler. Kullanıcı verisi olan ortamda çalıştırmayın.
 
-Docker PostgreSQL bağlantı bilgileri:
+Mock seed, `audit_logs` içindeki `mock-v13` işaretiyle korunur. Normal container restart'larında tekrar uygulanmaz. `postgres`, `web` ve `pgadmin` dışındaki tek seferlik servislerin çalışır veya durmuş halde tutulması gerekmez. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
+
+## Bağlantı Bilgileri
+
+Lokal PostgreSQL bağlantısı:
 
 ```text
 Host=localhost
@@ -50,183 +51,105 @@ Username=bank_urun
 Password=bank_urun
 ```
 
-pgAdmin genelde direkt açılır. Login ekranı gelirse:
+pgAdmin girişi:
 
 ```text
 Email=admin@bankurun.com
 Password=bank_urun
 ```
 
-pgAdmin içinde `Bank Urun PostgreSQL` server'ı hazır gelir. Server şifresi sorarsa `bank_urun` yaz.
-
-Docker ile mock veri yüklemek için:
-
-```powershell
-Get-Content scripts\seed-mock-data.sql | docker exec -i bank_urun_postgres psql -U bank_urun -d bank_urun
-```
+`Bank Urun PostgreSQL` sunucusu hazır gelir. Sunucu şifresi sorulursa `bank_urun` yazın. Container ağı içinde PostgreSQL host adı `postgres` olur.
 
 ## Docker Olmadan Çalıştırma
 
-Bu seçenek için bilgisayarda PostgreSQL kurulu ve servis olarak çalışıyor olmalı. Varsayılan connection string:
-
-```text
-Host=localhost;Port=5432;Database=bank_urun;Username=bank_urun;Password=bank_urun
-```
-
-PostgreSQL içinde kullanıcı ve database yoksa önce şunu çalıştır:
+Bilgisayarda .NET 10 SDK ve PostgreSQL 17 kurulu olmalıdır. Önce kullanıcı ve veritabanını oluşturun:
 
 ```powershell
 psql -U postgres -d postgres -c "create user bank_urun with password 'bank_urun';" -c "create database bank_urun owner bank_urun;"
 ```
 
-Sonra projeyi çalıştır:
+Migration, mock veri ve uygulama:
 
 ```powershell
 dotnet tool restore
 dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj
+$env:PGPASSWORD = "bank_urun"
+psql -h localhost -U bank_urun -d bank_urun -v ON_ERROR_STOP=1 -f scripts\seed-mock-data.sql
 dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
 ```
 
-Tek komut halinde çalıştırmak istersen:
+Mock veri istenmiyorsa `psql ... seed-mock-data.sql` satırını atlayabilirsiniz.
 
-```powershell
-dotnet tool restore; dotnet tool run dotnet-ef database update --project BankUrun.Web\BankUrun.Web.csproj --startup-project BankUrun.Web\BankUrun.Web.csproj; dotnet run --project BankUrun.Web\BankUrun.Web.csproj --urls http://localhost:5188
-```
+## Portable PostgreSQL
 
-## Portable PostgreSQL ile Çalıştırma
+Admin yetkisi bulunmayan Windows bilgisayarlarda PostgreSQL 17 ZIP binary paketi kullanıcı klasöründen çalıştırılabilir.
 
-Şirket bilgisayarında admin yetkisi yoksa Docker veya PostgreSQL installer çoğu zaman çalışmaz. Bu durumda PostgreSQL'in ZIP binary paketini kullanıcı klasöründen portable olarak çalıştırabilirsin.
-
-1. PostgreSQL Windows x86-64 ZIP binaries paketini indir:
-   - Resmi EDB sayfası: https://www.enterprisedb.com/download-postgresql-binaries
-   - PostgreSQL 17.x Windows x86-64 ZIP dosyasını indir.
-
-2. ZIP dosyası `Downloads` klasöründeyse repo klasöründe şu komutu çalıştır:
+1. PostgreSQL 17 Windows x86-64 ZIP paketini [EDB PostgreSQL Binaries](https://www.enterprisedb.com/download-postgresql-binaries) sayfasından indirin.
+2. Repo klasöründe aşağıdaki komutu çalıştırın:
 
 ```powershell
 $pgZip = Get-ChildItem "$env:USERPROFILE\Downloads\postgresql-17*-windows-x64-binaries.zip" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgZipPath $pgZip.FullName -Seed
 ```
 
-ZIP dosyasını daha önce açtıysan `-PgRoot` ile klasörü göster:
+ZIP daha önce açıldıysa:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgRoot "$env:USERPROFILE\Tools\postgresql"
+powershell -ExecutionPolicy Bypass -File .\scripts\Run-WithPortablePostgres.ps1 -PgRoot "$env:USERPROFILE\Tools\postgresql" -Seed
 ```
 
-Bu script şunları yapar:
-
-- Portable PostgreSQL'i `.tools\postgres` altına çıkarır.
-- Data klasörünü `.data\postgres` altında oluşturur.
-- PostgreSQL'i servis kurmadan process olarak başlatır.
-- `bank_urun` user/database oluşturur.
-- EF migration uygular.
-- İstersen `-Seed` ile mock veriyi yükler.
-- Uygulamayı `http://localhost:5188` adresinde başlatır.
-
-Portable PostgreSQL'i durdurmak için:
+Portable servisi durdurmak için:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\Stop-PortablePostgres.ps1
 ```
 
-## Mock Veri
+Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altında tutulur ve Git'e eklenmez.
 
-Docker ile:
+## Sayfalar
+
+- `/Dashboard`: Şube ve ana ürün bazında hesaplanan dönem sonuçları, sıralamalar ve grafikler.
+- `/Parameters`: Ana ürün dönem parametreleri, aylık hedef/batch kırılımı ve hesaplanan sonuçlar.
+- `/Products`: Ana ürün, alt ürün ve dönem instance yönetimi.
+- `/Organization`: Grup ve şube tanımları.
+- `/Performance` ve `/Scores`: Geçiş uyumluluğu için `/Dashboard` sayfasına yönlenir.
+
+## Hesaplama Kuralları
+
+- Dönem 1 Ocak-Haziran, dönem 2 Temmuz-Aralık aylarını kapsar.
+- `Average`: Beklenen ayların hedef ve gerçekleşme ortalaması alınır.
+- `Cumulative`: Beklenen ayların hedef ve gerçekleşme toplamı alınır.
+- `H/G = gerçekleşme / hedef`; hedef sıfırsa oran ve puan sıfırdır.
+- `HGO puanı = kriter puanı × min(H/G, 1)`.
+- İlk sürümde toplam puan HGO puanına eşittir ve kriter puanını aşmaz.
+- Eksik batch ayı bulunan satır sıralamaya katılmaz.
+- Ürün ve aynı segmentteki şube sıralaması `DENSE_RANK` mantığıyla hesaplanır.
+
+## Temel Veritabanı Tabloları
+
+- `product_definitions`: Ana/alt ürün kodu ve güncel adı.
+- `main_product_instances`: Ana ürünün yıl/dönem kaydı.
+- `sub_product_instances`: Alt ürünün ana ürün instance bağlantısı.
+- `group_definitions`: Grup tanımları ve segment bilgisi.
+- `branches`: Gruba bağlı şubeler.
+- `main_product_parameters`: Ana ürün instance hesaplama tipi ve kriter puanı.
+- `branch_main_product_monthly_metrics`: Şube bazında aylık hedef ve batch gerçekleşmesi.
+- `audit_logs`: Yönetim işlemleri ve seed işaretleri.
+
+Şemayı pgAdmin'de `Databases > bank_urun > Schemas > public > Tables` yolundan görebilirsiniz. SQL ile tablo listesini almak için:
+
+```sql
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+order by table_name;
+```
+
+## Geliştirme Doğrulaması
 
 ```powershell
-Get-Content scripts\seed-mock-data.sql | docker exec -i bank_urun_postgres psql -U bank_urun -d bank_urun
+dotnet restore BankUrun.slnx
+dotnet build BankUrun.slnx
+dotnet test BankUrun.slnx
+docker compose config
 ```
-
-Docker olmadan mock veri yüklemek için:
-
-```powershell
-psql -U bank_urun -d bank_urun -f scripts\seed-mock-data.sql
-```
-
-## pgAdmin Bağlantısı
-
-Browser üzerinden Docker pgAdmin kullanmak için:
-
-```powershell
-docker compose up -d pgadmin
-```
-
-Sonra şu adrese gir:
-
-```text
-http://127.0.0.1:5050
-```
-
-PgAdmin genelde direkt açılır. Login ekranı gelirse:
-
-```text
-Email: admin@bankurun.com
-Password: bank_urun
-```
-
-Server hazır görünür: `Bank Urun PostgreSQL`. Şifre isterse PostgreSQL şifresi: `bank_urun`.
-
-Kendi pgAdmin uygulamanda server eklerken:
-
-- `Servers` üzerinde sağ tıkla, `Register` -> `Server...` seç.
-- `General` sekmesinde `Name`: `Bank Urun Local`.
-- `Connection` sekmesinde:
-  - `Host name/address`: `localhost`
-  - `Port`: `5432`
-  - `Maintenance database`: `bank_urun`
-  - `Username`: `bank_urun`
-  - `Password`: `bank_urun`
-  - `Save password`: açık olabilir.
-
-Not: pgAdmin kendi bilgisayarında uygulama olarak çalışıyorsa host `localhost` olmalı. Sadece başka bir Docker container içinden bağlanırken host adı `postgres` olur.
-
-## Veritabanı Şemasını Görüntüleme
-
-pgAdmin browser içinde:
-
-- `Servers` -> `Bank Urun PostgreSQL` -> `Databases` -> `bank_urun` -> `Schemas` -> `public` -> `Tables`
-- Her tablo için `Columns`, `Constraints`, `Indexes` bölümlerinden yapıyı görebilirsin.
-- Diagram için pgAdmin'de `Tools` -> `ERD Tool` kullanılabilir.
-
-Terminalden hızlı tablo/kolon görünümü:
-
-```powershell
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\dt"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d product_definitions"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d main_product_instances"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d sub_product_instances"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d branch_product_scores"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d group_product_parameters"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d group_product_segment_rules"
-docker exec -it bank_urun_postgres psql -U bank_urun -d bank_urun -c "\d branch_product_metric_results"
-```
-
-Tüm şemayı SQL olarak dump etmek için:
-
-```powershell
-docker exec bank_urun_postgres pg_dump -U bank_urun -d bank_urun --schema-only
-```
-
-## Temel Kurallar
-
-- Ana/alt ürün kod-ad tanımları `product_definitions` tablosunda tutulur.
-- Ana ürünün yıl/dönem varlığı `main_product_instances` tablosunda tutulur.
-- Alt ürünün ana ürün instance'ını beslemesi `sub_product_instances` tablosunda tutulur.
-- Ürün adı veya kodu değişince tek tanım satırı güncellenir; dönem ve bağlantı satırları yeni bilgiyi join ile görür.
-- Ürün kodları 2 karakterli alfanumeriktir.
-- Ürün kodu `(product_type, code)` bazında benzersizdir.
-- `main_product_instances.product_definition_type = 'Main'` ve composite foreign key ile yalnızca ana ürün tanımına bağlanabilir.
-- `sub_product_instances.product_definition_type = 'Sub'` ve composite foreign key ile yalnızca alt ürün tanımına bağlanabilir.
-- Aynı alt ürün birden fazla ana ürün dönemine bağlanabilir.
-- Seçili instance silme sadece dönem/bağlantı satırını kaldırır; tüm tablodan silme tanım satırını ve ilişkilerini kaldırır.
-- Pasifleştirme tanım satırını pasif yapar ve audit log yazar.
-- Grup tanımları `group_definitions`, şubeler `branches` tablosunda tutulur.
-- Şubeler tek bir gruba `branches.group_id` ile bağlanır.
-- Grup segmenti `Karma`, `Kurumsal`, `Ticari`, `Kobi`, `Diger` değerlerinden biri olur.
-- Eski şube puanları `branch_product_scores` tablosunda korunur; yeni Performans Merkezi bu tabloyu değiştirmez.
-- Grup seviyesindeki ürün kuralı `group_product_parameters`, segment dağılımı `group_product_segment_rules`, şube gerçekleşmeleri `branch_product_metric_results` tablosunda tutulur.
-- Performans segmentleri `Kurumsal`, `Ticari`, `Kobi`, `Bireysel`, `Diger` değerlerinden oluşur ve grup segmentinden bağımsızdır.
-- Segment puanı, HGO/gelişim/büyüklük gerçekleşmelerinin ağırlıklı başarısıyla hesaplanır; kazanılan puan tahsis edilen segment puanını aşmaz.
-- Mock seed 3 grup, 12 şube, 12 ana ürün, 28 alt ürün, 9 ürün performans parametresi, 45 segment kuralı ve 180 şube gerçekleşmesi oluşturur.
-- Halkbank logosu resmi logo sayfasındaki JPG varlığından alınmıştır: https://www.halkbank.com.tr/tr/bankamiz/kurumsal-iletisim/logolarimiz

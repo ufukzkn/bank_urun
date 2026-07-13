@@ -17,8 +17,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IMainProductPeriodCalculator, MainProductPeriodCalculator>();
 builder.Services.AddScoped<IParameterManagementService, ParameterManagementService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
 
 var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    await scope.ServiceProvider.GetRequiredService<IDatabaseInitializer>().InitializeAsync();
+}
 
 var supportedCultures = new[] { new CultureInfo("tr-TR") };
 app.UseRequestLocalization(new RequestLocalizationOptions

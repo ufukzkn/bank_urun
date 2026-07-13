@@ -14,7 +14,28 @@ services:
       test: ["CMD-SHELL", "pg_isready -U bank_urun -d bank_urun"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: BankUrun.Web/Dockerfile
+      target: final
+    container_name: bank_urun_web
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=bank_urun;Username=bank_urun;Password=bank_urun
+      DatabaseInitialization__Migrate: "true"
+      DatabaseInitialization__Seed: "true"
+      DatabaseInitialization__SeedScriptPath: /app/scripts/seed-mock-data.sql
+    ports:
+      - "5188:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: bank_urun_pgadmin
@@ -31,6 +52,8 @@ services:
     volumes:
       - bank_urun_pgadmin:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    restart: unless-stopped
+
 volumes:
   bank_urun_pgdata:
   bank_urun_pgadmin:
