@@ -14,4 +14,5 @@ public class GroupDefinition
     public DateTimeOffset UpdatedAt { get; set; }
 
     public ICollection<Branch> Branches { get; set; } = new List<Branch>();
+    public ICollection<MainProductParameter> MainProductParameters { get; set; } = new List<MainProductParameter>();
 }

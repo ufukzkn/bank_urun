@@ -2,7 +2,7 @@
 
 ASP.NET Core MVC ve PostgreSQL ile şube, yıl ve yarıyıl bağlamında ana ürün performansını görüntüleyen ve ana ürün parametrelerini yöneten örnek iç operasyon uygulaması.
 
-Uygulamanın varsayılan ekranı ayrı bir salt okunur `/Dashboard` görünümüdür. Ana ürünün hesaplama tipi, kriter puanı ve aylık hedefleri ayrı `/Parameters` ekranından yönetilir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
+Uygulamanın varsayılan ekranı salt okunur `/Performance` dashboard'udur ve dönemsel sonuçları gösterir. Ana ürünün grup ve dönem kapsamındaki hesaplama tipi, toplam puanı ve segment dağıtımları bağımsız `/Parameters` ekranından yönetilir. Aylık hedef/batch kırılımı yalnız `Ay verisi gir` veya `Ay bazında` görünümü özellikle açıldığında gösterilir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
 
 ## Docker ile Tek Komut Kurulum
 
@@ -16,7 +16,7 @@ docker compose up -d --build
 
 Bu komut PostgreSQL 17, web uygulaması ve browser pgAdmin'i başlatır. Web uygulaması açılırken EF Core migration'larını kendisi uygular; yalnız ilk kurulumda mock verisini yükler. Bunun için ayrıca çalışan `migrate` veya `seed` container'ı bulunmaz.
 
-- Dashboard: `http://localhost:5188/Dashboard`
+- Performans: `http://localhost:5188/Performance`
 - Parametreler: `http://localhost:5188/Parameters`
 - pgAdmin: `http://localhost:5050`
 - PostgreSQL: `localhost:5432`
@@ -37,7 +37,7 @@ docker compose down -v
 
 > `docker compose down -v` PostgreSQL verisini ve pgAdmin ayar volume'unu kalıcı olarak siler. Kullanıcı verisi olan ortamda çalıştırmayın.
 
-Mock seed, `audit_logs` içindeki `mock-v13` işaretiyle korunur. Normal container restart'larında tekrar uygulanmaz. `postgres`, `web` ve `pgadmin` dışındaki tek seferlik servislerin çalışır veya durmuş halde tutulması gerekmez. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
+Mock seed, `audit_logs` içindeki `mock-v16` işaretiyle korunur. Normal container restart'larında tekrar uygulanmaz. Compose yalnız sürekli çalışan `postgres`, `web` ve `pgadmin` servislerini içerir; ayrı migrate veya seed container'ı yoktur. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
 
 ## Bağlantı Bilgileri
 
@@ -108,11 +108,11 @@ Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altınd
 
 ## Sayfalar
 
-- `/Dashboard`: Şube ve ana ürün bazında hesaplanan dönem sonuçları, sıralamalar ve grafikler.
-- `/Parameters`: Ana ürün dönem parametreleri, aylık hedef/batch kırılımı ve hesaplanan sonuçlar.
+- `/Parameters`: Grup + ana ürün + dönem için toplam puan ve Kurumsal/Ticari/Kobi/Bireysel/Diğer segment dağıtımlarının yönetimi. Aylık hedef/batch kırılımı detay içindeki `Ay verisi gir` alanından açılır.
+- `/Performance`: Varsayılan olarak şube ve ana ürün bazında hesaplanan dönem sonuçlarını ve sıralamaları gösterir. Aylık grafik ve kırılımlar `Ay bazında` seçildiğinde açılır.
 - `/Products`: Ana ürün, alt ürün ve dönem instance yönetimi.
 - `/Organization`: Grup ve şube tanımları.
-- `/Performance` ve `/Scores`: Geçiş uyumluluğu için `/Dashboard` sayfasına yönlenir.
+- `/Dashboard` ve `/Scores`: Geriye uyumluluk için `/Performance` sayfasına yönlenir.
 
 ## Hesaplama Kuralları
 
@@ -132,8 +132,9 @@ Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altınd
 - `sub_product_instances`: Alt ürünün ana ürün instance bağlantısı.
 - `group_definitions`: Grup tanımları ve segment bilgisi.
 - `branches`: Gruba bağlı şubeler.
-- `main_product_parameters`: Ana ürün instance hesaplama tipi ve kriter puanı.
-- `branch_main_product_monthly_metrics`: Şube bazında aylık hedef ve batch gerçekleşmesi.
+- `main_product_parameters`: Grup + ana ürün instance hesaplama tipi ve kriter puanı.
+- `main_product_segment_rules`: Parametrenin segment sırası, hedef/büyüklük/ölçek payları, puan tahsisi ve HGO/gelişim/büyüklük ağırlıkları.
+- `branch_main_product_monthly_metrics`: Aynı gruptaki parametre ve şubeyi bağlayan aylık hedef ve batch gerçekleşmesi.
 - `audit_logs`: Yönetim işlemleri ve seed işaretleri.
 
 Şemayı pgAdmin'de `Databases > bank_urun > Schemas > public > Tables` yolundan görebilirsiniz. SQL ile tablo listesini almak için:

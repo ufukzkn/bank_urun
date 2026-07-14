@@ -1,141 +1,53 @@
 @using BankUrun.Web.Models
 @model BankUrun.Web.ViewModels.ParameterIndexViewModel
 
-@{
-    ViewData["Title"] = "Parametreler";
-    var selectedBranch = Model.Branches.FirstOrDefault(branch => branch.Id == Model.SelectedBranchId);
-}
+@{ ViewData["Title"] = "Parametreler"; }
 
 <section class="page-title parameter-page-title">
-    <div>
-        <h1>Parametreler</h1>
-        <p>Şube ve dönem bağlamında ana ürün hedeflerini ve hesaplanan puanları yönetin.</p>
-    </div>
-    <span class="batch-date">Batch tarihi <strong>@Model.BatchDate.ToString("dd.MM.yyyy")</strong></span>
+    <div><h1>Parametreler</h1><p>Grup ve ana ürün dönem kurallarını yönetin.</p></div>
 </section>
 
-@if (TempData["Success"] is string success)
-{
-    <div class="alert alert-success action-alert page-alert" role="alert">@success</div>
-}
-@if (TempData["Error"] is string error)
-{
-    <div class="alert alert-danger action-alert page-alert" role="alert">@error</div>
-}
+@if (TempData["Success"] is string success) { <div class="alert alert-success action-alert page-alert" role="alert">@success</div> }
+@if (TempData["Error"] is string error) { <div class="alert alert-danger action-alert page-alert" role="alert">@error</div> }
 
-<section class="parameter-workspace"
+<section class="surface-panel compact-create-panel performance-create-panel parameter-create-panel">
+    <div class="panel-heading"><div><h2>Yeni ürün performans kuralı</h2><p>Grup, dönemsel ana ürün, hesaplama türü ve toplam puanı seçin.</p></div></div>
+    <form asp-action="SaveParameter" method="post" class="compact-parameter-create-form">
+        @Html.AntiForgeryToken()
+        <label><span>Grup</span><div class="combo generic-combo"><input class="form-control" type="search" autocomplete="off" placeholder="Grup no veya adı ara" data-combo-input /><input type="hidden" name="GroupId" data-combo-value data-combo-required="Grup seçmelisiniz." /><div class="combo-menu">@foreach (var group in Model.Groups) { <button class="combo-option" type="button" data-combo-option data-id="@group.Id" data-label="@group.Label"><strong>@group.GroupNo</strong><span>@group.Name</span><small>@group.GroupSegment</small></button> }<div class="combo-empty">Grup bulunamadı.</div></div></div></label>
+        <label class="parameter-product-field"><span>Ana ürün / dönem</span><div class="combo generic-combo"><input class="form-control" type="search" autocomplete="off" placeholder="Yıl, kod veya ürün adı ara" data-combo-input /><input type="hidden" name="MainProductInstanceId" data-combo-value data-combo-required="Ana ürün dönemi seçmelisiniz." /><div class="combo-menu parameter-product-menu">@foreach (var product in Model.Products) { <button class="combo-option" type="button" data-combo-option data-id="@product.Id" data-label="@product.Label"><strong>@product.Code</strong><span>@product.Name</span><small>@product.Year / @product.Term. Dönem</small></button> }<div class="combo-empty">Ana ürün dönemi bulunamadı.</div></div></div></label>
+        <label><span>Hesaplama</span><select class="form-select" name="CalculationType"><option value="Average">Ortalamalı</option><option value="Cumulative">Kümülatif</option></select></label>
+        <label><span>Toplam puan</span><input class="form-control numeric-input" type="number" name="CriterionScore" min="0" step="0.01" value="100" required /></label>
+        <input type="hidden" name="IsActive" value="true" />
+        <button class="btn btn-primary" type="submit">Kural oluştur</button>
+    </form>
+</section>
+
+<section class="surface-panel table-panel compact-list-panel parameter-management-list"
          data-list="parameters"
          data-list-page="@Model.Page.Page"
          data-list-total-pages="@Model.Page.TotalPages"
          data-list-total-count="@Model.Page.TotalCount"
-         data-rows-url="@Url.Action("Rows", "Parameters")">
-    <div class="surface-panel parameter-context-panel">
-        <div class="parameter-context-heading">
-            <h2>Çalışma bağlamı</h2>
-            <p>Açık dönem hesapları mevcut batch ayına kadar olan veriyi kullanır.</p>
-        </div>
-        <div class="parameter-context-grid">
-            <label class="parameter-branch-field">
-                <span>Şube</span>
-                <div class="combo generic-combo">
-                    <input class="form-control" type="search" autocomplete="off" value="@selectedBranch?.Label" placeholder="Kod veya şube adı ara" data-combo-input />
-                    <input type="hidden" value="@Model.SelectedBranchId" data-combo-value data-list-filter="branchId" />
-                    <div class="combo-menu parameter-branch-menu">
-                        @foreach (var branch in Model.Branches)
-                        {
-                            <button class="combo-option" type="button" data-combo-option data-id="@branch.Id" data-label="@branch.Label">
-                                <strong>@branch.BranchCode</strong>
-                                <span>@branch.Name</span>
-                                <small>@branch.GroupSegment</small>
-                                <small class="combo-option-description">@branch.GroupNo - @branch.GroupName</small>
-                            </button>
-                        }
-                        <div class="combo-empty">Eşleşen şube bulunamadı.</div>
-                    </div>
-                </div>
-            </label>
-            <label>
-                <span>Yıl</span>
-                <select class="form-select" data-list-filter="year">
-                    @foreach (var year in Model.Years)
-                    {
-                        <option value="@year" selected="@(year == Model.SelectedYear)">@year</option>
-                    }
-                </select>
-            </label>
-            <label>
-                <span>Dönem</span>
-                <select class="form-select" data-list-filter="term">
-                    <option value="1" selected="@(Model.SelectedTerm == 1)">1. Dönem (Ocak-Haziran)</option>
-                    <option value="2" selected="@(Model.SelectedTerm == 2)">2. Dönem (Temmuz-Aralık)</option>
-                </select>
-            </label>
-        </div>
+         data-rows-url="@Url.Action("Rows", "Parameters")"
+         data-target-editor-url="@Url.Action("TargetEditor", "Parameters")">
+    <div class="panel-heading"><div><h2>Tanımlı parametreler</h2><p>Puan ve segment dağılımlarını detaydan yönetin.</p></div></div>
+    <div class="table-toolbar performance-list-toolbar parameter-list-toolbar">
+        <label class="toolbar-search"><span>Parametrelerde ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Grup veya ana ürün" /></label>
+        <label><span>Grup</span><select class="form-select" data-list-filter="groupId"><option value="">Tümü</option>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.GroupNo</option> }</select></label>
+        <label><span>Yıl</span><select class="form-select" data-list-filter="year"><option value="">Tümü</option>@foreach (var year in Model.Years) { <option value="@year">@year</option> }</select></label>
+        <label><span>Dönem</span><select class="form-select" data-list-filter="term"><option value="">Tümü</option><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select></label>
+        <label><span>Hesaplama</span><select class="form-select" data-list-filter="calculationType"><option value="">Tümü</option><option value="Average">Ortalamalı</option><option value="Cumulative">Kümülatif</option></select></label>
+        <label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label>
     </div>
-
-    <div class="surface-panel table-panel parameter-table-panel">
-        <div class="panel-heading table-panel-heading">
-            <div>
-                <h2>Ana ürün parametreleri</h2>
-                <p>H/G ve puanlar aylık ara değerlerden anlık hesaplanır.</p>
-            </div>
-        </div>
-        <div class="table-toolbar parameter-toolbar">
-            <label class="toolbar-search">
-                <span>Ürün ara</span>
-                <input class="form-control" type="search" data-list-filter="search" placeholder="Ana ürün kodu veya adı" />
-            </label>
-            <label>
-                <span>Hesaplama</span>
-                <select class="form-select" data-list-filter="calculationType">
-                    <option value="">Tümü</option>
-                    <option value="Average">Ortalamalı</option>
-                    <option value="Cumulative">Kümülatif</option>
-                </select>
-            </label>
-            <label>
-                <span>Sayfa</span>
-                <select class="form-select" data-list-page-size>
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                </select>
-            </label>
-        </div>
-        <div class="table-responsive parameter-table-scroll">
-            <table class="table compact-table parameter-table">
-                <thead>
-                    <tr>
-                        <th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th>
-                        <th><button class="sort-button" type="button" data-list-sort="calculation">Hesaplama <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Kriter puanı <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="target">Hedef <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="actual">Gerçekleşme <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="ratio">H/G <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="hgo">HGO puanı <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="total">Toplam puan <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="productRank">Ürün sırası <span></span></button></th>
-                        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="segmentRank">Segment sırası <span></span></button></th>
-                        <th class="text-end">İşlem</th>
-                    </tr>
-                </thead>
-                <tbody data-remote-list-body>
-                    @await Html.PartialAsync("_ParameterRows", Model.Page)
-                </tbody>
-            </table>
-        </div>
-        <div class="pagination-bar" data-list-pagination>
-            <div class="pagination-summary" data-list-summary>Parametreler hazırlanıyor</div>
-            <div class="pager-buttons">
-                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
-                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
-                <span data-list-page-indicator>1 / 1</span>
-                <input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
-                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
-                <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
-            </div>
-        </div>
-    </div>
+    <div class="table-responsive parameter-table-scroll"><table class="table compact-table performance-parameter-table"><thead><tr>
+        <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+        <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+        <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th>
+        <th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th>
+        <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Toplam puan <span></span></button></th>
+        <th><button class="sort-button" type="button" data-list-sort="active">Durum <span></span></button></th><th class="text-end">İşlem</th>
+    </tr></thead><tbody data-remote-list-body>@await Html.PartialAsync("_ParameterRows", Model.Page)</tbody></table></div>
+    <div class="pagination-bar" data-list-pagination><div class="pagination-summary" data-list-summary>Parametreler hazırlanıyor</div><div class="pager-buttons">
+        <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" title="İlk sayfa">«</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" title="Önceki sayfa">‹</button><span data-list-page-indicator>1 / 1</span><input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" /><button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" title="Sonraki sayfa">›</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" title="Son sayfa">»</button>
+    </div></div>
 </section>

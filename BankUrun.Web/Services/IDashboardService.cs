@@ -6,8 +6,10 @@ public interface IDashboardService
 {
     Task<DashboardIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default);
     Task<DashboardSnapshotViewModel> GetSnapshotAsync(
+        int? groupId,
         int? branchId,
         int? year,
         int? term,
+        int? mainProductInstanceId,
         CancellationToken cancellationToken = default);
 }

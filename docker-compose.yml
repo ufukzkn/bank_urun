@@ -29,11 +29,15 @@ services:
       DatabaseInitialization__Migrate: "true"
       DatabaseInitialization__Seed: "true"
       DatabaseInitialization__SeedScriptPath: /app/scripts/seed-mock-data.sql
+      UseHttpsRedirection: "false"
+      DataProtection__KeysPath: /keys
     ports:
       - "5188:8080"
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - bank_urun_keys:/keys
     restart: unless-stopped
 
   pgadmin:
@@ -57,3 +61,4 @@ services:
 volumes:
   bank_urun_pgdata:
   bank_urun_pgadmin:
+  bank_urun_keys:

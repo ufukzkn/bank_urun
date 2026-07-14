@@ -2,99 +2,93 @@
 @model BankUrun.Web.ViewModels.ParameterPageViewModel
 
 @functions {
-    private static string Number(decimal? value) => value?.ToString("N2") ?? "-";
-    private static string Rank(int? value) => value?.ToString() ?? "-";
-    private static string CalculationLabel(MainProductCalculationType? type) => type switch
-    {
-        MainProductCalculationType.Average => "Ortalamalı",
-        MainProductCalculationType.Cumulative => "Kümülatif",
-        _ => "Tanımlanmadı"
-    };
+    private static string Calculation(MainProductCalculationType type) =>
+        type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+    private static string Fmt(decimal value) => value.ToString("0.##");
 }
 
 @if (Model.Rows.Count == 0)
 {
-    <tr class="empty-row"><td colspan="11" class="empty-cell">Seçili bağlamda ürün bulunamadı.</td></tr>
+    <tr class="empty-row"><td colspan="7" class="empty-cell">Filtreye uygun parametre yok</td></tr>
 }
 
 @foreach (var row in Model.Rows)
 {
-    var detailId = $"parameter-detail-{row.BranchId}-{row.MainProductInstanceId}";
-    <tr class="parameter-row" data-detail-id="@detailId">
-        <td><strong>@row.MainProductCode</strong><small>@row.MainProductName</small></td>
-        <td>
-            <span class="status-pill @(row.ParameterId.HasValue ? "neutral" : "passive")">@CalculationLabel(row.CalculationType)</span>
-            @if (row.ParameterId.HasValue && !row.IsActive) { <small>Pasif parametre</small> }
-        </td>
-        <td class="text-end numeric-cell">@Number(row.CriterionScore)</td>
-        <td class="text-end numeric-cell">@Number(row.PeriodTarget)</td>
-        <td class="text-end numeric-cell">
-            @if (row.HasCompleteBatchData) { @Number(row.PeriodActual) }
-            else { <span class="batch-waiting">Batch verisi bekleniyor</span> }
-        </td>
-        <td class="text-end numeric-cell">@(row.HgRatio.HasValue ? $"% {Number(row.HgRatio)}" : "-")</td>
-        <td class="text-end numeric-cell">@Number(row.HgoScore)</td>
-        <td class="text-end numeric-cell"><strong>@Number(row.TotalScore)</strong></td>
-        <td class="text-end numeric-cell">@Rank(row.ProductRank)</td>
-        <td class="text-end numeric-cell">@Rank(row.SegmentRank)</td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+    var detailId = $"parameter-detail-{row.ParameterId}";
+    var monthlyId = $"parameter-monthly-{row.ParameterId}";
+    <tr class="list-row performance-parameter-row" data-detail-id="@detailId">
+        <td>@row.Year</td>
+        <td>@row.Term</td>
+        <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
+        <td><strong>@row.MainProductCode</strong><small>@row.MainProductName · @Calculation(row.CalculationType)</small></td>
+        <td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td>
+        <td><span class="status-pill @(row.IsActive ? "active" : "passive")">@(row.IsActive ? "Aktif" : "Pasif")</span></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td>
     </tr>
-    <tr class="list-detail-row parameter-detail-row" data-detail-for="@detailId">
-        <td colspan="11">
+    <tr class="list-detail-row" data-detail-for="@detailId">
+        <td colspan="7">
             <div class="collapse" id="@detailId">
-                <div class="parameter-detail-panel">
-                    <div class="parameter-rule-editor">
-                        <div class="detail-section-heading">
-                            <h3>Ürün kuralı</h3>
-                            <p>@row.Year / @row.Term dönemindeki tüm şubeler için geçerlidir.</p>
+                <div class="performance-parameter-detail">
+                    <form asp-controller="Parameters" asp-action="SaveParameter" method="post" class="parameter-editor-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" value="@row.ParameterId" />
+                        <input type="hidden" name="GroupId" value="@row.GroupId" />
+                        <input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" />
+                        <div class="parameter-editor-heading">
+                            <label><span>Toplam puan</span><input class="form-control form-control-sm numeric-input" type="number" name="CriterionScore" value="@Fmt(row.CriterionScore)" min="0" step="0.01" required /></label>
+                            <label><span>Hesaplama</span><select class="form-select form-select-sm" name="CalculationType"><option value="Average" selected="@(row.CalculationType == MainProductCalculationType.Average)">Ortalamalı</option><option value="Cumulative" selected="@(row.CalculationType == MainProductCalculationType.Cumulative)">Kümülatif</option></select></label>
+                            <label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@row.IsActive" /><input type="hidden" name="IsActive" value="false" /><span>Aktif kural</span></label>
                         </div>
-                        <form asp-controller="Parameters" asp-action="SaveParameter" method="post" class="parameter-rule-form">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="Id" value="@(row.ParameterId ?? 0)" />
-                            <input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" />
-                            <label><span>Hesaplama türü</span><select class="form-select form-select-sm" name="CalculationType"><option value="Average" selected="@(row.CalculationType is null or MainProductCalculationType.Average)">Ortalamalı</option><option value="Cumulative" selected="@(row.CalculationType == MainProductCalculationType.Cumulative)">Kümülatif</option></select></label>
-                            <label><span>Kriter puanı</span><input class="form-control form-control-sm numeric-input" type="number" name="CriterionScore" value="@(row.CriterionScore ?? 0)" min="0" step="0.01" required /></label>
-                            <label class="check-line parameter-active-toggle"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@(row.ParameterId is null || row.IsActive)" /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label>
-                            <div class="detail-command-row">
-                                <button class="btn btn-sm btn-primary" type="submit" data-confirm="Ürün kuralını kaydetmek istediğinize emin misiniz?">@(row.ParameterId.HasValue ? "Güncelle" : "Parametre oluştur")</button>
-                                @if (row.ParameterId.HasValue) { <button class="btn btn-sm btn-outline-danger" type="submit" form="delete-parameter-@row.ParameterId" data-confirm="Bu parametreyi ve bağlı aylık hedefleri silmek istediğinize emin misiniz?">Sil</button> }
+                        <div class="table-responsive segment-editor-scroll">
+                            <table class="table segment-editor-table">
+                                <thead><tr><th>Segment</th><th>Sıra</th><th>Hedef %</th><th>Büyüklük %</th><th>Ölçek %</th><th>Puan</th><th>HGO payı %</th><th>Gelişim payı %</th><th>Büyüklük payı %</th></tr></thead>
+                                <tbody>
+                                @for (var index = 0; index < row.Rules.Count; index++)
+                                {
+                                    var rule = row.Rules[index];
+                                    <tr>
+                                        <td><strong>@rule.PerformanceSegment</strong><input type="hidden" name="Rules[@index].Id" value="@rule.Id" /><input type="hidden" name="Rules[@index].PerformanceSegment" value="@rule.PerformanceSegment" /></td>
+                                        <td><input class="form-control form-control-sm" type="number" name="Rules[@index].SortOrder" value="@rule.SortOrder" min="1" required /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].TargetShare" value="@Fmt(rule.TargetShare)" min="0" max="100" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].SizeShare" value="@Fmt(rule.SizeShare)" min="0" max="100" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].ScaleShare" value="@Fmt(rule.ScaleShare)" min="0" max="100" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].AllocatedScore" value="@Fmt(rule.AllocatedScore)" min="0" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].HgoWeight" value="@Fmt(rule.HgoWeight)" min="0" max="100" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].DevelopmentWeight" value="@Fmt(rule.DevelopmentWeight)" min="0" max="100" step="0.01" /></td>
+                                        <td><input class="form-control form-control-sm numeric-input" type="number" name="Rules[@index].SizeWeight" value="@Fmt(rule.SizeWeight)" min="0" max="100" step="0.01" /></td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="detail-command-row">
+                            <button class="btn btn-sm btn-primary" type="submit" data-confirm="Parametre ve segment dağılımını güncellemek istediğinize emin misiniz?">Dağılımı kaydet</button>
+                            <button class="btn btn-sm btn-outline-danger" type="submit" form="delete-parameter-@row.ParameterId" data-confirm="Parametreyi ve bağlı aylık verileri silmek istediğinize emin misiniz?">Kuralı sil</button>
+                        </div>
+                    </form>
+                    <form id="delete-parameter-@row.ParameterId" asp-controller="Parameters" asp-action="DeleteParameter" method="post" class="button-form">
+                        @Html.AntiForgeryToken()<input type="hidden" name="Id" value="@row.ParameterId" />
+                    </form>
+
+                    <div class="parameter-monthly-disclosure">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@monthlyId" data-parameter-monthly-toggle>
+                            Ay verisi gir
+                        </button>
+                        <div class="collapse" id="@monthlyId">
+                            <div class="parameter-target-section">
+                                <div class="detail-section-heading"><h3>Aylık hedef ve batch verisi</h3><p>Bu alan yalnız aylık inceleme veya hedef girişi gerektiğinde kullanılır.</p></div>
+                                @if (row.Branches.Count > 0)
+                                {
+                                    var branch = row.Branches[0];
+                                    <label class="target-branch-selector"><span>Şube</span><div class="combo generic-combo"><input class="form-control form-control-sm" type="search" value="@branch.Label" autocomplete="off" data-combo-input /><input type="hidden" value="@branch.Id" data-combo-value data-target-branch data-parameter-id="@row.ParameterId" /><div class="combo-menu">@foreach (var option in row.Branches) { <button class="combo-option" type="button" data-combo-option data-id="@option.Id" data-label="@option.Label"><strong>@option.BranchCode</strong><span>@option.Name</span></button> }<div class="combo-empty">Şube bulunamadı.</div></div></div></label>
+                                    <div data-target-editor><div class="inline-empty-state">Ay verisini görüntülemek için bu alanı açın.</div></div>
+                                }
+                                else
+                                {
+                                    <div class="inline-empty-state">Bu gruba bağlı şube bulunmuyor.</div>
+                                }
                             </div>
-                        </form>
-                        @if (row.ParameterId.HasValue)
-                        {
-                            <form id="delete-parameter-@row.ParameterId" asp-controller="Parameters" asp-action="DeleteParameter" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@row.ParameterId" /></form>
-                        }
-                    </div>
-                    <div class="monthly-metrics-editor">
-                        <div class="detail-section-heading">
-                            <h3>Aylık kırılım</h3>
-                            <p>Hedef düzenlenebilir; gerçekleşme batch kaynağından salt okunur gelir.</p>
                         </div>
-                        @if (row.ParameterId.HasValue)
-                        {
-                            <form asp-controller="Parameters" asp-action="UpdateTargets" method="post">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="ParameterId" value="@row.ParameterId" />
-                                <input type="hidden" name="BranchId" value="@row.BranchId" />
-                                <div class="monthly-metric-grid">
-                                    @for (var index = 0; index < row.Months.Count; index++)
-                                    {
-                                        var month = row.Months[index];
-                                        <div class="month-metric-card @(month.IsIncludedInCalculation ? "is-included" : "")">
-                                            <div class="month-metric-heading"><strong>@month.MonthName</strong>@if (month.IsIncludedInCalculation) { <span>Hesapta</span> } else if (month.IsBatchExpected) { <span class="is-waiting">Batch bekliyor</span> }</div>
-                                            <input type="hidden" name="Months[@index].Month" value="@month.Month" />
-                                            <label><span>Hedef</span><input class="form-control form-control-sm numeric-input" type="number" name="Months[@index].TargetValue" value="@month.TargetValue" min="0" step="0.01" required /></label>
-                                            <div class="readonly-metric"><span>Gerçekleşme</span><strong>@Number(month.ActualValue)</strong><small>@(month.ActualAsOfDate?.ToString("dd.MM.yyyy") ?? "Veri yok")</small></div>
-                                        </div>
-                                    }
-                                </div>
-                                <div class="detail-command-row monthly-save-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Bu şubenin aylık hedeflerini güncellemek istediğinize emin misiniz?">Hedefleri güncelle</button></div>
-                            </form>
-                        }
-                        else
-                        {
-                            <div class="inline-empty-state">Aylık hedef girmek için önce ürün parametresini oluşturun.</div>
-                        }
                     </div>
                 </div>
             </div>

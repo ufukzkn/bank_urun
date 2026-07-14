@@ -14,12 +14,12 @@
     @{ var controller = ViewContext.RouteData.Values["controller"]?.ToString(); }
     <div class="app-frame">
         <aside class="app-sidebar">
-            <a class="brand-mark" asp-controller="Dashboard" asp-action="Index" aria-label="Dashboard">
+            <a class="brand-mark" asp-controller="Performance" asp-action="Index" aria-label="Performans">
                 <img src="~/img/halkbank-logo.jpg" alt="Halkbank" />
             </a>
             <nav class="app-nav" aria-label="Ana menü">
-                <a class="app-nav-link @(controller == "Dashboard" ? "is-active" : "")" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
                 <a class="app-nav-link @(controller == "Parameters" ? "is-active" : "")" asp-controller="Parameters" asp-action="Index">Parametreler</a>
+                <a class="app-nav-link @(controller == "Performance" ? "is-active" : "")" asp-controller="Performance" asp-action="Index">Performans</a>
                 <a class="app-nav-link @(controller == "Products" ? "is-active" : "")" asp-controller="Products" asp-action="Index">Ürün Kataloğu</a>
                 <a class="app-nav-link @(controller == "Organization" ? "is-active" : "")" asp-controller="Organization" asp-action="Index">Organizasyon</a>
             </nav>

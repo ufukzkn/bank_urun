@@ -3,6 +3,7 @@ using System;
 using BankUrun.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BankUrun.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713202551_GroupScopedMainProductParameters")]
+    partial class GroupScopedMainProductParameters
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -380,86 +383,6 @@ namespace BankUrun.Web.Migrations
                         });
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.MainProductSegmentRule", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("AllocatedScore")
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("allocated_score");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<decimal>("DevelopmentWeight")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("development_weight");
-
-                    b.Property<decimal>("HgoWeight")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("hgo_weight");
-
-                    b.Property<int>("MainProductParameterId")
-                        .HasColumnType("integer")
-                        .HasColumnName("main_product_parameter_id");
-
-                    b.Property<string>("PerformanceSegment")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("performance_segment");
-
-                    b.Property<decimal>("ScaleShare")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("scale_share");
-
-                    b.Property<decimal>("SizeShare")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("size_share");
-
-                    b.Property<decimal>("SizeWeight")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("size_weight");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<decimal>("TargetShare")
-                        .HasColumnType("numeric(9,4)")
-                        .HasColumnName("target_share");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MainProductParameterId", "PerformanceSegment")
-                        .IsUnique();
-
-                    b.ToTable("main_product_segment_rules", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_main_product_segment_rules_ratios", "target_share between 0 and 1 and size_share between 0 and 1 and scale_share between 0 and 1 and hgo_weight between 0 and 1 and development_weight between 0 and 1 and size_weight between 0 and 1");
-
-                            t.HasCheckConstraint("ck_main_product_segment_rules_score", "allocated_score >= 0");
-
-                            t.HasCheckConstraint("ck_main_product_segment_rules_segment", "performance_segment in ('Kurumsal', 'Ticari', 'Kobi', 'Bireysel', 'Diger')");
-
-                            t.HasCheckConstraint("ck_main_product_segment_rules_sort_order", "sort_order > 0");
-                        });
-                });
-
             modelBuilder.Entity("BankUrun.Web.Models.ProductDefinition", b =>
                 {
                     b.Property<int>("Id")
@@ -625,17 +548,6 @@ namespace BankUrun.Web.Migrations
                     b.Navigation("MainProductInstance");
                 });
 
-            modelBuilder.Entity("BankUrun.Web.Models.MainProductSegmentRule", b =>
-                {
-                    b.HasOne("BankUrun.Web.Models.MainProductParameter", "MainProductParameter")
-                        .WithMany("SegmentRules")
-                        .HasForeignKey("MainProductParameterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MainProductParameter");
-                });
-
             modelBuilder.Entity("BankUrun.Web.Models.SubProductInstance", b =>
                 {
                     b.HasOne("BankUrun.Web.Models.MainProductInstance", "MainProductInstance")
@@ -678,8 +590,6 @@ namespace BankUrun.Web.Migrations
             modelBuilder.Entity("BankUrun.Web.Models.MainProductParameter", b =>
                 {
                     b.Navigation("MonthlyMetrics");
-
-                    b.Navigation("SegmentRules");
                 });
 
             modelBuilder.Entity("BankUrun.Web.Models.ProductDefinition", b =>

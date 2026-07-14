@@ -5,5 +5,5 @@ namespace BankUrun.Web.Controllers;
 public class ScoresController : Controller
 {
     [HttpGet]
-    public IActionResult Index() => Redirect("/Dashboard");
+    public IActionResult Index() => Redirect("/Performance");
 }

@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupDefinition> GroupDefinitions => Set<GroupDefinition>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<MainProductParameter> MainProductParameters => Set<MainProductParameter>();
+    public DbSet<MainProductSegmentRule> MainProductSegmentRules => Set<MainProductSegmentRule>();
     public DbSet<BranchMainProductMonthlyMetric> BranchMainProductMonthlyMetrics => Set<BranchMainProductMonthlyMetric>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
@@ -136,6 +137,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(branch => branch.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
             entity.HasIndex(branch => branch.BranchCode).IsUnique();
             entity.HasIndex(branch => branch.GroupId);
+            entity.HasAlternateKey(branch => new { branch.Id, branch.GroupId });
             entity.HasOne(branch => branch.Group)
                 .WithMany(group => group.Branches)
                 .HasForeignKey(branch => branch.GroupId)
@@ -152,16 +154,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("main_product_parameters");
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).HasColumnName("id");
+            entity.Property(item => item.GroupId).HasColumnName("group_id");
             entity.Property(item => item.MainProductInstanceId).HasColumnName("main_product_instance_id");
             entity.Property(item => item.CalculationType).HasColumnName("calculation_type").HasConversion<string>().HasMaxLength(20).IsRequired();
             entity.Property(item => item.CriterionScore).HasColumnName("criterion_score").HasColumnType("numeric(18,2)").IsRequired();
             entity.Property(item => item.IsActive).HasColumnName("is_active").HasDefaultValue(true);
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
-            entity.HasIndex(item => item.MainProductInstanceId).IsUnique();
+            entity.HasIndex(item => new { item.GroupId, item.MainProductInstanceId }).IsUnique();
+            entity.HasAlternateKey(item => new { item.Id, item.GroupId });
+            entity.HasOne(item => item.Group)
+                .WithMany(group => group.MainProductParameters)
+                .HasForeignKey(item => item.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(item => item.MainProductInstance)
-                .WithOne(instance => instance.Parameter)
-                .HasForeignKey<MainProductParameter>(item => item.MainProductInstanceId)
+                .WithMany(instance => instance.Parameters)
+                .HasForeignKey(item => item.MainProductInstanceId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
@@ -175,6 +183,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.ToTable("branch_main_product_monthly_metrics");
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Id).HasColumnName("id");
+            entity.Property(item => item.GroupId).HasColumnName("group_id");
             entity.Property(item => item.BranchId).HasColumnName("branch_id");
             entity.Property(item => item.MainProductParameterId).HasColumnName("main_product_parameter_id");
             entity.Property(item => item.Month).HasColumnName("month").IsRequired();
@@ -186,17 +195,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(item => new { item.BranchId, item.MainProductParameterId, item.Month }).IsUnique();
             entity.HasOne(item => item.Branch)
                 .WithMany(branch => branch.MonthlyMetrics)
-                .HasForeignKey(item => item.BranchId)
+                .HasForeignKey(item => new { item.BranchId, item.GroupId })
+                .HasPrincipalKey(branch => new { branch.Id, branch.GroupId })
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.MainProductParameter)
                 .WithMany(parameter => parameter.MonthlyMetrics)
-                .HasForeignKey(item => item.MainProductParameterId)
+                .HasForeignKey(item => new { item.MainProductParameterId, item.GroupId })
+                .HasPrincipalKey(parameter => new { parameter.Id, parameter.GroupId })
                 .OnDelete(DeleteBehavior.Cascade);
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_month", "month between 1 and 12");
                 table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_values", "target_value >= 0 and (actual_value is null or actual_value >= 0)");
                 table.HasCheckConstraint("ck_branch_main_product_monthly_metrics_actual_pair", "(actual_value is null and actual_as_of_date is null) or (actual_value is not null and actual_as_of_date is not null)");
+            });
+        });
+
+        modelBuilder.Entity<MainProductSegmentRule>(entity =>
+        {
+            entity.ToTable("main_product_segment_rules");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasColumnName("id");
+            entity.Property(item => item.MainProductParameterId).HasColumnName("main_product_parameter_id");
+            entity.Property(item => item.PerformanceSegment).HasColumnName("performance_segment").HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.Property(item => item.SortOrder).HasColumnName("sort_order");
+            entity.Property(item => item.TargetShare).HasColumnName("target_share").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.SizeShare).HasColumnName("size_share").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.ScaleShare).HasColumnName("scale_share").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.AllocatedScore).HasColumnName("allocated_score").HasColumnType("numeric(18,2)");
+            entity.Property(item => item.HgoWeight).HasColumnName("hgo_weight").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.DevelopmentWeight).HasColumnName("development_weight").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.SizeWeight).HasColumnName("size_weight").HasColumnType("numeric(9,4)");
+            entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+            entity.HasIndex(item => new { item.MainProductParameterId, item.PerformanceSegment }).IsUnique();
+            entity.HasOne(item => item.MainProductParameter)
+                .WithMany(parameter => parameter.SegmentRules)
+                .HasForeignKey(item => item.MainProductParameterId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("ck_main_product_segment_rules_segment", "performance_segment in ('Kurumsal', 'Ticari', 'Kobi', 'Bireysel', 'Diger')");
+                table.HasCheckConstraint("ck_main_product_segment_rules_sort_order", "sort_order > 0");
+                table.HasCheckConstraint("ck_main_product_segment_rules_ratios", "target_share between 0 and 1 and size_share between 0 and 1 and scale_share between 0 and 1 and hgo_weight between 0 and 1 and development_weight between 0 and 1 and size_weight between 0 and 1");
+                table.HasCheckConstraint("ck_main_product_segment_rules_score", "allocated_score >= 0");
             });
         });
     }

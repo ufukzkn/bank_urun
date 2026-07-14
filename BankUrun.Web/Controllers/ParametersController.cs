@@ -22,6 +22,19 @@ public class ParametersController(IParameterManagementService parameterService) 
         return PartialView("_ParameterRows", page);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> TargetEditor(int parameterId, int branchId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return PartialView("_TargetEditor", await parameterService.GetTargetEditorAsync(parameterId, branchId, cancellationToken));
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveParameter(MainProductParameterInput input, CancellationToken cancellationToken)
