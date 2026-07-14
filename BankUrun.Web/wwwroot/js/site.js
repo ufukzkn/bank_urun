@@ -766,6 +766,14 @@ if (dashboardRoot) {
   yearValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
   termValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
   productValue?.addEventListener("change", refreshDashboard);
+  snapshot?.addEventListener("click", (event) => {
+    const selectButton = event.target.closest("[data-dashboard-select-branch]");
+    if (!selectButton) return;
+    const option = branchOptions.find((candidate) => candidate.dataset.id === selectButton.dataset.dashboardSelectBranch);
+    if (!option) return;
+    setComboValue(branchValue, branchInput, option);
+    refreshDashboard();
+  });
   initializeProductList();
   refreshDashboard();
 }

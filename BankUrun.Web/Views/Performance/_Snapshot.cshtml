@@ -55,11 +55,36 @@
             {
                 var branchClass = branch.EligibleScore == 0 ? "pending" : StatusClass(branch.SuccessPercent);
                 var width = Math.Min(branch.SuccessPercent, 100);
-                <div class="dashboard-ranking-row @branchClass @(branch.IsSelected ? "is-selected" : "")">
-                    <span class="dashboard-rank">@(branch.Rank?.ToString() ?? "-")</span>
-                    <div class="dashboard-ranking-label"><strong>@branch.BranchCode</strong><span>@branch.BranchName</span><small>@branch.CompleteProductCount tamam · @branch.PendingProductCount bekliyor</small></div>
-                    <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
-                    <strong class="dashboard-bar-value">%@branch.SuccessPercent.ToString("N2")</strong>
+                var branchDetailId = $"branch-ranking-detail-{branch.BranchId}";
+                <div class="dashboard-ranking-item @branchClass @(branch.IsSelected ? "is-selected" : "")">
+                    <div class="dashboard-ranking-row">
+                        <span class="dashboard-rank">@(branch.Rank?.ToString() ?? "-")</span>
+                        <div class="dashboard-ranking-label"><strong>@branch.BranchCode</strong><span>@branch.BranchName</span><small>@branch.CompleteProductCount tamam · @branch.PendingProductCount bekliyor</small></div>
+                        <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
+                        <strong class="dashboard-bar-value">%@branch.SuccessPercent.ToString("N2")</strong>
+                        <button class="btn btn-sm btn-outline-primary dashboard-ranking-detail-button"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#@branchDetailId"
+                                aria-expanded="false"
+                                aria-controls="@branchDetailId">Detay</button>
+                    </div>
+                    <div class="collapse dashboard-ranking-detail" id="@branchDetailId">
+                        <div class="dashboard-ranking-detail-grid">
+                            <div><span>Kriter puanı</span><strong>@branch.EligibleScore.ToString("N2")</strong></div>
+                            <div><span>Kazanılan puan</span><strong>@branch.EarnedScore.ToString("N2")</strong></div>
+                            <div><span>Başarı oranı</span><strong>%@branch.SuccessPercent.ToString("N2")</strong></div>
+                            <div><span>Batch kapsamı</span><strong>@branch.CompleteProductCount / @branch.ActiveProductCount</strong></div>
+                        </div>
+                        @if (!branch.IsSelected)
+                        {
+                            <button class="btn btn-sm btn-primary" type="button" data-dashboard-select-branch="@branch.BranchId">Bu şubeyi görüntüle</button>
+                        }
+                        else
+                        {
+                            <span class="dashboard-selected-branch-note">Şu anda görüntülenen şube</span>
+                        }
+                    </div>
                 </div>
             }
         </div>

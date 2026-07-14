@@ -2089,27 +2089,59 @@ label span {
 .dashboard-products-panel > .panel-heading h2 { font-size: 1.08rem; }
 .dashboard-panel-heading p,
 .dashboard-products-panel > .panel-heading p { font-size: 0.84rem; }
-.dashboard-ranking-chart { gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.dashboard-ranking-row {
-  gap: 10px;
-  grid-template-columns: 32px minmax(150px, 0.75fr) minmax(100px, 1fr) 70px;
-  min-height: 54px;
-  padding: 9px 10px;
+.dashboard-ranking-chart { gap: 8px; grid-template-columns: 1fr; }
+.dashboard-ranking-item {
+  background: #fafbfc;
+  border: 1px solid #e0e7ed;
+  border-radius: 5px;
+  min-width: 0;
 }
-.dashboard-rank { font-size: 0.88rem; }
-.dashboard-ranking-label strong { font-size: 0.8rem; }
-.dashboard-ranking-label span { font-size: 0.88rem; }
-.dashboard-ranking-label small { font-size: 0.72rem; margin-top: 2px; }
-.dashboard-bar-track { height: 10px; }
-.dashboard-bar-value { font-size: 0.84rem; }
+.dashboard-ranking-item.is-selected { background: #eef7fb; border-color: #bcdceb; }
+.dashboard-ranking-row {
+  background: transparent;
+  border: 0;
+  gap: 14px;
+  grid-template-columns: 38px minmax(220px, 0.85fr) minmax(180px, 1.4fr) 82px 66px;
+  min-height: 68px;
+  padding: 11px 12px;
+}
+.dashboard-rank { font-size: 1rem; }
+.dashboard-ranking-label strong { font-size: 0.84rem; }
+.dashboard-ranking-label span { font-size: 0.98rem; }
+.dashboard-ranking-label small { font-size: 0.78rem; margin-top: 3px; }
+.dashboard-bar-track { height: 12px; }
+.dashboard-bar-value { font-size: 0.94rem; }
+.dashboard-ranking-detail-button { justify-self: end; }
+.dashboard-ranking-detail {
+  border-top: 1px solid #dde6ed;
+  padding: 13px 14px 14px 64px;
+}
+.dashboard-ranking-detail-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  margin-bottom: 12px;
+  max-width: 760px;
+}
+.dashboard-ranking-detail-grid div { display: grid; gap: 3px; }
+.dashboard-ranking-detail-grid span { color: #6c7d8e; font-size: 0.76rem; }
+.dashboard-ranking-detail-grid strong { color: #20384c; font-size: 1rem; }
+.dashboard-selected-branch-note { color: #166887; font-size: 0.82rem; font-weight: 750; }
 
 .performance-product-toolbar { margin-bottom: 11px; max-width: 760px; }
 .performance-product-toolbar label span { font-size: 0.76rem; }
 .performance-product-toolbar .form-control,
 .performance-product-toolbar .form-select { min-height: 36px; }
-.performance-product-table th,
-.performance-product-table td { font-size: 0.82rem; padding: 10px 9px; }
-.performance-product-table td:first-child small { font-size: 0.76rem; margin-top: 4px; }
+.performance-product-table tbody > tr.list-row > td {
+  font-size: 14px;
+  padding: 13px 11px;
+}
+.performance-product-table thead th {
+  font-size: 13px;
+  padding: 11px;
+}
+.performance-product-table td:first-child strong { font-size: 14px; }
+.performance-product-table td:first-child small { font-size: 12px; margin-top: 5px; }
 .segment-rank-cell strong { font-size: 1rem; }
 
 .performance-product-detail { background: #f7fafc; padding: 16px; }
@@ -2152,8 +2184,10 @@ label span {
   .dashboard-context-panel,
   .dashboard-section-panel > .dashboard-chart-panel,
   .dashboard-products-panel { padding: 10px; }
-  .dashboard-ranking-row { grid-template-columns: 34px minmax(150px, 1fr) 70px; }
-  .dashboard-ranking-row .dashboard-bar-track { grid-column: 2 / 4; }
+  .dashboard-ranking-row { gap: 9px; grid-template-columns: 34px minmax(150px, 1fr) 70px 62px; }
+  .dashboard-ranking-row .dashboard-bar-track { grid-column: 2 / 5; }
+  .dashboard-ranking-detail { padding: 12px; }
+  .dashboard-ranking-detail-grid { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
   .performance-period-summary { grid-template-columns: repeat(2, minmax(145px, 1fr)); }
 }
 
@@ -2165,4 +2199,8 @@ label span {
   .dashboard-snapshot-heading,
   .performance-detail-heading { align-items: flex-start; flex-direction: column; }
   .performance-monthly-toggle { width: 100%; }
+  .dashboard-ranking-row { grid-template-columns: 30px minmax(125px, 1fr) 64px; }
+  .dashboard-ranking-row .dashboard-bar-track { grid-column: 2 / 4; }
+  .dashboard-ranking-detail-button { grid-column: 2 / 4; justify-self: stretch; }
+  .dashboard-ranking-detail-grid { grid-template-columns: 1fr 1fr; }
 }
