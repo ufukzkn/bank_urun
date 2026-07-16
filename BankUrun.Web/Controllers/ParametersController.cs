@@ -23,6 +23,23 @@ public class ParametersController(IParameterManagementService parameterService) 
     }
 
     [HttpGet]
+    public async Task<IActionResult> SubProductRows([FromQuery] SubProductTargetQuery query, CancellationToken cancellationToken)
+    {
+        var page = await parameterService.GetSubProductPageAsync(query, cancellationToken);
+        Response.Headers.Append("X-Total-Count", page.TotalCount.ToString());
+        Response.Headers.Append("X-Total-Pages", page.TotalPages.ToString());
+        Response.Headers.Append("X-Page", page.Page.ToString());
+        return PartialView("_SubProductTargetRows", page);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> SubProductTargetEditor(int subProductId, int branchId, int year, int term, CancellationToken cancellationToken)
+    {
+        try { return PartialView("_SubProductTargetEditor", await parameterService.GetSubProductTargetEditorAsync(subProductId, branchId, year, term, cancellationToken)); }
+        catch (InvalidOperationException) { return NotFound(); }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> TargetEditor(int parameterId, int branchId, CancellationToken cancellationToken)
     {
         try
@@ -53,6 +70,15 @@ public class ParametersController(IParameterManagementService parameterService) 
             ModelState.IsValid,
             () => parameterService.UpdateTargetsAsync(input, Actor, cancellationToken),
             "Aylık hedefler güncellendi.");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateSubProductTargets(SubProductMonthlyTargetsInput input, CancellationToken cancellationToken)
+    {
+        return await ExecuteAndRedirectAsync(ModelState.IsValid,
+            () => parameterService.UpdateSubProductTargetsAsync(input, Actor, cancellationToken),
+            "Alt ürün aylık hedefleri güncellendi.");
     }
 
     [HttpPost]

@@ -23,27 +23,29 @@ public class MainProductPeriodCalculator : IMainProductPeriodCalculator
             throw new InvalidOperationException("Aylık değerler seçili dönemle uyumlu değil.");
         }
 
-        var expectedMonths = GetExpectedMonths(input.Year, input.Term, input.AsOfDate);
         var valuesByMonth = input.Months.ToDictionary(month => month.Month);
-        var expectedValues = expectedMonths
+        var periodValues = termMonths
             .Select(month => valuesByMonth.GetValueOrDefault(month))
             .ToList();
-        var completeBatch = expectedValues.Count > 0
-            && expectedValues.All(value => value is not null
+        var lastMonth = termMonths[^1];
+        var periodEnd = new DateOnly(input.Year, lastMonth, DateTime.DaysInMonth(input.Year, lastMonth));
+        var periodClosed = input.AsOfDate > periodEnd;
+        var completeBatch = periodClosed
+            && periodValues.All(value => value is not null
                 && value.ActualValue.HasValue
                 && value.ActualAsOfDate.HasValue
                 && value.ActualAsOfDate.Value <= input.AsOfDate);
-        var targets = expectedValues.Select(value => value?.TargetValue ?? 0).ToList();
+        var targets = periodValues.Select(value => value?.TargetValue ?? 0).ToList();
         var target = Aggregate(targets, input.CalculationType);
 
         if (!completeBatch)
         {
             return new MainProductPeriodCalculationResult(
-                Round(target), null, null, null, null, false, expectedMonths);
+                Round(target), null, null, null, null, false, termMonths);
         }
 
         var actual = Aggregate(
-            expectedValues.Select(value => value!.ActualValue!.Value),
+            periodValues.Select(value => value!.ActualValue!.Value),
             input.CalculationType);
         var ratio = target == 0 ? 0 : actual / target;
         var score = input.CriterionScore * Math.Min(ratio, 1);
@@ -55,7 +57,7 @@ public class MainProductPeriodCalculator : IMainProductPeriodCalculator
             Round(score),
             Round(score),
             true,
-            expectedMonths);
+            termMonths);
     }
 
     public IReadOnlyList<int> GetTermMonths(int term) => term switch

@@ -11,4 +11,5 @@ public class Branch
 
     public GroupDefinition Group { get; set; } = null!;
     public ICollection<BranchMainProductMonthlyMetric> MonthlyMetrics { get; set; } = new List<BranchMainProductMonthlyMetric>();
+    public ICollection<BranchSubProductMonthlyMetric> SubProductMonthlyMetrics { get; set; } = new List<BranchSubProductMonthlyMetric>();
 }

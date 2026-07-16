@@ -44,7 +44,7 @@ public class MainProductPeriodCalculatorTests
     }
 
     [Fact]
-    public void OpenTerm_UsesOnlyElapsedBatchMonths()
+    public void OpenTerm_ShowsFullTargetButDoesNotProducePeriodScore()
     {
         var result = calculator.Calculate(Input(
             2026,
@@ -52,13 +52,13 @@ public class MainProductPeriodCalculatorTests
             new DateOnly(2026, 7, 13),
             MainProductCalculationType.Cumulative,
             10m,
-            [Month(7, 50m, 45m), Month(8, 80m, null)]));
+            Enumerable.Range(7, 6).Select(month => Month(month, month * 10m, month == 7 ? 45m : null))));
 
-        Assert.Equal([7], result.ExpectedMonths);
-        Assert.True(result.HasCompleteBatchData);
-        Assert.Equal(50m, result.TargetValue);
-        Assert.Equal(45m, result.ActualValue);
-        Assert.Equal(9m, result.TotalScore);
+        Assert.Equal([7, 8, 9, 10, 11, 12], result.ExpectedMonths);
+        Assert.False(result.HasCompleteBatchData);
+        Assert.Equal(570m, result.TargetValue);
+        Assert.Null(result.ActualValue);
+        Assert.Null(result.TotalScore);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class MainProductPeriodCalculatorTests
     }
 
     [Fact]
-    public void FutureTerm_HasNoExpectedBatchAndNoScore()
+    public void FutureTerm_ShowsConfiguredTargetAndNoScore()
     {
         var result = calculator.Calculate(Input(
             2027,
@@ -137,7 +137,23 @@ public class MainProductPeriodCalculatorTests
             10m,
             Enumerable.Range(1, 6).Select(month => Month(month, 100m, null))));
 
-        Assert.Empty(result.ExpectedMonths);
+        Assert.Equal([1, 2, 3, 4, 5, 6], result.ExpectedMonths);
+        Assert.Equal(100m, result.TargetValue);
+        Assert.False(result.HasCompleteBatchData);
+        Assert.Null(result.TotalScore);
+    }
+
+    [Fact]
+    public void PeriodEndDay_IsNotClosedYet()
+    {
+        var result = calculator.Calculate(Input(
+            2026,
+            1,
+            new DateOnly(2026, 6, 30),
+            MainProductCalculationType.Cumulative,
+            10m,
+            Enumerable.Range(1, 6).Select(month => Month(month, 100m, 90m))));
+
         Assert.False(result.HasCompleteBatchData);
         Assert.Null(result.TotalScore);
     }

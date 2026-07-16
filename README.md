@@ -2,7 +2,7 @@
 
 ASP.NET Core MVC ve PostgreSQL ile şube, yıl ve yarıyıl bağlamında ana ürün performansını görüntüleyen ve ana ürün parametrelerini yöneten örnek iç operasyon uygulaması.
 
-Uygulamanın varsayılan ekranı salt okunur `/Performance` dashboard'udur ve dönemsel sonuçları gösterir. Ana ürünün grup ve dönem kapsamındaki hesaplama tipi, toplam puanı ve segment dağıtımları bağımsız `/Parameters` ekranından yönetilir. Aylık hedef/batch kırılımı yalnız `Ay verisi gir` veya `Ay bazında` görünümü özellikle açıldığında gösterilir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
+Uygulamanın varsayılan ekranı salt okunur `/Performance` dashboard'udur. Şube, şube–ürün ve tüm şubelerden toplanan ana ürün sonuçları üç ayrı görünümde karşılaştırılır. Ana ürün değerleri bağlı alt ürünlerin şube/ay hedef ve gerçekleşmelerinden üretilir. Ana ürün kuralları ile alt ürün hedefleri `/Parameters` ekranının iki çalışma modundan yönetilir. Aylık kırılımlar yalnız detay istendiğinde yüklenir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
 
 ## Docker ile Tek Komut Kurulum
 
@@ -37,7 +37,7 @@ docker compose down -v
 
 > `docker compose down -v` PostgreSQL verisini ve pgAdmin ayar volume'unu kalıcı olarak siler. Kullanıcı verisi olan ortamda çalıştırmayın.
 
-Mock seed, `audit_logs` içindeki `mock-v16` işaretiyle korunur. Normal container restart'larında tekrar uygulanmaz. Compose yalnız sürekli çalışan `postgres`, `web` ve `pgadmin` servislerini içerir; ayrı migrate veya seed container'ı yoktur. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
+Mock seed, `audit_logs` içindeki `mock-v18` işaretiyle korunur. Dengeli demo seti 4 grup, 62 şube, 12 puanlanan ana ürün, ortak alt ürün bağlantıları ve 2024-2026 arasındaki iki dönemleri içerir. Normal container restart'larında aynı sürüm tekrar uygulanmaz. Compose yalnız sürekli çalışan `postgres`, `web` ve `pgadmin` servislerini içerir; ayrı migrate veya seed container'ı yoktur. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
 
 ## Bağlantı Bilgileri
 
@@ -109,7 +109,7 @@ Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altınd
 ## Sayfalar
 
 - `/Parameters`: Grup + ana ürün + dönem için toplam puan ve Kurumsal/Ticari/Kobi/Bireysel/Diğer segment dağıtımlarının yönetimi. Aylık hedef/batch kırılımı detay içindeki `Ay verisi gir` alanından açılır.
-- `/Performance`: Varsayılan olarak şube ve ana ürün bazında hesaplanan dönem sonuçlarını ve sıralamaları gösterir. Aylık grafik ve kırılımlar `Ay bazında` seçildiğinde açılır.
+- `/Performance`: Şube, şube–ürün ve ana ürün genel toplamlarını üç modda gösterir. Satır detayları aylık alt ürün katkılarını ihtiyaç anında yükler.
 - `/Products`: Ana ürün, alt ürün ve dönem instance yönetimi.
 - `/Organization`: Grup ve şube tanımları.
 - `/Dashboard` ve `/Scores`: Geriye uyumluluk için `/Performance` sayfasına yönlenir.
@@ -117,13 +117,14 @@ Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altınd
 ## Hesaplama Kuralları
 
 - Dönem 1 Ocak-Haziran, dönem 2 Temmuz-Aralık aylarını kapsar.
-- `Average`: Beklenen ayların hedef ve gerçekleşme ortalaması alınır.
-- `Cumulative`: Beklenen ayların hedef ve gerçekleşme toplamı alınır.
+- `Average`: Altı aylık hedef ve gerçekleşme ortalaması alınır.
+- `Cumulative`: Altı aylık hedef ve gerçekleşme toplamı alınır.
+- Hedef dönem kapanmadan görülebilir; gerçekleşme ve puan ancak dönem kapandıktan ve altı aylık batch tamamlandıktan sonra oluşur.
 - `H/G = gerçekleşme / hedef`; hedef sıfırsa oran ve puan sıfırdır.
 - `HGO puanı = kriter puanı × min(H/G, 1)`.
 - İlk sürümde toplam puan HGO puanına eşittir ve kriter puanını aşmaz.
 - Eksik batch ayı bulunan satır sıralamaya katılmaz.
-- Ürün ve aynı segmentteki şube sıralaması `DENSE_RANK` mantığıyla hesaplanır.
+- Segment sırası aynı grup, yıl, dönem ve üründeki şubelerin yalnız toplam puanına göre `DENSE_RANK` mantığıyla hesaplanır.
 
 ## Temel Veritabanı Tabloları
 

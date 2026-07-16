@@ -18,39 +18,72 @@ public class DashboardService(
 
     public async Task<DashboardIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default)
     {
-        var groups = await db.GroupDefinitions.AsNoTracking().Where(group => group.IsActive)
+        var groups = await db.GroupDefinitions.AsNoTracking()
+            .Where(group => group.IsActive)
             .OrderBy(group => group.GroupNo)
-            .Select(group => new ParameterGroupOptionViewModel { Id = group.Id, GroupNo = group.GroupNo, Name = group.Name, GroupSegment = group.GroupSegment })
+            .Select(group => new ParameterGroupOptionViewModel
+            {
+                Id = group.Id,
+                GroupNo = group.GroupNo,
+                Name = group.Name,
+                GroupSegment = group.GroupSegment
+            })
             .ToListAsync(cancellationToken);
-        var branches = await GetBranchOptionsAsync(cancellationToken);
-        var products = await db.MainProductInstances.AsNoTracking().Include(instance => instance.MainProduct)
+        var branches = await db.Branches.AsNoTracking()
+            .Include(branch => branch.Group)
+            .Where(branch => branch.Group.IsActive)
+            .OrderBy(branch => branch.BranchCode)
+            .Select(branch => new ParameterBranchOptionViewModel
+            {
+                Id = branch.Id,
+                GroupId = branch.GroupId,
+                BranchCode = branch.BranchCode,
+                Name = branch.Name,
+                GroupNo = branch.Group.GroupNo,
+                GroupName = branch.Group.Name,
+                GroupSegment = branch.Group.GroupSegment
+            })
+            .ToListAsync(cancellationToken);
+        var products = await db.MainProductInstances.AsNoTracking()
+            .Include(instance => instance.MainProduct)
             .Where(instance => instance.Term == 1 || instance.Term == 2)
-            .OrderByDescending(instance => instance.Year).ThenByDescending(instance => instance.Term).ThenBy(instance => instance.MainProduct.Code)
-            .Select(instance => new ParameterProductOptionViewModel { Id = instance.Id, Year = instance.Year, Term = instance.Term, Code = instance.MainProduct.Code, Name = instance.MainProduct.Name })
+            .OrderByDescending(instance => instance.Year)
+            .ThenByDescending(instance => instance.Term)
+            .ThenBy(instance => instance.MainProduct.Code)
+            .Select(instance => new ParameterProductOptionViewModel
+            {
+                Id = instance.Id,
+                Year = instance.Year,
+                Term = instance.Term,
+                Code = instance.MainProduct.Code,
+                Name = instance.MainProduct.Name
+            })
             .ToListAsync(cancellationToken);
-        var years = products.Select(product => product.Year).Distinct().OrderByDescending(year => year).ToList();
-        var year = years.Contains(Today.Year) ? Today.Year : years.FirstOrDefault(Today.Year);
-        var term = products.Any(product => product.Year == year && product.Term == (Today.Month <= 6 ? 1 : 2))
-            ? (Today.Month <= 6 ? 1 : 2)
-            : products.Where(product => product.Year == year).Select(product => product.Term).DefaultIfEmpty(1).Max();
-        var groupId = groups.FirstOrDefault()?.Id ?? 0;
-        var branchId = branches.FirstOrDefault(branch => branch.GroupId == groupId)?.Id ?? 0;
+        var periods = products.Select(product => (product.Year, product.Term))
+            .Distinct()
+            .OrderByDescending(period => period.Year)
+            .ThenByDescending(period => period.Term)
+            .Select(period => new DashboardPeriodOptionViewModel { Year = period.Year, Term = period.Term })
+            .ToList();
+        var selectedPeriod = PickDefaultPeriod(periods);
+
         return new DashboardIndexViewModel
         {
             Groups = groups,
             Branches = branches,
             Products = products,
-            Years = years,
-            SelectedGroupId = groupId,
-            SelectedBranchId = branchId,
-            SelectedYear = year,
-            SelectedTerm = term,
+            Periods = periods,
+            SelectedMode = PerformanceMode.BranchProduct,
+            SelectedYear = selectedPeriod.Year,
+            SelectedTerm = selectedPeriod.Term,
             BatchDate = Today,
-            Snapshot = await GetSnapshotAsync(groupId, branchId, year, term, null, cancellationToken)
+            Snapshot = await GetSnapshotAsync(
+                PerformanceMode.BranchProduct, null, null, selectedPeriod.Year, selectedPeriod.Term, null, cancellationToken)
         };
     }
 
     public async Task<DashboardSnapshotViewModel> GetSnapshotAsync(
+        PerformanceMode mode,
         int? groupId,
         int? branchId,
         int? year,
@@ -58,171 +91,430 @@ public class DashboardService(
         int? mainProductInstanceId,
         CancellationToken cancellationToken = default)
     {
-        var allBranches = await db.Branches.AsNoTracking().Include(branch => branch.Group)
-            .OrderBy(branch => branch.BranchCode).ToListAsync(cancellationToken);
-        if (allBranches.Count == 0) return new DashboardSnapshotViewModel();
-        var selectedGroup = allBranches.Select(branch => branch.Group).DistinctBy(group => group.Id)
-            .FirstOrDefault(group => group.Id == groupId) ?? allBranches[0].Group;
-        var groupBranches = allBranches.Where(branch => branch.GroupId == selectedGroup.Id).ToList();
-        var selectedBranch = groupBranches.FirstOrDefault(branch => branch.Id == branchId) ?? groupBranches.FirstOrDefault();
-        if (selectedBranch is null) return new DashboardSnapshotViewModel { GroupId = selectedGroup.Id };
+        if (!Enum.IsDefined(mode)) mode = PerformanceMode.BranchProduct;
+        var periods = await GetPeriodsAsync(cancellationToken);
+        var selectedPeriod = periods.FirstOrDefault(period => period.Year == year && period.Term == term)
+            ?? PickDefaultPeriod(periods);
+        var dataset = await BuildDatasetAsync(selectedPeriod.Year, selectedPeriod.Term, cancellationToken);
+        var selectedGroup = groupId.HasValue
+            ? dataset.Branches.Select(branch => branch.Group).DistinctBy(group => group.Id)
+                .FirstOrDefault(group => group.Id == groupId.Value)
+            : null;
+        var selectedBranch = branchId.HasValue
+            ? dataset.Branches.FirstOrDefault(branch => branch.Id == branchId.Value
+                && (selectedGroup is null || branch.GroupId == selectedGroup.Id))
+            : null;
+        if (selectedBranch is not null) selectedGroup = selectedBranch.Group;
 
-        var selectedYear = year ?? Today.Year;
-        var selectedTerm = term is 1 or 2 ? term.Value : (Today.Month <= 6 ? 1 : 2);
-        var instanceQuery = db.MainProductInstances.AsNoTracking().Include(instance => instance.MainProduct)
-            .Where(instance => instance.Year == selectedYear && instance.Term == selectedTerm);
-        var instances = await instanceQuery.OrderBy(instance => instance.MainProduct.Code).ToListAsync(cancellationToken);
+        var branchRows = BuildBranchRows(dataset.Branches, dataset.Records);
+        var visibleBranchRows = branchRows
+            .Where(row => selectedGroup is null || row.GroupId == selectedGroup.Id)
+            .OrderBy(row => row.BranchCode)
+            .ToList();
+        ApplyBranchRanks(visibleBranchRows);
+        var branchProductRows = dataset.Records
+            .Where(record => selectedGroup is null || record.Branch.GroupId == selectedGroup.Id)
+            .Where(record => selectedBranch is null || record.Branch.Id == selectedBranch.Id)
+            .Where(record => !mainProductInstanceId.HasValue || record.Instance.Id == mainProductInstanceId.Value)
+            .OrderBy(record => record.Branch.BranchCode)
+            .ThenBy(record => record.Instance.MainProduct.Code)
+            .Select(BuildBranchProduct)
+            .ToList();
+        ApplyBranchProductRanks(branchProductRows);
+        var mainRows = BuildMainProductRows(
+            dataset.Records.Where(record => selectedGroup is null || record.Branch.GroupId == selectedGroup.Id).ToList());
+        if (mainProductInstanceId.HasValue)
+        {
+            mainRows = mainRows.Where(row => row.MainProductInstanceId == mainProductInstanceId.Value).ToList();
+        }
+        ApplyMainProductRanks(mainRows);
+        var selectedSummary = selectedBranch is null
+            ? null
+            : visibleBranchRows.FirstOrDefault(row => row.BranchId == selectedBranch.Id);
+
+        return new DashboardSnapshotViewModel
+        {
+            Mode = mode,
+            HasSelectedBranch = selectedBranch is not null,
+            GroupId = selectedGroup?.Id,
+            BranchId = selectedBranch?.Id,
+            BranchCode = selectedBranch?.BranchCode ?? string.Empty,
+            BranchName = selectedBranch?.Name ?? string.Empty,
+            GroupNo = selectedGroup?.GroupNo ?? string.Empty,
+            GroupName = selectedGroup?.Name ?? "Tüm gruplar",
+            Year = selectedPeriod.Year,
+            Term = selectedPeriod.Term,
+            AssignedScore = selectedSummary?.CriterionScore ?? 0,
+            EarnedScore = selectedSummary?.TotalScore,
+            SuccessPercent = selectedSummary?.SuccessPercent,
+            HasCompletePeriodData = selectedSummary?.HasCompletePeriodData ?? false,
+            BranchRank = selectedSummary?.Rank,
+            RankedBranchCount = selectedSummary?.RankCandidateCount ?? 0,
+            Branches = visibleBranchRows,
+            BranchProducts = branchProductRows,
+            MainProducts = mainRows
+        };
+    }
+
+    public async Task<DashboardMonthlyDetailViewModel?> GetBranchProductMonthlyDetailAsync(
+        int branchId,
+        int mainProductInstanceId,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await db.MainProductInstances.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == mainProductInstanceId, cancellationToken);
+        if (instance is null) return null;
+        var dataset = await BuildDatasetAsync(instance.Year, instance.Term, cancellationToken);
+        var record = dataset.Records.FirstOrDefault(item => item.Branch.Id == branchId && item.Instance.Id == mainProductInstanceId);
+        if (record is null) return null;
+
+        return new DashboardMonthlyDetailViewModel
+        {
+            Mode = PerformanceMode.BranchProduct,
+            Title = $"{record.Instance.MainProduct.Code} · {record.Instance.MainProduct.Name}",
+            Subtitle = $"{record.Branch.BranchCode} · {record.Branch.Name}",
+            CalculationType = record.Parameter.CalculationType,
+            Months = BuildMonthRows(record.Months),
+            Contributions = BuildBranchContributions(record, dataset.MetricLookup)
+        };
+    }
+
+    public async Task<DashboardMonthlyDetailViewModel?> GetMainProductMonthlyDetailAsync(
+        int mainProductInstanceId,
+        int? groupId,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await db.MainProductInstances.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == mainProductInstanceId, cancellationToken);
+        if (instance is null) return null;
+        var dataset = await BuildDatasetAsync(instance.Year, instance.Term, cancellationToken);
+        var records = dataset.Records
+            .Where(record => record.Instance.Id == mainProductInstanceId)
+            .Where(record => !groupId.HasValue || record.Branch.GroupId == groupId.Value)
+            .ToList();
+        if (records.Count == 0) return null;
+        var calculationType = records[0].Parameter.CalculationType;
+        var months = calculator.GetTermMonths(instance.Term).Select(month =>
+        {
+            var values = records.Select(record => record.Months.First(value => value.Month == month)).ToList();
+            var complete = values.All(value => value.ActualValue.HasValue && value.ActualAsOfDate.HasValue);
+            return new MainProductMonthlyValue(
+                month,
+                Round(values.Sum(value => value.TargetValue)),
+                complete ? Round(values.Sum(value => value.ActualValue!.Value)) : null,
+                complete ? values.Max(value => value.ActualAsOfDate) : null);
+        }).ToList();
+        var first = records[0];
+        return new DashboardMonthlyDetailViewModel
+        {
+            Mode = PerformanceMode.MainProduct,
+            Title = $"{first.Instance.MainProduct.Code} · {first.Instance.MainProduct.Name}",
+            Subtitle = groupId.HasValue
+                ? $"{first.Branch.Group.GroupNo} · {first.Branch.Group.Name} genel toplamı"
+                : $"Tüm gruplar · {records.Select(record => record.Branch.Id).Distinct().Count()} şube",
+            CalculationType = calculationType,
+            Months = BuildMonthRows(months),
+            Contributions = BuildAggregateContributions(records, dataset.MetricLookup)
+        };
+    }
+
+    private async Task<DashboardDataset> BuildDatasetAsync(int year, int term, CancellationToken cancellationToken)
+    {
+        var branches = await db.Branches.AsNoTracking().Include(branch => branch.Group)
+            .Where(branch => branch.Group.IsActive)
+            .OrderBy(branch => branch.BranchCode)
+            .ToListAsync(cancellationToken);
+        var instances = await db.MainProductInstances.AsNoTracking()
+            .Include(instance => instance.MainProduct)
+            .Include(instance => instance.SubProductInstances).ThenInclude(link => link.SubProduct)
+            .Where(instance => instance.Year == year && instance.Term == term)
+            .OrderBy(instance => instance.MainProduct.Code)
+            .ToListAsync(cancellationToken);
         var instanceIds = instances.Select(instance => instance.Id).ToList();
         var parameters = await db.MainProductParameters.AsNoTracking()
             .Where(parameter => instanceIds.Contains(parameter.MainProductInstanceId) && parameter.IsActive)
             .ToListAsync(cancellationToken);
-        var parameterIds = parameters.Select(parameter => parameter.Id).ToList();
-        var metrics = parameterIds.Count == 0 ? [] : await db.BranchMainProductMonthlyMetrics.AsNoTracking()
-            .Where(metric => parameterIds.Contains(metric.MainProductParameterId))
-            .ToListAsync(cancellationToken);
+        var subProductIds = instances.SelectMany(instance => instance.SubProductInstances)
+            .Where(link => link.SubProduct.IsActive)
+            .Select(link => link.SubProductId)
+            .Distinct()
+            .ToList();
+        var metrics = subProductIds.Count == 0
+            ? []
+            : await db.BranchSubProductMonthlyMetrics.AsNoTracking()
+                .Where(metric => metric.Year == year && metric.Term == term && subProductIds.Contains(metric.SubProductId))
+                .ToListAsync(cancellationToken);
         var parameterLookup = parameters.ToDictionary(parameter => (parameter.GroupId, parameter.MainProductInstanceId));
-        var metricLookup = metrics.ToDictionary(metric => (metric.BranchId, metric.MainProductParameterId, metric.Month));
-        var termMonths = calculator.GetTermMonths(selectedTerm);
-        var records = new List<CalculatedDashboardRecord>(allBranches.Count * Math.Max(1, instances.Count));
+        var metricLookup = metrics.ToDictionary(metric => (metric.BranchId, metric.SubProductId, metric.Month));
+        var termMonths = calculator.GetTermMonths(term);
+        var records = new List<CalculatedDashboardRecord>();
 
-        foreach (var branch in allBranches)
+        foreach (var branch in branches)
         {
             foreach (var instance in instances)
             {
-                parameterLookup.TryGetValue((branch.GroupId, instance.Id), out var parameter);
-                if (parameter is null) continue;
-                var months = termMonths.Select(month =>
-                {
-                    metricLookup.TryGetValue((branch.Id, parameter.Id, month), out var metric);
-                    return new MainProductMonthlyValue(month, metric?.TargetValue ?? 0, metric?.ActualValue, metric?.ActualAsOfDate);
-                }).ToList();
+                if (!parameterLookup.TryGetValue((branch.GroupId, instance.Id), out var parameter)) continue;
+                var subProducts = instance.SubProductInstances
+                    .Where(link => link.SubProduct.IsActive)
+                    .Select(link => link.SubProduct)
+                    .DistinctBy(product => product.Id)
+                    .OrderBy(product => product.Code)
+                    .ToList();
+                var months = termMonths.Select(month => AggregateMonth(
+                    branch.Id, subProducts, month, metricLookup)).ToList();
                 var result = calculator.Calculate(new MainProductPeriodCalculationInput(
-                    instance.Year, instance.Term, Today, parameter.CalculationType, parameter.CriterionScore, months));
-                records.Add(new CalculatedDashboardRecord(branch, instance, parameter, result, months));
+                    year, term, Today, parameter.CalculationType, parameter.CriterionScore, months));
+                records.Add(new CalculatedDashboardRecord(branch, instance, parameter, subProducts, result, months));
             }
         }
 
-        var branchSummaries = groupBranches.Select(branch => BuildBranchSummary(
-            branch,
-            records.Where(record => record.Branch.Id == branch.Id).ToList(),
-            branch.Id == selectedBranch.Id)).ToList();
-        ApplyBranchRanks(branchSummaries);
-        var selectedRecords = records.Where(record => record.Branch.Id == selectedBranch.Id)
-            .OrderBy(record => record.Instance.MainProduct.Code).ToList();
-        var segmentCandidates = selectedRecords.Select(record => new SegmentRankCandidate(
-            record.Instance.Id,
-            IsRankable(record) ? record.Result.TotalScore : null,
-            IsRankable(record) ? record.Result.HgRatioPercent : null)).ToList();
-        var products = selectedRecords.Select(record =>
-        {
-            var segmentRank = SegmentRankCalculator.Calculate(record.Instance.Id, segmentCandidates);
-            return BuildProduct(record, segmentRank.Rank, segmentRank.CandidateCount);
-        }).ToList();
-        if (mainProductInstanceId.HasValue)
-        {
-            products = products.Where(product => product.MainProductInstanceId == mainProductInstanceId.Value).ToList();
-        }
-        var selectedSummary = branchSummaries.First(summary => summary.BranchId == selectedBranch.Id);
-        var ranking = branchSummaries.Where(summary => summary.Rank.HasValue)
-            .OrderBy(summary => summary.Rank).ThenBy(summary => summary.BranchCode).Take(12).ToList();
-        if (selectedSummary.Rank.HasValue && ranking.All(summary => summary.BranchId != selectedBranch.Id)) ranking.Add(selectedSummary);
+        return new DashboardDataset(branches, instances, records, metricLookup);
+    }
 
-        return new DashboardSnapshotViewModel
+    private static MainProductMonthlyValue AggregateMonth(
+        int branchId,
+        IReadOnlyCollection<ProductDefinition> subProducts,
+        int month,
+        IReadOnlyDictionary<(int BranchId, int SubProductId, int Month), BranchSubProductMonthlyMetric> metricLookup)
+    {
+        var metrics = subProducts.Select(product =>
         {
-            GroupId = selectedGroup.Id,
-            BranchId = selectedBranch.Id,
-            BranchCode = selectedBranch.BranchCode,
-            BranchName = selectedBranch.Name,
-            GroupNo = selectedGroup.GroupNo,
-            GroupName = selectedGroup.Name,
-            GroupSegment = selectedGroup.GroupSegment,
-            Year = selectedYear,
-            Term = selectedTerm,
-            AssignedScore = selectedSummary.AssignedScore,
-            EligibleScore = selectedSummary.EligibleScore,
-            EarnedScore = selectedSummary.EarnedScore,
-            SuccessPercent = selectedSummary.SuccessPercent,
-            ActiveProductCount = selectedSummary.ActiveProductCount,
-            CompleteProductCount = selectedSummary.CompleteProductCount,
-            PendingProductCount = selectedSummary.PendingProductCount,
-            BranchRank = selectedSummary.Rank,
-            RankedBranchCount = branchSummaries.Count(summary => summary.Rank.HasValue),
-            BranchRanking = ranking,
-            Products = products
+            metricLookup.TryGetValue((branchId, product.Id, month), out var metric);
+            return metric;
+        }).ToList();
+        return SubProductMetricAggregator.AggregateMonth(month, metrics);
+    }
+
+    private static List<DashboardBranchPerformanceViewModel> BuildBranchRows(
+        IReadOnlyCollection<Branch> branches,
+        IReadOnlyCollection<CalculatedDashboardRecord> records) =>
+        branches.Select(branch =>
+        {
+            var branchRecords = records.Where(record => record.Branch.Id == branch.Id).ToList();
+            var complete = branchRecords.Count > 0 && branchRecords.All(IsRankable);
+            var criterion = Round(branchRecords.Sum(record => record.Parameter.CriterionScore));
+            var score = complete ? Round(branchRecords.Sum(record => record.Result.TotalScore!.Value)) : (decimal?)null;
+            return new DashboardBranchPerformanceViewModel
+            {
+                GroupId = branch.GroupId,
+                GroupNo = branch.Group.GroupNo,
+                GroupName = branch.Group.Name,
+                BranchId = branch.Id,
+                BranchCode = branch.BranchCode,
+                BranchName = branch.Name,
+                CriterionScore = criterion,
+                HgoScore = score,
+                TotalScore = score,
+                SuccessPercent = score.HasValue && criterion > 0 ? Round(score.Value / criterion * 100) : null,
+                HasCompletePeriodData = complete,
+                CompleteProductCount = branchRecords.Count(IsRankable),
+                ProductCount = branchRecords.Count
+            };
+        }).ToList();
+
+    private static void ApplyBranchRanks(IReadOnlyList<DashboardBranchPerformanceViewModel> rows)
+    {
+        var ranks = DenseRankCalculator.Calculate(rows.Select(row => row.TotalScore).ToList());
+        var candidates = rows.Count(row => row.TotalScore.HasValue);
+        for (var index = 0; index < rows.Count; index++)
+        {
+            rows[index].Rank = ranks[index];
+            rows[index].RankCandidateCount = candidates;
+        }
+    }
+
+    private static DashboardProductPerformanceViewModel BuildBranchProduct(CalculatedDashboardRecord record) => new()
+    {
+        GroupId = record.Branch.GroupId,
+        GroupNo = record.Branch.Group.GroupNo,
+        GroupName = record.Branch.Group.Name,
+        BranchId = record.Branch.Id,
+        BranchCode = record.Branch.BranchCode,
+        BranchName = record.Branch.Name,
+        MainProductInstanceId = record.Instance.Id,
+        ProductCode = record.Instance.MainProduct.Code,
+        ProductName = record.Instance.MainProduct.Name,
+        CalculationType = record.Parameter.CalculationType,
+        CriterionScore = record.Parameter.CriterionScore,
+        TargetValue = record.Result.TargetValue,
+        ActualValue = record.Result.ActualValue,
+        HgRatioPercent = record.Result.HgRatioPercent,
+        HgoScore = record.Result.HgoScore,
+        TotalScore = record.Result.TotalScore,
+        HasCompleteBatchData = record.Result.HasCompleteBatchData,
+        HasSubProductConfiguration = record.SubProducts.Count > 0,
+        SubProductCount = record.SubProducts.Count
+    };
+
+    private static List<DashboardMainProductPerformanceViewModel> BuildMainProductRows(
+        IReadOnlyCollection<CalculatedDashboardRecord> records)
+    {
+        var rows = records.GroupBy(record => record.Instance.Id).Select(group =>
+        {
+            var groupRecords = group.ToList();
+            var first = groupRecords[0];
+            var configured = groupRecords.All(record => record.SubProducts.Count > 0);
+            var complete = configured && groupRecords.All(IsRankable);
+            var target = Round(groupRecords.Sum(record => record.Result.TargetValue));
+            var actual = complete ? Round(groupRecords.Sum(record => record.Result.ActualValue!.Value)) : (decimal?)null;
+            return new DashboardMainProductPerformanceViewModel
+            {
+                MainProductInstanceId = first.Instance.Id,
+                ProductCode = first.Instance.MainProduct.Code,
+                ProductName = first.Instance.MainProduct.Name,
+                SubProductCount = first.SubProducts.Count,
+                BranchCount = groupRecords.Select(record => record.Branch.Id).Distinct().Count(),
+                CriterionScore = Round(groupRecords.Sum(record => record.Parameter.CriterionScore)),
+                TargetValue = target,
+                ActualValue = actual,
+                HgRatioPercent = actual.HasValue && target > 0 ? Round(actual.Value / target * 100) : null,
+                HgoScore = complete ? Round(groupRecords.Sum(record => record.Result.HgoScore!.Value)) : null,
+                TotalScore = complete ? Round(groupRecords.Sum(record => record.Result.TotalScore!.Value)) : null,
+                HasCompleteBatchData = complete,
+                HasSubProductConfiguration = configured
+            };
+        }).OrderBy(row => row.ProductCode).ToList();
+        return rows;
+    }
+
+    private static void ApplyBranchProductRanks(IReadOnlyList<DashboardProductPerformanceViewModel> rows)
+    {
+        var ranks = DenseRankCalculator.Calculate(rows.Select(row => row.TotalScore).ToList());
+        var candidates = rows.Count(row => row.TotalScore.HasValue);
+        for (var index = 0; index < rows.Count; index++)
+        {
+            rows[index].SegmentRank = ranks[index];
+            rows[index].SegmentRankCandidateCount = candidates;
+        }
+    }
+
+    private static void ApplyMainProductRanks(IReadOnlyList<DashboardMainProductPerformanceViewModel> rows)
+    {
+        var ranks = DenseRankCalculator.Calculate(rows.Select(row => row.TotalScore).ToList());
+        var candidates = rows.Count(row => row.TotalScore.HasValue);
+        for (var index = 0; index < rows.Count; index++)
+        {
+            rows[index].Rank = ranks[index];
+            rows[index].RankCandidateCount = candidates;
+        }
+    }
+
+    private IReadOnlyList<DashboardSubProductContributionViewModel> BuildBranchContributions(
+        CalculatedDashboardRecord record,
+        IReadOnlyDictionary<(int BranchId, int SubProductId, int Month), BranchSubProductMonthlyMetric> metricLookup) =>
+        record.SubProducts.Select(product => BuildContribution(
+            product,
+            record.Parameter.CalculationType,
+            calculator.GetTermMonths(record.Instance.Term)
+                .Select(month => GetMetric(metricLookup, record.Branch.Id, product.Id, month)).ToList()))
+            .ToList();
+
+    private IReadOnlyList<DashboardSubProductContributionViewModel> BuildAggregateContributions(
+        IReadOnlyCollection<CalculatedDashboardRecord> records,
+        IReadOnlyDictionary<(int BranchId, int SubProductId, int Month), BranchSubProductMonthlyMetric> metricLookup)
+    {
+        var first = records.First();
+        return first.SubProducts.Select(product =>
+        {
+            var branchContributions = records.Select(record => BuildContribution(
+                product,
+                record.Parameter.CalculationType,
+                calculator.GetTermMonths(record.Instance.Term)
+                    .Select(month => GetMetric(metricLookup, record.Branch.Id, product.Id, month)).ToList())).ToList();
+            return new DashboardSubProductContributionViewModel
+            {
+                SubProductId = product.Id,
+                Code = product.Code,
+                Name = product.Name,
+                TargetValue = Round(branchContributions.Sum(item => item.TargetValue)),
+                ActualValue = branchContributions.All(item => item.ActualValue.HasValue)
+                    ? Round(branchContributions.Sum(item => item.ActualValue!.Value))
+                    : null
+            };
+        }).ToList();
+    }
+
+    private static BranchSubProductMonthlyMetric? GetMetric(
+        IReadOnlyDictionary<(int BranchId, int SubProductId, int Month), BranchSubProductMonthlyMetric> lookup,
+        int branchId, int subProductId, int month)
+    {
+        lookup.TryGetValue((branchId, subProductId, month), out var metric);
+        return metric;
+    }
+
+    private static DashboardSubProductContributionViewModel BuildContribution(
+        ProductDefinition product,
+        MainProductCalculationType calculationType,
+        IReadOnlyCollection<BranchSubProductMonthlyMetric?> metrics)
+    {
+        var targetValues = metrics.Select(metric => metric?.TargetValue ?? 0).ToList();
+        var complete = metrics.Count > 0 && metrics.All(metric => metric?.ActualValue.HasValue == true);
+        return new DashboardSubProductContributionViewModel
+        {
+            SubProductId = product.Id,
+            Code = product.Code,
+            Name = product.Name,
+            TargetValue = Round(Aggregate(targetValues, calculationType)),
+            ActualValue = complete
+                ? Round(Aggregate(metrics.Select(metric => metric!.ActualValue!.Value), calculationType))
+                : null
         };
     }
 
-    private DashboardProductPerformanceViewModel BuildProduct(
-        CalculatedDashboardRecord record,
-        int? segmentRank,
-        int segmentRankCandidateCount)
-    {
-        var months = record.Months.Select(month => new DashboardProductMonthViewModel
+    private static IReadOnlyList<DashboardProductMonthViewModel> BuildMonthRows(
+        IEnumerable<MainProductMonthlyValue> months) => months.Select(month => new DashboardProductMonthViewModel
         {
             Month = month.Month,
             MonthName = TurkishMonthNames[month.Month],
             TargetValue = month.TargetValue,
             ActualValue = month.ActualValue,
             ActualAsOfDate = month.ActualAsOfDate,
-            HgRatioPercent = month.ActualValue.HasValue && month.TargetValue > 0 ? Round(month.ActualValue.Value / month.TargetValue * 100) : null
+            HgRatioPercent = month.ActualValue.HasValue && month.TargetValue > 0
+                ? Round(month.ActualValue.Value / month.TargetValue * 100)
+                : null
         }).ToList();
-        return new DashboardProductPerformanceViewModel
-        {
-            MainProductInstanceId = record.Instance.Id,
-            ProductCode = record.Instance.MainProduct.Code,
-            ProductName = record.Instance.MainProduct.Name,
-            CalculationType = record.Parameter.CalculationType,
-            CriterionScore = record.Parameter.CriterionScore,
-            TargetValue = record.Result.TargetValue,
-            ActualValue = record.Result.ActualValue,
-            HgRatioPercent = record.Result.HgRatioPercent,
-            HgoScore = record.Result.HgoScore,
-            TotalScore = record.Result.TotalScore,
-            SegmentRank = segmentRank,
-            SegmentRankCandidateCount = segmentRankCandidateCount,
-            HasCompleteBatchData = record.Result.HasCompleteBatchData,
-            Months = months
-        };
-    }
 
-    private static DashboardBranchPerformanceViewModel BuildBranchSummary(Branch branch, IReadOnlyCollection<CalculatedDashboardRecord> records, bool selected)
+    private async Task<IReadOnlyList<DashboardPeriodOptionViewModel>> GetPeriodsAsync(CancellationToken cancellationToken) =>
+        (await db.MainProductInstances.AsNoTracking()
+            .Where(instance => instance.Term == 1 || instance.Term == 2)
+            .Select(instance => new { instance.Year, instance.Term })
+            .Distinct()
+            .ToListAsync(cancellationToken))
+        .Select(period => new DashboardPeriodOptionViewModel { Year = period.Year, Term = period.Term })
+        .ToList();
+
+    private DashboardPeriodOptionViewModel PickDefaultPeriod(IReadOnlyCollection<DashboardPeriodOptionViewModel> periods) =>
+        periods.Where(period => IsPeriodClosed(period.Year, period.Term))
+            .OrderByDescending(period => period.Year).ThenByDescending(period => period.Term).FirstOrDefault()
+        ?? periods.OrderByDescending(period => period.Year).ThenByDescending(period => period.Term).FirstOrDefault()
+        ?? new DashboardPeriodOptionViewModel { Year = Today.Year, Term = Today.Month <= 6 ? 1 : 2 };
+
+    private bool IsPeriodClosed(int year, int term)
     {
-        var complete = records.Where(IsRankable).ToList();
-        var eligible = complete.Sum(record => record.Parameter.CriterionScore);
-        var earned = complete.Sum(record => record.Result.TotalScore ?? 0);
-        return new DashboardBranchPerformanceViewModel
-        {
-            BranchId = branch.Id,
-            BranchCode = branch.BranchCode,
-            BranchName = branch.Name,
-            GroupSegment = branch.Group.GroupSegment,
-            AssignedScore = Round(records.Sum(record => record.Parameter.CriterionScore)),
-            EligibleScore = Round(eligible),
-            EarnedScore = Round(earned),
-            SuccessPercent = eligible == 0 ? 0 : Round(earned / eligible * 100),
-            ActiveProductCount = records.Count,
-            CompleteProductCount = complete.Count,
-            PendingProductCount = records.Count - complete.Count,
-            IsSelected = selected
-        };
+        var lastMonth = calculator.GetTermMonths(term)[^1];
+        return Today > new DateOnly(year, lastMonth, DateTime.DaysInMonth(year, lastMonth));
     }
 
-    private static void ApplyBranchRanks(IReadOnlyList<DashboardBranchPerformanceViewModel> rows)
+    private static bool IsRankable(CalculatedDashboardRecord record) =>
+        record.SubProducts.Count > 0 && record.Result.HasCompleteBatchData && record.Result.TotalScore.HasValue;
+    private static decimal Aggregate(IEnumerable<decimal> values, MainProductCalculationType type)
     {
-        var ranks = DenseRankCalculator.Calculate(rows.Select(row => row.EligibleScore > 0 ? (decimal?)row.SuccessPercent : null).ToList());
-        for (var index = 0; index < rows.Count; index++) rows[index].Rank = ranks[index];
+        var list = values.ToList();
+        return list.Count == 0 ? 0 : type == MainProductCalculationType.Average ? list.Average() : list.Sum();
     }
-
-    private async Task<IReadOnlyList<ParameterBranchOptionViewModel>> GetBranchOptionsAsync(CancellationToken cancellationToken) =>
-        await db.Branches.AsNoTracking().Include(branch => branch.Group).OrderBy(branch => branch.BranchCode)
-            .Select(branch => new ParameterBranchOptionViewModel
-            {
-                Id = branch.Id, GroupId = branch.GroupId, BranchCode = branch.BranchCode, Name = branch.Name,
-                GroupNo = branch.Group.GroupNo, GroupName = branch.Group.Name, GroupSegment = branch.Group.GroupSegment
-            }).ToListAsync(cancellationToken);
-
-    private static bool IsRankable(CalculatedDashboardRecord record) => record.Result.HasCompleteBatchData && record.Result.TotalScore.HasValue;
     private DateOnly Today => DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
-    private sealed record CalculatedDashboardRecord(Branch Branch, MainProductInstance Instance, MainProductParameter Parameter, MainProductPeriodCalculationResult Result, IReadOnlyList<MainProductMonthlyValue> Months);
+
+    private sealed record CalculatedDashboardRecord(
+        Branch Branch,
+        MainProductInstance Instance,
+        MainProductParameter Parameter,
+        IReadOnlyList<ProductDefinition> SubProducts,
+        MainProductPeriodCalculationResult Result,
+        IReadOnlyList<MainProductMonthlyValue> Months);
+    private sealed record DashboardDataset(
+        IReadOnlyList<Branch> Branches,
+        IReadOnlyList<MainProductInstance> Instances,
+        IReadOnlyList<CalculatedDashboardRecord> Records,
+        IReadOnlyDictionary<(int BranchId, int SubProductId, int Month), BranchSubProductMonthlyMetric> MetricLookup);
 }

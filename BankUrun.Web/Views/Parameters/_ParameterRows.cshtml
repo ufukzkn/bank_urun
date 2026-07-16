@@ -15,7 +15,6 @@
 @foreach (var row in Model.Rows)
 {
     var detailId = $"parameter-detail-{row.ParameterId}";
-    var monthlyId = $"parameter-monthly-{row.ParameterId}";
     <tr class="list-row performance-parameter-row" data-detail-id="@detailId">
         <td>@row.Year</td>
         <td>@row.Term</td>
@@ -63,33 +62,13 @@
                         </div>
                         <div class="detail-command-row">
                             <button class="btn btn-sm btn-primary" type="submit" data-confirm="Parametre ve segment dağılımını güncellemek istediğinize emin misiniz?">Dağılımı kaydet</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-show-sub-products data-main-product-id="@row.MainProductInstanceId" data-year="@row.Year" data-term="@row.Term" data-group-id="@row.GroupId">Alt ürünleri gör</button>
                             <button class="btn btn-sm btn-outline-danger" type="submit" form="delete-parameter-@row.ParameterId" data-confirm="Parametreyi ve bağlı aylık verileri silmek istediğinize emin misiniz?">Kuralı sil</button>
                         </div>
                     </form>
                     <form id="delete-parameter-@row.ParameterId" asp-controller="Parameters" asp-action="DeleteParameter" method="post" class="button-form">
                         @Html.AntiForgeryToken()<input type="hidden" name="Id" value="@row.ParameterId" />
                     </form>
-
-                    <div class="parameter-monthly-disclosure">
-                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#@monthlyId" data-parameter-monthly-toggle>
-                            Ay verisi gir
-                        </button>
-                        <div class="collapse" id="@monthlyId">
-                            <div class="parameter-target-section">
-                                <div class="detail-section-heading"><h3>Aylık hedef ve batch verisi</h3><p>Bu alan yalnız aylık inceleme veya hedef girişi gerektiğinde kullanılır.</p></div>
-                                @if (row.Branches.Count > 0)
-                                {
-                                    var branch = row.Branches[0];
-                                    <label class="target-branch-selector"><span>Şube</span><div class="combo generic-combo"><input class="form-control form-control-sm" type="search" value="@branch.Label" autocomplete="off" data-combo-input /><input type="hidden" value="@branch.Id" data-combo-value data-target-branch data-parameter-id="@row.ParameterId" /><div class="combo-menu">@foreach (var option in row.Branches) { <button class="combo-option" type="button" data-combo-option data-id="@option.Id" data-label="@option.Label"><strong>@option.BranchCode</strong><span>@option.Name</span></button> }<div class="combo-empty">Şube bulunamadı.</div></div></div></label>
-                                    <div data-target-editor><div class="inline-empty-state">Ay verisini görüntülemek için bu alanı açın.</div></div>
-                                }
-                                else
-                                {
-                                    <div class="inline-empty-state">Bu gruba bağlı şube bulunmuyor.</div>
-                                }
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </td>

@@ -583,8 +583,25 @@ setupList(document.querySelector('[data-list="branches"]'), {
   matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
 });
 
-const parameterRoot = document.querySelector('[data-list="parameters"]');
-if (parameterRoot) {
+const parameterManagement = document.querySelector("[data-parameter-management]");
+if (parameterManagement) {
+  const parameterRoot = parameterManagement.querySelector('[data-list="parameters"]');
+  const subProductRoot = parameterManagement.querySelector('[data-list="subProductTargets"]');
+  const modeButtons = Array.from(parameterManagement.querySelectorAll("[data-parameter-mode]"));
+  const modePanels = Array.from(parameterManagement.querySelectorAll("[data-parameter-mode-panel]"));
+  let activeParameterMode = "main";
+  const setParameterMode = (mode) => {
+    activeParameterMode = mode;
+    modeButtons.forEach((button) => {
+      const active = button.dataset.parameterMode === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active.toString());
+    });
+    modePanels.forEach((panel) => panel.classList.toggle("d-none", panel.dataset.parameterModePanel !== mode));
+    window.sessionStorage.setItem("bankurun.parameter-mode", mode);
+  };
+  modeButtons.forEach((button) => button.addEventListener("click", () => setParameterMode(button.dataset.parameterMode || "main")));
+
   const parameterList = setupList(parameterRoot, {
     defaultSort: { key: "year", direction: "desc" },
     descendingKeys: ["year", "term", "criterion", "active"],
@@ -613,38 +630,80 @@ if (parameterRoot) {
       };
     }
   });
-  const loadTargetEditor = async (branchValue) => {
+  const subProductList = setupList(subProductRoot, {
+    defaultSort: { key: "year", direction: "desc" },
+    descendingKeys: ["year", "term"],
+    numericKeys: [],
+    label: "alt ürün",
+    colspan: 5,
+    remote: async ({ state, filterValue, signal }) => {
+      const params = new URLSearchParams({
+        GroupId: filterValue("groupId"),
+        MainProductInstanceId: filterValue("mainProductInstanceId"),
+        Year: filterValue("year"),
+        Term: filterValue("term"),
+        Search: filterValue("search"),
+        SortKey: state.sort.key,
+        SortDirection: state.sort.direction,
+        Page: state.page.toString(),
+        PageSize: subProductRoot?.querySelector("[data-list-page-size]")?.value || "10"
+      });
+      const response = await fetch(`${parameterManagement.dataset.subProductRowsUrl}?${params}`, { signal });
+      if (!response.ok) throw new Error("Alt ürün listesi yüklenemedi.");
+      return {
+        html: await response.text(),
+        totalCount: Number(response.headers.get("X-Total-Count") || 0),
+        totalPages: Number(response.headers.get("X-Total-Pages") || 1),
+        page: Number(response.headers.get("X-Page") || 1)
+      };
+    }
+  });
+  const loadSubTargetEditor = async (branchValue) => {
     if (!branchValue?.value) return;
-    const detail = branchValue.closest(".performance-parameter-detail");
-    const target = detail?.querySelector("[data-target-editor]");
+    const detail = branchValue.closest(".sub-product-target-detail");
+    const target = detail?.querySelector("[data-sub-target-editor]");
     if (!target) return;
     target.classList.add("is-loading");
     try {
-      const params = new URLSearchParams({ parameterId: branchValue.dataset.parameterId, branchId: branchValue.value });
-      const response = await fetch(`${parameterRoot.dataset.targetEditorUrl}?${params}`);
+      const params = new URLSearchParams({
+        subProductId: branchValue.dataset.subProductId,
+        branchId: branchValue.value,
+        year: branchValue.dataset.year,
+        term: branchValue.dataset.term
+      });
+      const response = await fetch(`${parameterManagement.dataset.subProductEditorUrl}?${params}`);
       if (!response.ok) throw new Error("Hedefler yüklenemedi.");
       target.innerHTML = await response.text();
       target.dataset.loaded = "true";
     } catch {
-      target.innerHTML = '<div class="inline-empty-state">Şube hedefleri yüklenemedi.</div>';
+      target.innerHTML = '<div class="inline-empty-state">Alt ürün hedefleri yüklenemedi.</div>';
       target.dataset.loaded = "false";
     } finally {
       target.classList.remove("is-loading");
     }
   };
-  parameterRoot.addEventListener("change", async (event) => {
-    const branchValue = event.target.closest?.("[data-target-branch]");
-    if (branchValue) await loadTargetEditor(branchValue);
+  parameterManagement.addEventListener("change", async (event) => {
+    const branchValue = event.target.closest?.("[data-sub-target-branch]");
+    if (branchValue) await loadSubTargetEditor(branchValue);
   });
-  parameterRoot.addEventListener("click", async (event) => {
-    const toggle = event.target.closest?.("[data-parameter-monthly-toggle]");
-    if (!toggle) return;
-    const detail = toggle.closest(".performance-parameter-detail");
-    const target = detail?.querySelector("[data-target-editor]");
-    const branchValue = detail?.querySelector("[data-target-branch]");
-    if (target?.dataset.loaded !== "true") await loadTargetEditor(branchValue);
+  parameterManagement.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-show-sub-products]");
+    if (!button || !subProductRoot) return;
+    const setFilter = (name, value) => {
+      const input = subProductRoot.querySelector(`[data-list-filter="${name}"]`);
+      if (input) input.value = value || "";
+    };
+    setFilter("groupId", button.dataset.groupId);
+    setFilter("year", button.dataset.year);
+    setFilter("term", button.dataset.term);
+    setFilter("mainProductInstanceId", button.dataset.mainProductId);
+    setParameterMode("sub");
+    subProductList?.apply(true);
   });
   parameterList?.apply(true);
+  subProductList?.apply(true);
+  const storedMode = window.sessionStorage.getItem("bankurun.parameter-mode");
+  if (storedMode === "sub") setParameterMode("sub");
 }
 
 const dashboardRoot = document.querySelector("[data-dashboard]");
@@ -659,34 +718,46 @@ if (dashboardRoot) {
   const productInput = productValue?.closest(".generic-combo")?.querySelector("[data-combo-input]");
   const productOptions = Array.from(productValue?.closest(".generic-combo")?.querySelectorAll("[data-combo-option]") || []);
   const snapshot = dashboardRoot.querySelector("[data-dashboard-snapshot]");
-  const sectionButtons = Array.from(dashboardRoot.querySelectorAll("[data-dashboard-section-mode]"));
+  const modeStage = dashboardRoot.querySelector("[data-performance-mode-stage]");
+  const modeButtons = Array.from(dashboardRoot.querySelectorAll("[data-performance-mode]"));
+  const branchField = dashboardRoot.querySelector('[data-filter-field="branch"]');
+  const productField = dashboardRoot.querySelector('[data-filter-field="product"]');
+  const clearButton = dashboardRoot.querySelector("[data-dashboard-clear]");
   const storageKey = "bankurun.performance-context";
+  const defaultYear = yearValue?.value || "";
+  const defaultTerm = termValue?.value || "";
   let requestController = null;
-
-  const setDashboardSection = (section) => {
-    const products = section === "products";
-    dashboardRoot.classList.toggle("show-product-performance", products);
-    sectionButtons.forEach((button) => {
-      const active = button.dataset.dashboardSectionMode === section;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", active.toString());
-    });
-  };
-  sectionButtons.forEach((button) => button.addEventListener("click", () => setDashboardSection(button.dataset.dashboardSectionMode)));
-  setDashboardSection("branches");
+  let currentMode = dashboardRoot.dataset.defaultMode || "BranchProduct";
 
   const setComboValue = (value, input, option, emptyLabel = "") => {
     if (value) value.value = option?.dataset.id || "";
     if (input) input.value = option?.dataset.label || emptyLabel;
   };
+  const syncTermContext = () => {
+    const options = Array.from(termValue?.querySelectorAll("option") || []);
+    options.forEach((option) => {
+      const hidden = !(option.dataset.years || "").split(",").includes(yearValue?.value || "");
+      option.hidden = hidden;
+      option.disabled = hidden;
+    });
+    if (termValue?.selectedOptions[0]?.disabled) {
+      const available = options.find((option) => !option.disabled);
+      if (available) termValue.value = available.value;
+    }
+  };
   const syncBranchContext = () => {
+    const hasGroup = Boolean(groupValue?.value) && currentMode === "BranchProduct";
+    if (branchInput) {
+      branchInput.disabled = !hasGroup;
+      branchInput.placeholder = hasGroup ? "Kod veya şube adı ara" : "Önce grup seçin";
+    }
     branchOptions.forEach((option) => {
-      const hidden = option.dataset.groupId !== groupValue?.value;
+      const hidden = !hasGroup || option.dataset.groupId !== groupValue?.value;
       option.dataset.contextHidden = hidden.toString();
       option.classList.toggle("d-none", hidden);
     });
     const current = branchOptions.find((option) => option.dataset.id === branchValue?.value && option.dataset.contextHidden !== "true");
-    if (!current) setComboValue(branchValue, branchInput, branchOptions.find((option) => option.dataset.contextHidden !== "true"));
+    if (!current) setComboValue(branchValue, branchInput, null, "");
   };
   const syncProductContext = () => {
     productOptions.forEach((option) => {
@@ -698,31 +769,46 @@ if (dashboardRoot) {
     const current = productOptions.find((option) => option.dataset.id === productValue?.value && option.dataset.contextHidden !== "true");
     if (!current) setComboValue(productValue, productInput, productOptions.find((option) => !option.dataset.id), "Tüm ana ürünler");
   };
-  const initializeProductList = () => setupList(snapshot?.querySelector('[data-list="performanceProducts"]'), {
-    defaultSort: { key: "product", direction: "asc" },
-    descendingKeys: ["criterion", "target", "actual", "ratio", "hgo", "total", "segmentRank"],
-    numericKeys: ["criterion", "target", "actual", "ratio", "hgo", "total", "segmentRank"],
-    label: "ürün",
-    matches: (row, value) => (!value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()))
-      && (!value("batch") || row.dataset.batch === value("batch")),
+  const syncModeUi = () => {
+    modeButtons.forEach((button) => {
+      const active = button.dataset.performanceMode === currentMode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", active.toString());
+    });
+    branchField?.classList.toggle("d-none", currentMode !== "BranchProduct");
+    productField?.classList.toggle("d-none", currentMode === "Branch");
+    syncBranchContext();
+  };
+
+  const setupPerformanceList = (name, defaultKey, label, defaultDirection = "asc") => setupList(snapshot?.querySelector(`[data-list="${name}"]`), {
+    defaultSort: { key: defaultKey, direction: defaultDirection },
+    descendingKeys: ["criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount"],
+    numericKeys: ["criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount"],
+    label,
+    matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
   });
+  const initializeSnapshot = () => {
+    setupPerformanceList("performanceBranches", "total", "şube", "desc");
+    setupPerformanceList("performanceBranchProducts", "total", "sonuç", "desc");
+    setupPerformanceList("performanceMainProducts", "total", "ana ürün", "desc");
+  };
 
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(storageKey) || "null");
     if (stored?.groupId && groupValue?.querySelector(`option[value="${stored.groupId}"]`)) groupValue.value = stored.groupId;
     if (stored?.year && yearValue?.querySelector(`option[value="${stored.year}"]`)) yearValue.value = stored.year;
-    if (stored?.term && termValue?.querySelector(`option[value="${stored.term}"]`)) termValue.value = stored.term;
+    syncTermContext();
+    if (stored?.term && termValue?.querySelector(`option[value="${stored.term}"]:not(:disabled)`)) termValue.value = stored.term;
+    if (["Branch", "BranchProduct", "MainProduct"].includes(stored?.mode)) currentMode = stored.mode;
     syncBranchContext();
     syncProductContext();
     const storedBranch = branchOptions.find((option) => option.dataset.id === String(stored?.branchId || "") && option.dataset.contextHidden !== "true");
-    if (storedBranch && branchValue && branchInput) {
-      branchValue.value = storedBranch.dataset.id || "";
-      branchInput.value = storedBranch.dataset.label || "";
-    }
+    if (storedBranch) setComboValue(branchValue, branchInput, storedBranch);
     const storedProduct = productOptions.find((option) => option.dataset.id === String(stored?.mainProductInstanceId || "") && option.dataset.contextHidden !== "true");
     if (storedProduct) setComboValue(productValue, productInput, storedProduct, "Tüm ana ürünler");
   } catch {
     window.sessionStorage.removeItem(storageKey);
+    syncTermContext();
     syncBranchContext();
     syncProductContext();
   }
@@ -736,21 +822,34 @@ if (dashboardRoot) {
       branchId: branchValue?.value || "",
       year: yearValue?.value || "",
       term: termValue?.value || "",
-      mainProductInstanceId: productValue?.value || ""
+      mainProductInstanceId: productValue?.value || "",
+      mode: currentMode
     }));
     const params = new URLSearchParams({
+      mode: currentMode,
       groupId: groupValue?.value || "",
-      branchId: branchValue?.value || "",
+      branchId: currentMode === "BranchProduct" ? (branchValue?.value || "") : "",
       year: yearValue?.value || "",
       term: termValue?.value || "",
-      mainProductInstanceId: productValue?.value || ""
+      mainProductInstanceId: currentMode === "Branch" ? "" : (productValue?.value || "")
     });
     try {
       const response = await fetch(`${dashboardRoot.dataset.snapshotUrl}?${params}`, { signal: requestController.signal });
       if (!response.ok) throw new Error("Dashboard yüklenemedi.");
       if (snapshot) {
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!reduceMotion) {
+          if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
+          snapshot.classList.add("is-leaving");
+          await new Promise((resolve) => window.setTimeout(resolve, 90));
+        }
         snapshot.innerHTML = await response.text();
-        initializeProductList();
+        initializeSnapshot();
+        snapshot.classList.remove("is-leaving");
+        snapshot.classList.add("is-entering");
+        if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
+        window.requestAnimationFrame(() => snapshot.classList.remove("is-entering"));
+        window.setTimeout(() => { if (modeStage) modeStage.style.height = "auto"; }, 220);
       }
     } catch (error) {
       if (error.name !== "AbortError" && snapshot) {
@@ -761,20 +860,77 @@ if (dashboardRoot) {
     }
   };
 
-  groupValue?.addEventListener("change", () => { syncBranchContext(); refreshDashboard(); });
-  branchValue?.addEventListener("change", refreshDashboard);
-  yearValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
-  termValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
-  productValue?.addEventListener("change", refreshDashboard);
-  snapshot?.addEventListener("click", (event) => {
-    const selectButton = event.target.closest("[data-dashboard-select-branch]");
-    if (!selectButton) return;
-    const option = branchOptions.find((candidate) => candidate.dataset.id === selectButton.dataset.dashboardSelectBranch);
-    if (!option) return;
-    setComboValue(branchValue, branchInput, option);
+  modeButtons.forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.performanceMode === currentMode) return;
+    currentMode = button.dataset.performanceMode || "BranchProduct";
+    syncModeUi();
+    refreshDashboard();
+  }));
+
+  groupValue?.addEventListener("change", () => {
+    setComboValue(branchValue, branchInput, null, "");
+    syncBranchContext();
     refreshDashboard();
   });
-  initializeProductList();
+  branchValue?.addEventListener("change", refreshDashboard);
+  yearValue?.addEventListener("change", () => { syncTermContext(); syncProductContext(); refreshDashboard(); });
+  termValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
+  productValue?.addEventListener("change", refreshDashboard);
+  clearButton?.addEventListener("click", () => {
+    if (yearValue) yearValue.value = defaultYear;
+    if (termValue) termValue.value = defaultTerm;
+    if (groupValue) groupValue.value = "";
+    setComboValue(branchValue, branchInput, null, "");
+    setComboValue(productValue, productInput, productOptions.find((option) => !option.dataset.id), "Tüm ana ürünler");
+    syncTermContext();
+    syncBranchContext();
+    syncProductContext();
+    currentMode = "BranchProduct";
+    syncModeUi();
+    refreshDashboard();
+  });
+  snapshot?.addEventListener("click", async (event) => {
+    const inspectButton = event.target.closest("[data-inspect-branch]");
+    if (inspectButton) {
+      if (groupValue) groupValue.value = inspectButton.dataset.groupId || "";
+      syncBranchContext();
+      const option = branchOptions.find((item) => item.dataset.id === inspectButton.dataset.branchId);
+      setComboValue(branchValue, branchInput, option, inspectButton.dataset.branchLabel || "");
+      currentMode = "BranchProduct";
+      syncModeUi();
+      refreshDashboard();
+      return;
+    }
+    const detailButton = event.target.closest("[data-monthly-detail]");
+    if (!detailButton) return;
+    const detailRow = detailRowFor(detailButton.closest(".list-row"));
+    const target = detailRow?.querySelector("[data-monthly-detail-target]");
+    if (!target || target.dataset.loaded === "true" || target.dataset.loading === "true") return;
+    target.dataset.loading = "true";
+    try {
+      const params = new URLSearchParams({
+        mainProductInstanceId: detailButton.dataset.productId || ""
+      });
+      let detailUrl = dashboardRoot.dataset.mainDetailUrl;
+      if (detailButton.dataset.monthlyDetail === "branch") {
+        params.set("branchId", detailButton.dataset.branchId || "");
+        detailUrl = dashboardRoot.dataset.branchDetailUrl;
+      } else if (groupValue?.value) {
+        params.set("groupId", groupValue.value);
+      }
+      const response = await fetch(`${detailUrl}?${params}`);
+      if (!response.ok) throw new Error("Aylık detay yüklenemedi.");
+      target.innerHTML = await response.text();
+      target.dataset.loaded = "true";
+    } catch {
+      target.innerHTML = '<div class="inline-empty-state">Aylık detay yüklenemedi. Lütfen yeniden deneyin.</div>';
+    } finally {
+      target.dataset.loading = "false";
+    }
+  });
+  syncTermContext();
+  syncModeUi();
+  initializeSnapshot();
   refreshDashboard();
 }
 

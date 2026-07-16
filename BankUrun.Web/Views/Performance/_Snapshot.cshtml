@@ -1,204 +1,83 @@
+@using BankUrun.Web.Models
 @model BankUrun.Web.ViewModels.DashboardSnapshotViewModel
-
 @functions {
-    private static string StatusClass(decimal percent) => percent >= 90 ? "good" : percent >= 70 ? "watch" : "low";
-    private static string Calculation(BankUrun.Web.Models.MainProductCalculationType type) =>
-        type == BankUrun.Web.Models.MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
-    private static string DecimalText(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "-";
+    private static string Calculation(MainProductCalculationType type) => type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+    private static string Inv(decimal? value, decimal fallback = -1) => (value ?? fallback).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private static string Tone(decimal? ratio) => ratio switch
+    {
+        >= 90 => "performance-tone-excellent",
+        >= 80 => "performance-tone-good",
+        >= 70 => "performance-tone-watch",
+        not null => "performance-tone-low",
+        _ => "performance-tone-pending"
+    };
 }
 
-@{
-    var successClass = StatusClass(Model.SuccessPercent);
-}
-
-<div class="dashboard-snapshot-heading">
-    <div>
-        <span class="dashboard-context-code">@Model.GroupNo · @Model.GroupSegment · @Model.Year / @Model.Term. Dönem</span>
-        <h2>@Model.BranchCode · @Model.BranchName</h2>
-        <p>@Model.GroupName grubundaki @Model.RankedBranchCount şube arasında dönemsel görünüm.</p>
-    </div>
-    <span class="dashboard-success-chip @successClass">%@Model.SuccessPercent.ToString("N2")</span>
-</div>
-
-<div class="dashboard-kpi-grid">
-    <article class="dashboard-kpi-card">
-        <span>Toplam kriter puanı</span><strong>@Model.AssignedScore.ToString("N2")</strong>
-        <small>@Model.ActiveProductCount aktif ana ürün</small>
-    </article>
-    <article class="dashboard-kpi-card">
-        <span>Hesaplanabilir kriter puanı</span><strong>@Model.EligibleScore.ToString("N2")</strong>
-        <small>Batch'i tamamlanan ürünlerin toplamı</small>
-    </article>
-    <article class="dashboard-kpi-card @successClass">
-        <span>Kazanılan toplam puan</span><strong>@Model.EarnedScore.ToString("N2")</strong>
-        <small>Başarı %@Model.SuccessPercent.ToString("N2")</small>
-    </article>
-    <article class="dashboard-kpi-card">
-        <span>Şube sırası</span><strong>@(Model.BranchRank?.ToString() ?? "-") / @Model.RankedBranchCount</strong>
-        <small>@Model.GroupSegment segmenti</small>
-    </article>
-    <article class="dashboard-kpi-card @(Model.PendingProductCount > 0 ? "watch" : "good")">
-        <span>Batch kapsamı</span><strong>@Model.CompleteProductCount / @Model.ActiveProductCount</strong>
-        <small>@Model.PendingProductCount ürün batch bekliyor</small>
-    </article>
-</div>
-
-<div class="dashboard-section-panel" data-dashboard-section-panel="branches">
-    <section class="surface-panel dashboard-chart-panel dashboard-ranking-panel">
-        <div class="panel-heading dashboard-panel-heading"><div><h2>Şube başarı sıralaması</h2><p>Seçili grup içinde hesaplanabilir kriter puanına göre.</p></div></div>
-        <div class="dashboard-ranking-chart">
-            @if (Model.BranchRanking.Count == 0)
-            {
-                <div class="dashboard-empty-state">Bu bağlamda sıralanabilir şube bulunmuyor.</div>
-            }
-            @foreach (var branch in Model.BranchRanking)
-            {
-                var branchClass = branch.EligibleScore == 0 ? "pending" : StatusClass(branch.SuccessPercent);
-                var width = Math.Min(branch.SuccessPercent, 100);
-                var branchDetailId = $"branch-ranking-detail-{branch.BranchId}";
-                <div class="dashboard-ranking-item @branchClass @(branch.IsSelected ? "is-selected" : "")">
-                    <div class="dashboard-ranking-row">
-                        <span class="dashboard-rank">@(branch.Rank?.ToString() ?? "-")</span>
-                        <div class="dashboard-ranking-label"><strong>@branch.BranchCode</strong><span>@branch.BranchName</span><small>@branch.CompleteProductCount tamam · @branch.PendingProductCount bekliyor</small></div>
-                        <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
-                        <strong class="dashboard-bar-value">%@branch.SuccessPercent.ToString("N2")</strong>
-                        <button class="btn btn-sm btn-outline-primary dashboard-ranking-detail-button"
-                                type="button"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#@branchDetailId"
-                                aria-expanded="false"
-                                aria-controls="@branchDetailId">Detay</button>
-                    </div>
-                    <div class="collapse dashboard-ranking-detail" id="@branchDetailId">
-                        <div class="dashboard-ranking-detail-grid">
-                            <div><span>Kriter puanı</span><strong>@branch.EligibleScore.ToString("N2")</strong></div>
-                            <div><span>Kazanılan puan</span><strong>@branch.EarnedScore.ToString("N2")</strong></div>
-                            <div><span>Başarı oranı</span><strong>%@branch.SuccessPercent.ToString("N2")</strong></div>
-                            <div><span>Batch kapsamı</span><strong>@branch.CompleteProductCount / @branch.ActiveProductCount</strong></div>
-                        </div>
-                        @if (!branch.IsSelected)
-                        {
-                            <button class="btn btn-sm btn-primary" type="button" data-dashboard-select-branch="@branch.BranchId">Bu şubeyi görüntüle</button>
-                        }
-                        else
-                        {
-                            <span class="dashboard-selected-branch-note">Şu anda görüntülenen şube</span>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
+<div class="performance-mode-content is-entering" data-dashboard-mode="@Model.Mode">
+@if (Model.Mode == PerformanceMode.Branch)
+{
+    <section class="surface-panel table-panel compact-list-panel performance-search-panel" data-list="performanceBranches">
+        <div class="panel-heading dashboard-search-heading"><div><span class="dashboard-context-code">@Model.Year / @Model.Term. Dönem</span><h2>Şube performansı</h2><p>Şubeler bu tabloda görüntülenen kapsam içinde toplam puana göre sıralanır.</p></div><span class="result-count-chip">@Model.Branches.Count şube</span></div>
+        <div class="table-toolbar performance-search-toolbar"><label class="toolbar-search"><span>Şube ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Grup, şube kodu veya adı" /></label><label><span>Sayfa boyutu</span><select class="form-select" data-list-page-size><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></label></div>
+        <div class="table-responsive performance-table-scroll"><table class="table compact-table performance-search-table"><thead><tr>
+            <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="branch">Şube <span></span></button></th>
+            <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Toplam kriter <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="hgo">Toplam HGO <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="total">Toplam puan <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="ratio">Başarı <span></span></button></th><th class="text-end" title="Bu tabloda görüntülenen, puanı tamamlanmış şubelerin toplam puana göre sırası."><button class="sort-button justify-content-end" type="button" data-list-sort="rank">Şube sırası <span></span></button></th><th class="text-end">İşlem</th>
+        </tr></thead><tbody>
+        @foreach (var row in Model.Branches)
+        {
+            var detailId = $"branch-performance-{row.BranchId}";
+            <tr class="list-row @Tone(row.SuccessPercent)" data-detail-id="@detailId" data-search="@($"{row.GroupNo} {row.GroupName} {row.BranchCode} {row.BranchName}".ToUpperInvariant())" data-group="@($"{row.GroupNo} {row.GroupName}")" data-branch="@($"{row.BranchCode} {row.BranchName}")" data-criterion="@Inv(row.CriterionScore)" data-hgo="@Inv(row.HgoScore)" data-total="@Inv(row.TotalScore)" data-ratio="@Inv(row.SuccessPercent)" data-rank="@(row.Rank ?? int.MaxValue)">
+                <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td><td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td><td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td><td class="text-end numeric-cell">@Text(row.HgoScore)</td><td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td><td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N2}" : "—")</span></td><td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td>
+            </tr>
+            <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="8"><div class="collapse" id="@detailId"><div class="branch-inline-detail"><div><strong>@row.CompleteProductCount / @row.ProductCount ana ürün tamamlandı</strong><span>@(row.HasCompletePeriodData ? "Dönem batch'i tamamlandı." : "Eksik alt ürün batch'i bulunuyor.")</span></div><button class="btn btn-sm btn-primary" type="button" data-inspect-branch data-group-id="@row.GroupId" data-branch-id="@row.BranchId" data-branch-label="@($"{row.BranchCode} - {row.BranchName}")">Şubeyi incele</button></div></div></td></tr>
+        }
+        <tr class="empty-row @(Model.Branches.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="8" class="empty-cell">Filtreye uygun şube bulunamadı.</td></tr>
+        </tbody></table></div>@await Html.PartialAsync("_ListPager")
     </section>
+}
+else if (Model.Mode == PerformanceMode.BranchProduct)
+{
+    @if (Model.HasSelectedBranch)
+    {
+        <div class="dashboard-snapshot-heading"><div><span class="dashboard-context-code">@Model.GroupNo · @Model.Year / @Model.Term. Dönem</span><h2>@Model.BranchCode · @Model.BranchName</h2><p>Yalnız bu şubenin ana ürün performansı gösteriliyor.</p></div><span class="dashboard-period-chip @(Model.HasCompletePeriodData ? "is-complete" : "is-waiting")">@(Model.HasCompletePeriodData ? "Dönem tamamlandı" : "Veri bekleniyor")</span></div>
+        <div class="dashboard-kpi-grid branch-summary-grid"><article class="dashboard-kpi-card"><span>Toplam kriter</span><strong>@Model.AssignedScore.ToString("N2")</strong></article><article class="dashboard-kpi-card"><span>Toplam HGO</span><strong>@Text(Model.EarnedScore)</strong></article><article class="dashboard-kpi-card"><span>Toplam puan</span><strong>@Text(Model.EarnedScore)</strong></article><article class="dashboard-kpi-card"><span>Şube sırası</span><strong>@(Model.BranchRank.HasValue ? $"{Model.BranchRank} / {Model.RankedBranchCount}" : "—")</strong><small>Seçili grup içindeki toplam puan sırası</small></article></div>
+        <div class="role-score-grid compact-role-grid">@foreach (var role in new[] { "Şb. Md.", "KOBİ", "Bireysel", "Perakende" }) { <article><span>@role</span><strong>—</strong><small>Veri bekleniyor</small></article> }</div>
+    }
+    <section class="surface-panel table-panel compact-list-panel performance-search-panel" data-list="performanceBranchProducts">
+        <div class="panel-heading dashboard-search-heading"><div><span class="dashboard-context-code">@Model.Year / @Model.Term. Dönem</span><h2>Şube–ürün performansı</h2><p>Görüntülenen sonuçlar toplam puana göre sıralanır; aylık içerikler yalnız Detay düğmesiyle yüklenir.</p></div><span class="result-count-chip">@Model.BranchProducts.Count sonuç</span></div>
+        <div class="table-toolbar performance-search-toolbar"><label class="toolbar-search"><span>Şube veya ürün ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Kod, şube veya ürün adı" /></label><label><span>Sayfa boyutu</span><select class="form-select" data-list-page-size><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></label></div>
+        <div class="table-responsive performance-table-scroll"><table class="table compact-table performance-search-table"><thead><tr>
+            <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="branch">Şube <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Kriter <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="target">Hedef <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="actual">Gerçekleşme <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="ratio">H/G <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="hgo">HGO <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="total">Toplam <span></span></button></th><th class="text-end" title="Bu tabloda görüntülenen, puanı tamamlanmış şube–ürün sonuçlarının toplam puana göre sırası."><button class="sort-button justify-content-end" type="button" data-list-sort="rank">Şube–ürün sırası <span></span></button></th><th class="text-end">İşlem</th>
+        </tr></thead><tbody>
+        @foreach (var row in Model.BranchProducts)
+        {
+            var detailId = $"branch-product-{row.BranchId}-{row.MainProductInstanceId}";
+            <tr class="list-row @Tone(row.HgRatioPercent)" data-detail-id="@detailId" data-search="@($"{row.GroupNo} {row.GroupName} {row.BranchCode} {row.BranchName} {row.ProductCode} {row.ProductName}".ToUpperInvariant())" data-group="@($"{row.GroupNo} {row.GroupName}")" data-branch="@($"{row.BranchCode} {row.BranchName}")" data-product="@($"{row.ProductCode} {row.ProductName}")" data-criterion="@Inv(row.CriterionScore)" data-target="@Inv(row.TargetValue)" data-actual="@Inv(row.ActualValue)" data-ratio="@Inv(row.HgRatioPercent)" data-hgo="@Inv(row.HgoScore)" data-total="@Inv(row.TotalScore)" data-rank="@(row.SegmentRank ?? int.MaxValue)">
+                <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td><td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td><td><strong>@row.ProductCode</strong><small>@row.ProductName</small><span class="calculation-badge">@Calculation(row.CalculationType)</span>@if (!row.HasSubProductConfiguration) { <span class="data-waiting-badge">Alt ürün bağlantısı yok</span> } else if (!row.HasCompleteBatchData) { <span class="data-waiting-badge">Veri bekleniyor</span> }</td><td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td><td class="text-end numeric-cell">@row.TargetValue.ToString("N2")</td><td class="text-end numeric-cell">@Text(row.ActualValue)</td><td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td><td class="text-end numeric-cell">@Text(row.HgoScore)</td><td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td><td class="text-end numeric-cell">@(row.SegmentRank.HasValue ? $"{row.SegmentRank} / {row.SegmentRankCandidateCount}" : "—")</td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" data-monthly-detail="branch" data-branch-id="@row.BranchId" data-product-id="@row.MainProductInstanceId">Detay</button></td>
+            </tr><tr class="list-detail-row" data-detail-for="@detailId"><td colspan="11"><div class="collapse" id="@detailId"><div class="performance-lazy-detail" data-monthly-detail-target><div class="inline-loading-state">Aylık detay yalnız bu alan açıldığında yüklenir.</div></div></div></td></tr>
+        }
+        <tr class="empty-row @(Model.BranchProducts.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="11" class="empty-cell">Filtreye uygun şube–ürün sonucu bulunamadı.</td></tr>
+        </tbody></table></div>@await Html.PartialAsync("_ListPager")
+    </section>
+}
+else
+{
+    <section class="surface-panel table-panel compact-list-panel performance-search-panel" data-list="performanceMainProducts">
+        <div class="panel-heading dashboard-search-heading"><div><span class="dashboard-context-code">@Model.Year / @Model.Term. Dönem · @Model.GroupName</span><h2>Ana ürün performansı</h2><p>Ana ürünler kapsamdaki şubelerin alt ürün satışlarından oluşan toplam puana göre sıralanır.</p></div><span class="result-count-chip">@Model.MainProducts.Count ana ürün</span></div>
+        <div class="table-toolbar performance-search-toolbar"><label class="toolbar-search"><span>Ana ürün ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Ürün kodu veya adı" /></label><label><span>Sayfa boyutu</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option></select></label></div>
+        <div class="table-responsive performance-table-scroll"><table class="table compact-table performance-search-table"><thead><tr>
+            <th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="subCount">Alt ürün <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="branchCount">Şube <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Toplam kriter <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="target">Hedef <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="actual">Gerçekleşme <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="ratio">H/G <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="hgo">HGO <span></span></button></th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="total">Toplam <span></span></button></th><th class="text-end" title="Bu tabloda görüntülenen, puanı tamamlanmış ana ürünlerin toplam puana göre sırası."><button class="sort-button justify-content-end" type="button" data-list-sort="rank">Ana ürün sırası <span></span></button></th><th class="text-end">İşlem</th>
+        </tr></thead><tbody>
+        @foreach (var row in Model.MainProducts)
+        {
+            var detailId = $"main-product-{row.MainProductInstanceId}";
+            <tr class="list-row @Tone(row.HgRatioPercent)" data-detail-id="@detailId" data-search="@($"{row.ProductCode} {row.ProductName}".ToUpperInvariant())" data-product="@($"{row.ProductCode} {row.ProductName}")" data-sub-count="@row.SubProductCount" data-branch-count="@row.BranchCount" data-criterion="@Inv(row.CriterionScore)" data-target="@Inv(row.TargetValue)" data-actual="@Inv(row.ActualValue)" data-ratio="@Inv(row.HgRatioPercent)" data-hgo="@Inv(row.HgoScore)" data-total="@Inv(row.TotalScore)" data-rank="@(row.Rank ?? int.MaxValue)">
+                <td><strong>@row.ProductCode</strong><small>@row.ProductName</small>@if (!row.HasSubProductConfiguration) { <span class="data-waiting-badge">Alt ürün bağlantısı yok</span> } else if (!row.HasCompleteBatchData) { <span class="data-waiting-badge">Veri bekleniyor</span> }</td><td class="text-end numeric-cell">@row.SubProductCount</td><td class="text-end numeric-cell">@row.BranchCount</td><td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td><td class="text-end numeric-cell">@row.TargetValue.ToString("N2")</td><td class="text-end numeric-cell">@Text(row.ActualValue)</td><td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td><td class="text-end numeric-cell">@Text(row.HgoScore)</td><td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td><td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" data-monthly-detail="main" data-product-id="@row.MainProductInstanceId">Detay</button></td>
+            </tr><tr class="list-detail-row" data-detail-for="@detailId"><td colspan="11"><div class="collapse" id="@detailId"><div class="performance-lazy-detail" data-monthly-detail-target><div class="inline-loading-state">Aylık genel toplam yalnız bu alan açıldığında yüklenir.</div></div></div></td></tr>
+        }
+        <tr class="empty-row @(Model.MainProducts.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="11" class="empty-cell">Filtreye uygun ana ürün sonucu bulunamadı.</td></tr>
+        </tbody></table></div>@await Html.PartialAsync("_ListPager")
+    </section>
+}
 </div>
-
-<section class="surface-panel table-panel compact-list-panel dashboard-products-panel"
-         data-list="performanceProducts"
-         data-dashboard-section-panel="products">
-    <div class="panel-heading"><div><h2>Ana ürün performansı</h2><p>Seçili şubenin dönem sonuçları; aylık kırılımı ilgili ürünün detayından açabilirsiniz.</p></div></div>
-    <div class="table-toolbar performance-product-toolbar">
-        <label class="toolbar-search"><span>Ürünlerde ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Kod veya ana ürün adı" /></label>
-        <label><span>Batch</span><select class="form-select" data-list-filter="batch"><option value="">Tümü</option><option value="complete">Tamamlandı</option><option value="pending">Bekleniyor</option></select></label>
-        <label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label>
-    </div>
-    <div class="table-responsive performance-table-scroll">
-        <table class="table compact-table performance-product-table">
-            <thead><tr>
-                <th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th>
-                <th><button class="sort-button" type="button" data-list-sort="calculation">Hesaplama türü <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="criterion">Kriter puanı <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="target">Hedef <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="actual">Gerçekleşme <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="ratio">H/G oranı <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="hgo">HGO puanı <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="total">Toplam puan <span></span></button></th>
-                <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="segmentRank">Segment sırası <span></span></button></th>
-                <th>Batch durumu</th><th class="text-end">İşlem</th>
-            </tr></thead>
-            <tbody>
-                @foreach (var product in Model.Products)
-                {
-                    var detailId = $"performance-product-{product.MainProductInstanceId}";
-                    var monthlyId = $"performance-product-months-{product.MainProductInstanceId}";
-                    var ratio = product.HgRatioPercent ?? 0;
-                    var rowClass = product.HasCompleteBatchData ? StatusClass(ratio) : "pending";
-                    <tr class="list-row performance-product-row @rowClass"
-                        data-detail-id="@detailId"
-                        data-search="@($"{product.ProductCode} {product.ProductName}".ToUpperInvariant())"
-                        data-batch="@(product.HasCompleteBatchData ? "complete" : "pending")"
-                        data-product="@product.ProductName"
-                        data-calculation="@Calculation(product.CalculationType)"
-                        data-criterion="@product.CriterionScore.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                        data-target="@product.TargetValue.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                        data-actual="@(product.ActualValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-1")"
-                        data-ratio="@(product.HgRatioPercent?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-1")"
-                        data-hgo="@(product.HgoScore?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-1")"
-                        data-total="@(product.TotalScore?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-1")"
-                        data-segment-rank="@(product.SegmentRank ?? int.MaxValue)">
-                        <td><strong>@product.ProductCode</strong><small>@product.ProductName</small></td>
-                        <td>@Calculation(product.CalculationType)</td>
-                        <td class="text-end numeric-cell">@product.CriterionScore.ToString("N2")</td>
-                        <td class="text-end numeric-cell">@product.TargetValue.ToString("N2")</td>
-                        <td class="text-end numeric-cell">@DecimalText(product.ActualValue)</td>
-                        <td class="text-end numeric-cell">@(product.HgRatioPercent.HasValue ? $"%{product.HgRatioPercent:N2}" : "-")</td>
-                        <td class="text-end numeric-cell">@DecimalText(product.HgoScore)</td>
-                        <td class="text-end numeric-cell"><strong>@DecimalText(product.TotalScore)</strong></td>
-                        <td class="text-end numeric-cell segment-rank-cell" title="Seçili şubede sıralamaya katılan @product.SegmentRankCandidateCount ana ürün içinde">
-                            @if (product.SegmentRank.HasValue)
-                            {
-                                <strong>@product.SegmentRank</strong>
-                            }
-                            else
-                            {
-                                <span>-</span>
-                            }
-                        </td>
-                        <td><span class="status-pill @(product.HasCompleteBatchData ? "active" : "warning")">@(product.HasCompleteBatchData ? "Tamamlandı" : "Bekleniyor")</span></td>
-                        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td>
-                    </tr>
-                    <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="11"><div class="collapse" id="@detailId"><div class="performance-product-detail">
-                        <div class="performance-detail-heading">
-                            <div><h3>Dönem özeti</h3><p>@product.ProductName için hesaplanan dönem sonucu.</p></div>
-                            <button class="btn btn-sm btn-outline-primary performance-monthly-toggle"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#@monthlyId"
-                                    aria-expanded="false"
-                                    aria-controls="@monthlyId">
-                                <span class="monthly-toggle-show">Ay bazında görüntüle</span>
-                                <span class="monthly-toggle-hide">Aylık görünümü kapat</span>
-                            </button>
-                        </div>
-                        <div class="performance-period-summary">
-                            <div><span>Dönem hedefi</span><strong>@product.TargetValue.ToString("N2")</strong></div>
-                            <div><span>Dönem gerçekleşmesi</span><strong>@DecimalText(product.ActualValue)</strong></div>
-                            <div><span>H/G oranı</span><strong>@(product.HgRatioPercent.HasValue ? $"%{product.HgRatioPercent:N2}" : "-")</strong></div>
-                            <div><span>Toplam puan</span><strong>@DecimalText(product.TotalScore)</strong></div>
-                            <div><span>Batch</span><strong>@(product.HasCompleteBatchData ? "Tamamlandı" : "Veri bekleniyor")</strong></div>
-                        </div>
-                        <div class="collapse performance-monthly-detail" id="@monthlyId">
-                            <div class="detail-section-heading"><h3>@product.ProductName aylık kırılımı</h3><p>Gerçekleşme ve batch tarihi salt okunurdur.</p></div>
-                            <div class="performance-month-detail-grid">
-                            @foreach (var month in product.Months)
-                            {
-                                var monthRatio = month.HgRatioPercent ?? 0;
-                                var monthClass = month.ActualValue.HasValue ? StatusClass(monthRatio) : "pending";
-                                var width = Math.Min(monthRatio, 100);
-                                <article class="performance-month-card @monthClass">
-                                    <div><strong>@month.MonthName</strong><span>@(month.ActualAsOfDate?.ToString("dd.MM.yyyy") ?? "Batch bekleniyor")</span></div>
-                                    <dl><dt>Hedef</dt><dd>@month.TargetValue.ToString("N2")</dd><dt>Gerçekleşme</dt><dd>@DecimalText(month.ActualValue)</dd><dt>H/G</dt><dd>@(month.HgRatioPercent.HasValue ? $"%{month.HgRatioPercent:N2}" : "-")</dd></dl>
-                                    <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
-                                </article>
-                            }
-                            </div>
-                        </div>
-                    </div></div></td></tr>
-                }
-                <tr class="empty-row @(Model.Products.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="11" class="empty-cell">Filtreye uygun ana ürün performansı yok.</td></tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="pagination-bar" data-list-pagination>
-        <div class="pagination-summary" data-list-summary>Ürünler hazırlanıyor</div>
-        <div class="pager-buttons"><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" title="İlk sayfa">«</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" title="Önceki sayfa">‹</button><span data-list-page-indicator>1 / 1</span><input class="form-control form-control-sm page-jump" type="number" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" /><button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" title="Sonraki sayfa">›</button><button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" title="Son sayfa">»</button></div>
-    </div>
-</section>

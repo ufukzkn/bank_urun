@@ -48,7 +48,7 @@ set name = excluded.name, is_active = true, updated_at = now();
 insert into main_product_instances (main_product_id, product_definition_type, year, term, created_at)
 select product.id, 'Main', period.year, period.term, now()
 from product_definitions product
-cross join (values (2024, 2), (2025, 2), (2026, 1), (2026, 2)) as period(year, term)
+cross join (values (2024, 1), (2024, 2), (2025, 1), (2025, 2), (2026, 1), (2026, 2)) as period(year, term)
 where product.product_type = 'Main'
   and product.code in ('AU','B1','D2','G1','K0','KR','KK','MA','MC','NB','SG','YP')
 on conflict (main_product_id, year, term) do nothing;
@@ -60,7 +60,7 @@ with ranked_main as (
   join product_definitions product on product.id = instance.main_product_id
   where product.product_type = 'Main'
     and product.code in ('AU','B1','D2','G1','K0','KR','KK','MA','MC','NB','SG','YP')
-    and (instance.year, instance.term) in ((2024,2),(2025,2),(2026,1),(2026,2))
+    and (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
 ), ranked_sub as (
   select product.id, row_number() over (order by product.code) as sub_rank, count(*) over () as sub_count
   from product_definitions product
@@ -80,7 +80,8 @@ insert into group_definitions (
 values
   ('1001', 'KARMA - 1', 'Karma', true, true, true, true, now(), now()),
   ('1002', 'KURUMSAL - 1', 'Kurumsal', true, true, true, true, now(), now()),
-  ('1003', 'TICARI - 1', 'Ticari', true, true, true, true, now(), now())
+  ('1003', 'TICARI - 1', 'Ticari', true, true, true, true, now(), now()),
+  ('1004', 'KOBİ - 1', 'Kobi', true, true, true, true, now(), now())
 on conflict (group_no) do update
 set name = excluded.name, group_segment = excluded.group_segment, is_active = true,
     branch_performance_enabled = true, miy_performance_enabled = true, scale_enabled = true,
@@ -119,7 +120,13 @@ values
   ('1003','3109','İstanbul Ticari Şubesi'), ('1003','3110','İzmir Ticari Şubesi'),
   ('1003','3111','Kayseri Ticari Şubesi'), ('1003','3112','Konya Ticari Şubesi'),
   ('1003','3113','Mersin Ticari Şubesi'), ('1003','3114','Samsun Ticari Şubesi'),
-  ('1003','3115','Şekerpınar Ticari Şubesi'), ('1003','3116','Trabzon Ticari Şubesi');
+  ('1003','3115','Şekerpınar Ticari Şubesi'), ('1003','3116','Trabzon Ticari Şubesi'),
+  ('1004','4101','Adana KOBİ Şubesi'), ('1004','4102','Ankara KOBİ Şubesi'),
+  ('1004','4103','Antalya KOBİ Şubesi'), ('1004','4104','Bursa KOBİ Şubesi'),
+  ('1004','4105','Denizli KOBİ Şubesi'), ('1004','4106','Gaziantep KOBİ Şubesi'),
+  ('1004','4107','İstanbul Anadolu KOBİ Şubesi'), ('1004','4108','İstanbul Avrupa KOBİ Şubesi'),
+  ('1004','4109','İzmir KOBİ Şubesi'), ('1004','4110','Kayseri KOBİ Şubesi'),
+  ('1004','4111','Konya KOBİ Şubesi'), ('1004','4112','Mersin KOBİ Şubesi');
 
 insert into branches (group_id, branch_code, name, created_at, updated_at)
 select groups.id, seed.branch_code, seed.name, now(), now()
@@ -128,21 +135,24 @@ join group_definitions groups on groups.group_no = seed.group_no
 on conflict (branch_code) do update
 set group_id = excluded.group_id, name = excluded.name, updated_at = now();
 
--- v15 owns these representative rules, segment distributions and batch rows.
+-- v17 owns these representative rules, segment distributions and batch rows.
 delete from main_product_parameters parameter
 using main_product_instances instance, product_definitions product
 where parameter.main_product_instance_id = instance.id
   and instance.main_product_id = product.id
   and product.product_type = 'Main'
   and product.code in ('AU','B1','D2','G1','K0','KR','KK','MA','MC','NB','SG','YP')
-  and (instance.year, instance.term) in ((2024,2),(2025,2),(2026,1),(2026,2));
+  and (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2));
 
 with parameter_seed(code, calculation_type, criterion_score) as (
   values
     ('AU','Average',3.00::numeric), ('B1','Cumulative',5.00::numeric),
+    ('D2','Cumulative',6.00::numeric),
     ('G1','Average',8.00::numeric), ('K0','Cumulative',5.00::numeric),
+    ('KR','Cumulative',8.00::numeric), ('KK','Average',10.00::numeric),
     ('MA','Average',21.00::numeric), ('MC','Average',7.00::numeric),
-    ('NB','Cumulative',14.00::numeric), ('YP','Cumulative',3.00::numeric)
+    ('NB','Cumulative',14.00::numeric), ('SG','Cumulative',10.00::numeric),
+    ('YP','Cumulative',3.00::numeric)
 )
 insert into main_product_parameters (
   group_id, main_product_instance_id, calculation_type, criterion_score,
@@ -152,8 +162,8 @@ from parameter_seed seed
 join product_definitions product on product.product_type = 'Main' and product.code = seed.code
 join main_product_instances instance on instance.main_product_id = product.id
 cross join group_definitions groups
-where groups.group_no in ('1001','1002','1003')
-  and (instance.year, instance.term) in ((2024,2),(2025,2),(2026,1),(2026,2))
+where groups.group_no in ('1001','1002','1003','1004')
+  and (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
 on conflict (group_id, main_product_instance_id) do update
 set calculation_type = excluded.calculation_type, criterion_score = excluded.criterion_score,
     is_active = true, updated_at = now();
@@ -188,8 +198,8 @@ cross join (values
   ('Bireysel', 4, 0.2000::numeric),
   ('Diger', 5, 0.1000::numeric)
 ) as distribution(segment, sort_order, target_share)
-where product.code in ('AU','B1','G1','K0','MA','MC','NB','YP')
-  and (instance.year, instance.term) in ((2024,2),(2025,2),(2026,1),(2026,2))
+where product.code in ('AU','B1','D2','G1','K0','KR','KK','MA','MC','NB','SG','YP')
+  and (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
 on conflict (main_product_parameter_id, performance_segment) do update
 set sort_order = excluded.sort_order,
     target_share = excluded.target_share,
@@ -205,6 +215,7 @@ with metric_scope as (
   select branch.id as branch_id, branch.group_id, branch.branch_code,
          parameter.id as parameter_id, parameter.calculation_type,
          instance.year, instance.term, product.code as product_code, month_value.month,
+         make_date(instance.year, month_value.month, 1) as month_start,
          (make_date(instance.year, month_value.month, 1) + interval '1 month - 1 day')::date as month_end
   from branches branch
   join mock_branch_seed seeded_branch on seeded_branch.branch_code = branch.branch_code
@@ -213,11 +224,10 @@ with metric_scope as (
   join product_definitions product on product.id = instance.main_product_id
   cross join lateral generate_series(
     case when instance.term = 1 then 1 else 7 end,
-    case when instance.year = 2026 and instance.term = 2 then 7
-         when instance.term = 1 then 6 else 12 end
+    case when instance.term = 1 then 6 else 12 end
   ) as month_value(month)
-  where product.code in ('AU','B1','G1','K0','MA','MC','NB','YP')
-    and (instance.year, instance.term) in ((2024,2),(2025,2),(2026,1),(2026,2))
+  where product.code in ('AU','B1','D2','G1','K0','KR','KK','MA','MC','NB','SG','YP')
+    and (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
 ), metric_values as (
   select scope.*,
          round((350000 + mod(scope.branch_code::integer * 37
@@ -233,10 +243,12 @@ with metric_scope as (
              when 0 then 0.58 when 1 then 0.69 when 2 then 0.79
              when 3 then 0.91 when 4 then 1.03 else 1.12 end
            + (mod(scope.branch_code::integer + scope.month, 5) - 2)::numeric / 100) as performance_factor,
-         mod(scope.branch_code::integer
-           + ascii(substr(scope.product_code,1,1)) * 3
-           + coalesce(ascii(substr(scope.product_code,2,1)), 0) * 5
-           + scope.month * 7 + scope.year, 101) = 0 as missing_batch
+         scope.year = 2026 and scope.term = 2
+           and scope.month_start <= current_date
+           and mod(scope.branch_code::integer
+            + ascii(substr(scope.product_code,1,1)) * 3
+            + coalesce(ascii(substr(scope.product_code,2,1)), 0) * 5
+            + scope.month * 7 + scope.year, 173) = 0 as missing_batch
   from metric_scope scope
 )
 insert into branch_main_product_monthly_metrics (
@@ -244,8 +256,9 @@ insert into branch_main_product_monthly_metrics (
   target_value, actual_value, actual_as_of_date, created_at, updated_at)
 select metric.group_id, metric.branch_id, metric.parameter_id, metric.month,
        metric.target_value,
-       case when metric.missing_batch then null else round(metric.target_value * metric.performance_factor, 2) end,
-       case when metric.missing_batch then null
+       case when metric.month_start > current_date or metric.missing_batch then null
+            else round(metric.target_value * metric.performance_factor, 2) end,
+       case when metric.month_start > current_date or metric.missing_batch then null
             when metric.year = 2026 and metric.term = 2 then least(current_date, metric.month_end)
             else metric.month_end end,
        now(), now()
@@ -255,12 +268,67 @@ set group_id = excluded.group_id, target_value = excluded.target_value,
     actual_value = excluded.actual_value, actual_as_of_date = excluded.actual_as_of_date,
     updated_at = now();
 
+with sub_metric_scope as (
+  select distinct branch.id as branch_id, branch.branch_code,
+         sub_product.id as sub_product_id, sub_product.code as sub_product_code,
+         instance.year, instance.term, month_value.month,
+         make_date(instance.year, month_value.month, 1) as month_start,
+         (make_date(instance.year, month_value.month, 1) + interval '1 month - 1 day')::date as month_end
+  from branches branch
+  join mock_branch_seed seeded_branch on seeded_branch.branch_code = branch.branch_code
+  join main_product_parameters parameter on parameter.group_id = branch.group_id
+  join main_product_instances instance on instance.id = parameter.main_product_instance_id
+  join sub_product_instances link on link.main_product_instance_id = instance.id
+  join product_definitions sub_product on sub_product.id = link.sub_product_id and sub_product.product_type = 'Sub'
+  cross join lateral generate_series(
+    case when instance.term = 1 then 1 else 7 end,
+    case when instance.term = 1 then 6 else 12 end
+  ) as month_value(month)
+  where (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
+), sub_metric_values as (
+  select scope.*,
+         round((90000 + mod(scope.branch_code::integer * 29
+           + ascii(substr(scope.sub_product_code,1,1)) * 83
+           + coalesce(ascii(substr(scope.sub_product_code,2,1)), 0) * 47
+           + scope.month * 997 + scope.year, 310000))::numeric, 2) as target_value,
+         greatest(0.45::numeric,
+           case mod(scope.branch_code::integer
+             + ascii(substr(scope.sub_product_code,1,1)) * 3
+             + coalesce(ascii(substr(scope.sub_product_code,2,1)), 0) * 5
+             + scope.year + scope.term * 13, 6)
+             when 0 then 0.58 when 1 then 0.69 when 2 then 0.79
+             when 3 then 0.91 when 4 then 1.03 else 1.12 end
+           + (mod(scope.branch_code::integer + scope.month, 5) - 2)::numeric / 100) as performance_factor,
+         scope.year = 2026 and scope.term = 2
+           and scope.month_start <= current_date
+           and mod(scope.branch_code::integer
+             + ascii(substr(scope.sub_product_code,1,1)) * 7
+             + coalesce(ascii(substr(scope.sub_product_code,2,1)), 0) * 11
+             + scope.month * 17 + scope.year, 173) = 0 as missing_batch
+  from sub_metric_scope scope
+)
+insert into branch_sub_product_monthly_metrics (
+  branch_id, sub_product_id, product_definition_type, year, term, month,
+  target_value, actual_value, actual_as_of_date, created_at, updated_at)
+select metric.branch_id, metric.sub_product_id, 'Sub', metric.year, metric.term, metric.month,
+       metric.target_value,
+       case when metric.month_start > current_date or metric.missing_batch then null
+            else round(metric.target_value * metric.performance_factor, 2) end,
+       case when metric.month_start > current_date or metric.missing_batch then null
+            when metric.year = 2026 and metric.term = 2 then least(current_date, metric.month_end)
+            else metric.month_end end,
+       now(), now()
+from sub_metric_values metric
+on conflict (branch_id, sub_product_id, year, term, month) do update
+set target_value = excluded.target_value, actual_value = excluded.actual_value,
+    actual_as_of_date = excluded.actual_as_of_date, updated_at = now();
+
 insert into audit_logs (action, entity_name, entity_key, description, actor, created_at)
-select 'SeedMockData', 'System', 'mock-v16',
-       '3 grup, 50 şube, 4 dönem, 96 parametre, 480 segment kuralı ve yaklaşık 7600 çeşitlendirilmiş aylık metrik yüklendi.',
+select 'SeedMockData', 'System', 'mock-v18',
+       '4 grup, 62 şube, 12 ana ürün, 6 dönem ve yaklaşık 58000 alt ürün aylık metriği yüklendi.',
        'seed-script', now()
 where not exists (
-  select 1 from audit_logs where action = 'SeedMockData' and entity_key = 'mock-v16'
+  select 1 from audit_logs where action = 'SeedMockData' and entity_key = 'mock-v18'
 );
 
 commit;

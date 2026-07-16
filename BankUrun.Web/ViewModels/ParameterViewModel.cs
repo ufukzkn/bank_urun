@@ -9,6 +9,7 @@ public class ParameterIndexViewModel
     public IReadOnlyList<ParameterProductOptionViewModel> Products { get; set; } = [];
     public IReadOnlyList<int> Years { get; set; } = [];
     public ParameterPageViewModel Page { get; set; } = new();
+    public SubProductTargetPageViewModel SubProductPage { get; set; } = new();
 }
 
 public class ParameterGroupOptionViewModel
@@ -192,4 +193,65 @@ public class ParameterIdInput
 {
     [Range(1, int.MaxValue)]
     public int Id { get; set; }
+}
+
+public class SubProductTargetQuery
+{
+    public int? GroupId { get; set; }
+    public int? MainProductInstanceId { get; set; }
+    public int? Year { get; set; }
+    public int? Term { get; set; }
+    public string Search { get; set; } = string.Empty;
+    public string SortKey { get; set; } = "year";
+    public string SortDirection { get; set; } = "desc";
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+}
+
+public class SubProductTargetPageViewModel
+{
+    public IReadOnlyList<SubProductTargetRowViewModel> Rows { get; set; } = [];
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; } = 1;
+}
+
+public class SubProductTargetRowViewModel
+{
+    public int SubProductId { get; set; }
+    public string SubProductCode { get; set; } = string.Empty;
+    public string SubProductName { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public IReadOnlyList<SubProductParentViewModel> ParentProducts { get; set; } = [];
+    public IReadOnlyList<ParameterBranchOptionViewModel> Branches { get; set; } = [];
+}
+
+public class SubProductParentViewModel
+{
+    public int MainProductInstanceId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+}
+
+public class SubProductTargetEditorViewModel
+{
+    public int SubProductId { get; set; }
+    public int BranchId { get; set; }
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public string SubProductCode { get; set; } = string.Empty;
+    public string SubProductName { get; set; } = string.Empty;
+    public string BranchLabel { get; set; } = string.Empty;
+    public IReadOnlyList<ParameterMonthlyMetricViewModel> Months { get; set; } = [];
+}
+
+public class SubProductMonthlyTargetsInput
+{
+    [Range(1, int.MaxValue)] public int SubProductId { get; set; }
+    [Range(1, int.MaxValue)] public int BranchId { get; set; }
+    [Range(2000, 2100)] public int Year { get; set; }
+    [Range(1, 2)] public int Term { get; set; }
+    public List<MonthlyTargetInput> Months { get; set; } = [];
 }

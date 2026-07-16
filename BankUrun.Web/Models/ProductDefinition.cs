@@ -12,4 +12,5 @@ public class ProductDefinition
 
     public ICollection<MainProductInstance> MainProductInstances { get; set; } = new List<MainProductInstance>();
     public ICollection<SubProductInstance> SubProductInstances { get; set; } = new List<SubProductInstance>();
+    public ICollection<BranchSubProductMonthlyMetric> SubProductMonthlyMetrics { get; set; } = new List<BranchSubProductMonthlyMetric>();
 }

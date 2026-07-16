@@ -56,7 +56,8 @@ public class ParameterManagementService(
             Groups = groups,
             Products = products,
             Years = products.Select(product => product.Year).Distinct().OrderByDescending(year => year).ToList(),
-            Page = await GetPageAsync(new ParameterQuery(), cancellationToken)
+            Page = await GetPageAsync(new ParameterQuery(), cancellationToken),
+            SubProductPage = await GetSubProductPageAsync(new SubProductTargetQuery(), cancellationToken)
         };
     }
 
@@ -166,6 +167,198 @@ public class ParameterManagementService(
             .FirstOrDefaultAsync(item => item.Id == parameterId, cancellationToken)
             ?? throw new InvalidOperationException("Parametre bulunamadı.");
         return await BuildTargetEditorAsync(parameter, branchId, cancellationToken);
+    }
+
+    public async Task<SubProductTargetPageViewModel> GetSubProductPageAsync(
+        SubProductTargetQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var links = await db.SubProductInstances.AsNoTracking()
+            .Include(link => link.SubProduct)
+            .Include(link => link.MainProductInstance).ThenInclude(instance => instance.MainProduct)
+            .Where(link => link.SubProduct.IsActive)
+            .ToListAsync(cancellationToken);
+        if (query.GroupId.HasValue)
+        {
+            var allowedInstances = await db.MainProductParameters.AsNoTracking()
+                .Where(parameter => parameter.GroupId == query.GroupId.Value && parameter.IsActive)
+                .Select(parameter => parameter.MainProductInstanceId)
+                .ToListAsync(cancellationToken);
+            links = links.Where(link => allowedInstances.Contains(link.MainProductInstanceId)).ToList();
+        }
+        if (query.MainProductInstanceId.HasValue)
+            links = links.Where(link => link.MainProductInstanceId == query.MainProductInstanceId.Value).ToList();
+        if (query.Year.HasValue)
+            links = links.Where(link => link.MainProductInstance.Year == query.Year.Value).ToList();
+        if (query.Term is 1 or 2)
+            links = links.Where(link => link.MainProductInstance.Term == query.Term.Value).ToList();
+        var search = query.Search?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            links = links.Where(link => ContainsTurkish(
+                $"{link.SubProduct.Code} {link.SubProduct.Name} {link.MainProductInstance.MainProduct.Code} {link.MainProductInstance.MainProduct.Name}", search)).ToList();
+        }
+
+        var grouped = links.GroupBy(link => new
+            {
+                link.SubProductId,
+                link.SubProduct.Code,
+                link.SubProduct.Name,
+                link.MainProductInstance.Year,
+                link.MainProductInstance.Term
+            })
+            .Select(group => new SubProductTargetRowViewModel
+            {
+                SubProductId = group.Key.SubProductId,
+                SubProductCode = group.Key.Code,
+                SubProductName = group.Key.Name,
+                Year = group.Key.Year,
+                Term = group.Key.Term,
+                ParentProducts = group.Select(link => new SubProductParentViewModel
+                {
+                    MainProductInstanceId = link.MainProductInstanceId,
+                    Code = link.MainProductInstance.MainProduct.Code,
+                    Name = link.MainProductInstance.MainProduct.Name
+                }).DistinctBy(parent => parent.MainProductInstanceId).OrderBy(parent => parent.Code).ToList()
+            }).ToList();
+        var comparer = StringComparer.Create(TurkishCulture, true);
+        var descending = string.Equals(query.SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        grouped = (query.SortKey?.Trim().ToLowerInvariant(), descending) switch
+        {
+            ("term", false) => grouped.OrderBy(row => row.Term).ThenByDescending(row => row.Year).ToList(),
+            ("term", true) => grouped.OrderByDescending(row => row.Term).ThenByDescending(row => row.Year).ToList(),
+            ("subproduct", false) => grouped.OrderBy(row => row.SubProductCode, comparer).ToList(),
+            ("subproduct", true) => grouped.OrderByDescending(row => row.SubProductCode, comparer).ToList(),
+            ("parent", false) => grouped.OrderBy(row => string.Join(' ', row.ParentProducts.Select(parent => parent.Code)), comparer).ToList(),
+            ("parent", true) => grouped.OrderByDescending(row => string.Join(' ', row.ParentProducts.Select(parent => parent.Code)), comparer).ToList(),
+            (_, true) => grouped.OrderByDescending(row => row.Year).ThenByDescending(row => row.Term).ThenBy(row => row.SubProductCode, comparer).ToList(),
+            _ => grouped.OrderBy(row => row.Year).ThenBy(row => row.Term).ThenBy(row => row.SubProductCode, comparer).ToList()
+        };
+        var pageSize = AllowedPageSizes.Contains(query.PageSize) ? query.PageSize : 10;
+        var totalCount = grouped.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (decimal)pageSize));
+        var page = Math.Clamp(query.Page, 1, totalPages);
+        var selected = grouped.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        var branches = await db.Branches.AsNoTracking().Include(branch => branch.Group)
+            .Where(branch => !query.GroupId.HasValue || branch.GroupId == query.GroupId.Value)
+            .OrderBy(branch => branch.BranchCode)
+            .Select(branch => new ParameterBranchOptionViewModel
+            {
+                Id = branch.Id,
+                GroupId = branch.GroupId,
+                BranchCode = branch.BranchCode,
+                Name = branch.Name,
+                GroupNo = branch.Group.GroupNo,
+                GroupName = branch.Group.Name,
+                GroupSegment = branch.Group.GroupSegment
+            }).ToListAsync(cancellationToken);
+        selected.ForEach(row => row.Branches = branches);
+        return new SubProductTargetPageViewModel
+        {
+            Rows = selected,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages
+        };
+    }
+
+    public async Task<SubProductTargetEditorViewModel> GetSubProductTargetEditorAsync(
+        int subProductId, int branchId, int year, int term, CancellationToken cancellationToken = default)
+    {
+        _ = calculator.GetTermMonths(term);
+        var product = await db.ProductDefinitions.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == subProductId && item.Type == ProductType.Sub, cancellationToken)
+            ?? throw new InvalidOperationException("Alt ürün bulunamadı.");
+        var branch = await db.Branches.AsNoTracking().FirstOrDefaultAsync(item => item.Id == branchId, cancellationToken)
+            ?? throw new InvalidOperationException("Şube bulunamadı.");
+        var mapped = await db.SubProductInstances.AsNoTracking()
+            .AnyAsync(link => link.SubProductId == subProductId
+                && link.MainProductInstance.Year == year && link.MainProductInstance.Term == term, cancellationToken);
+        if (!mapped) throw new InvalidOperationException("Alt ürün seçili dönemde bir ana ürüne bağlı değil.");
+        var metrics = await db.BranchSubProductMonthlyMetrics.AsNoTracking()
+            .Where(item => item.BranchId == branchId && item.SubProductId == subProductId && item.Year == year && item.Term == term)
+            .ToDictionaryAsync(item => item.Month, cancellationToken);
+        return new SubProductTargetEditorViewModel
+        {
+            SubProductId = product.Id,
+            BranchId = branch.Id,
+            Year = year,
+            Term = term,
+            SubProductCode = product.Code,
+            SubProductName = product.Name,
+            BranchLabel = $"{branch.BranchCode} - {branch.Name}",
+            Months = calculator.GetTermMonths(term).Select(month =>
+            {
+                metrics.TryGetValue(month, out var metric);
+                return new ParameterMonthlyMetricViewModel
+                {
+                    Month = month,
+                    MonthName = TurkishMonthNames[month],
+                    TargetValue = metric?.TargetValue ?? 0,
+                    ActualValue = metric?.ActualValue,
+                    ActualAsOfDate = metric?.ActualAsOfDate
+                };
+            }).ToList()
+        };
+    }
+
+    public async Task UpdateSubProductTargetsAsync(
+        SubProductMonthlyTargetsInput input, string actor, CancellationToken cancellationToken = default)
+    {
+        var termMonths = calculator.GetTermMonths(input.Term);
+        if (input.Months.Count != termMonths.Count
+            || input.Months.Select(month => month.Month).Distinct().Count() != termMonths.Count
+            || input.Months.Select(month => month.Month).Except(termMonths).Any()
+            || input.Months.Any(month => month.TargetValue < 0))
+            throw new InvalidOperationException("Dönemin altı aylık hedeflerini eksiksiz ve geçerli girin.");
+        var branch = await db.Branches.FirstOrDefaultAsync(item => item.Id == input.BranchId, cancellationToken)
+            ?? throw new InvalidOperationException("Şube bulunamadı.");
+        var product = await db.ProductDefinitions.FirstOrDefaultAsync(item => item.Id == input.SubProductId && item.Type == ProductType.Sub, cancellationToken)
+            ?? throw new InvalidOperationException("Alt ürün bulunamadı.");
+        var mapped = await db.SubProductInstances.AsNoTracking().AnyAsync(link =>
+            link.SubProductId == input.SubProductId && link.MainProductInstance.Year == input.Year
+            && link.MainProductInstance.Term == input.Term, cancellationToken);
+        if (!mapped) throw new InvalidOperationException("Alt ürün seçili dönemde bir ana ürüne bağlı değil.");
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        var stored = await db.BranchSubProductMonthlyMetrics
+            .Where(item => item.BranchId == input.BranchId && item.SubProductId == input.SubProductId
+                && item.Year == input.Year && item.Term == input.Term)
+            .ToDictionaryAsync(item => item.Month, cancellationToken);
+        foreach (var monthInput in input.Months)
+        {
+            if (stored.TryGetValue(monthInput.Month, out var metric))
+            {
+                metric.TargetValue = Round(monthInput.TargetValue);
+                metric.UpdatedAt = now;
+            }
+            else
+            {
+                db.BranchSubProductMonthlyMetrics.Add(new BranchSubProductMonthlyMetric
+                {
+                    BranchId = input.BranchId,
+                    SubProductId = input.SubProductId,
+                    Year = input.Year,
+                    Term = input.Term,
+                    Month = monthInput.Month,
+                    TargetValue = Round(monthInput.TargetValue),
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+        }
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "UpdateSubProductTargets",
+            EntityName = "BranchSubProductMonthlyMetric",
+            EntityKey = $"{input.BranchId}:{input.SubProductId}:{input.Year}:{input.Term}",
+            Description = $"{branch.BranchCode} şubesi için {product.Code} alt ürün hedefleri güncellendi.",
+            Actor = actor,
+            CreatedAt = now
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task UpsertParameterAsync(MainProductParameterInput input, string actor, CancellationToken cancellationToken = default)
