@@ -1,0 +1,21 @@
+<div class="action-toast-backdrop" id="actionToastBackdrop"></div>
+<div class="toast-container action-toast-container">
+    <div id="actionConfirmToast" class="toast action-confirm-toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto" id="toastTitle">İşlemi onayla</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Kapat"></button>
+        </div>
+        <div class="toast-body">
+            <p id="toastMessage" class="toast-message">Bu işlemi yapmak istediğinize emin misiniz?</p>
+            <div class="confirm-impact d-none" data-confirm-impact aria-live="polite"></div>
+            <label class="confirm-code-field d-none" data-confirm-code-wrap>
+                <span>Onaylamak için kodu yazın: <strong data-confirm-code-label></strong></span>
+                <input class="form-control form-control-sm" type="text" autocomplete="off" data-confirm-code-input />
+            </label>
+            <div class="toast-actions" id="standardToastActions">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-toast-cancel>Vazgeç</button>
+                <button class="btn btn-sm btn-primary" type="button" data-toast-confirm>Onayla</button>
+            </div>
+        </div>
+    </div>
+</div>

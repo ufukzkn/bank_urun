@@ -3,6 +3,7 @@ using System;
 using BankUrun.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BankUrun.Web.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260717114618_AddPortfolioPerformanceModel")]
+    partial class AddPortfolioPerformanceModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -312,7 +315,7 @@ namespace BankUrun.Web.Migrations
 
                     b.ToTable("main_product_instances", null, t =>
                         {
-                            t.HasCheckConstraint("ck_main_product_instances_term_range", "term in (1, 2)");
+                            t.HasCheckConstraint("ck_main_product_instances_term_range", "term between 1 and 12");
 
                             t.HasCheckConstraint("ck_main_product_instances_type", "product_definition_type = 'Main'");
 
@@ -545,15 +548,9 @@ namespace BankUrun.Web.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("portfolio_id");
 
-                    b.Property<string>("ProductDefinitionType")
-                        .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
-                        .HasColumnName("product_definition_type");
-
-                    b.Property<int>("SubProductId")
+                    b.Property<int>("SubProductInstanceId")
                         .HasColumnType("integer")
-                        .HasColumnName("sub_product_id");
+                        .HasColumnName("sub_product_instance_id");
 
                     b.Property<int>("Term")
                         .HasColumnType("integer")
@@ -571,9 +568,9 @@ namespace BankUrun.Web.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SubProductId", "ProductDefinitionType");
+                    b.HasIndex("SubProductInstanceId");
 
-                    b.HasIndex("PortfolioId", "SubProductId", "Year", "Term", "Month")
+                    b.HasIndex("PortfolioId", "SubProductInstanceId", "Year", "Term", "Month")
                         .IsUnique();
 
                     b.ToTable("portfolio_sub_product_monthly_metrics", null, t =>
@@ -583,8 +580,6 @@ namespace BankUrun.Web.Migrations
                             t.HasCheckConstraint("ck_portfolio_sub_metrics_month", "month between 1 and 12");
 
                             t.HasCheckConstraint("ck_portfolio_sub_metrics_term", "term in (1, 2)");
-
-                            t.HasCheckConstraint("ck_portfolio_sub_metrics_type", "product_definition_type = 'Sub'");
 
                             t.HasCheckConstraint("ck_portfolio_sub_metrics_value", "actual_value is null or actual_value >= 0");
 
@@ -990,16 +985,15 @@ namespace BankUrun.Web.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("BankUrun.Web.Models.ProductDefinition", "SubProduct")
+                    b.HasOne("BankUrun.Web.Models.SubProductInstance", "SubProductInstance")
                         .WithMany("PortfolioMonthlyMetrics")
-                        .HasForeignKey("SubProductId", "ProductDefinitionType")
-                        .HasPrincipalKey("Id", "Type")
+                        .HasForeignKey("SubProductInstanceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Portfolio");
 
-                    b.Navigation("SubProduct");
+                    b.Navigation("SubProductInstance");
                 });
 
             modelBuilder.Entity("BankUrun.Web.Models.ProductGamut", b =>
@@ -1099,8 +1093,6 @@ namespace BankUrun.Web.Migrations
 
                     b.Navigation("MainProductInstances");
 
-                    b.Navigation("PortfolioMonthlyMetrics");
-
                     b.Navigation("ProductGamutAssignments");
 
                     b.Navigation("SubProductInstances");
@@ -1111,6 +1103,11 @@ namespace BankUrun.Web.Migrations
                     b.Navigation("MainProductAssignments");
 
                     b.Navigation("Portfolios");
+                });
+
+            modelBuilder.Entity("BankUrun.Web.Models.SubProductInstance", b =>
+                {
+                    b.Navigation("PortfolioMonthlyMetrics");
                 });
 #pragma warning restore 612, 618
         }

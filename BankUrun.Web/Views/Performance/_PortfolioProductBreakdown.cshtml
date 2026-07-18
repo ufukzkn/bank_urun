@@ -1,0 +1,35 @@
+@using BankUrun.Web.Models
+@model BankUrun.Web.ViewModels.DashboardPortfolioDetailViewModel
+@functions {
+    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+    private static string Calculation(MainProductCalculationType type) => type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+}
+<div class="performance-detail-section">
+    <div class="detail-section-heading"><h3>Ana ürün kırılımı</h3><p>Portföye ürün gamı üzerinden atanan ana ürünlerin dönem sonuçları.</p></div>
+    <div class="portfolio-product-breakdown-grid">
+        @foreach (var product in Model.Products)
+        {
+            <article>
+                <div class="portfolio-product-breakdown-heading">
+                    <div><strong>@product.ProductCode</strong><span>@product.ProductName</span></div>
+                    <span class="calculation-badge">@Calculation(product.CalculationType)</span>
+                </div>
+                <dl>
+                    <dt>Kriter</dt><dd>@product.CriterionScore.ToString("N2")</dd>
+                    <dt>Hedef</dt><dd>@product.TargetValue.ToString("N2")</dd>
+                    <dt>Gerçekleşme</dt><dd>@Text(product.ActualValue)</dd>
+                    <dt>H/G</dt><dd>@(product.HgRatioPercent.HasValue ? $"%{product.HgRatioPercent:N2}" : "—")</dd>
+                    <dt>Toplam puan</dt><dd>@Text(product.TotalScore)</dd>
+                </dl>
+                @if (!product.HasParameterConfiguration)
+                {
+                    <span class="data-waiting-badge">Parametre bekleniyor</span>
+                }
+                else if (!product.HasCompleteTargetData)
+                {
+                    <span class="data-waiting-badge">Hedef bekleniyor</span>
+                }
+            </article>
+        }
+    </div>
+</div>

@@ -62,6 +62,95 @@ public class ProductsController(IProductManagementService productService, IProdu
             "Ürün kalıcı silindi.");
     }
 
+    [HttpGet]
+    public Task<IActionResult> ProductDeleteImpact(
+        int productId,
+        ProductType type,
+        int? mainProductInstanceId,
+        int? subProductInstanceId,
+        string deleteScope = "Single",
+        CancellationToken cancellationToken = default) =>
+        ExecuteImpactAsync(() => productService.GetProductDeleteImpactAsync(new ProductIdInput
+        {
+            ProductId = productId,
+            Type = type,
+            MainProductInstanceId = mainProductInstanceId,
+            SubProductInstanceId = subProductInstanceId,
+            DeleteScope = deleteScope
+        }, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveProductGamut(ProductGamutInput input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Ürün gamı bilgilerini kontrol edin.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return await ExecuteAndRedirectAsync(
+            () => productService.UpsertProductGamutAsync(input, Actor, cancellationToken),
+            input.Id == 0 ? "Ürün gamı oluşturuldu." : "Ürün gamı güncellendi.");
+    }
+
+    [HttpGet]
+    public Task<IActionResult> ProductGamutDeleteImpact(int id, CancellationToken cancellationToken) =>
+        ExecuteImpactAsync(() => productService.GetProductGamutDeleteImpactAsync(id, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteProductGamut(LinkIdInput input, CancellationToken cancellationToken) =>
+        await ExecuteAndRedirectAsync(
+            () => productService.DeleteProductGamutAsync(input, Actor, cancellationToken),
+            "Ürün gamı silindi.");
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveProductGamutAssignment(ProductGamutAssignmentInput input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Ürün gamı atamasını kontrol edin.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return await ExecuteAndRedirectAsync(
+            () => productService.UpsertProductGamutAssignmentAsync(input, Actor, cancellationToken),
+            input.Id == 0 ? "Ana ürün ürün gamına eklendi." : "Ürün gamı ataması güncellendi.");
+    }
+
+    [HttpGet]
+    public Task<IActionResult> ProductGamutAssignmentRemovalImpact(int id, CancellationToken cancellationToken) =>
+        ExecuteImpactAsync(() => productService.GetProductGamutAssignmentRemovalImpactAsync(id, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteProductGamutAssignment(LinkIdInput input, CancellationToken cancellationToken) =>
+        await ExecuteAndRedirectAsync(
+            () => productService.DeleteProductGamutAssignmentAsync(input, Actor, cancellationToken),
+            "Ana ürün ürün gamından çıkarıldı.");
+
+    [HttpGet]
+    public Task<IActionResult> GroupMainProductRemovalImpact(
+        int groupId, int mainProductId, int effectiveFromYear, int effectiveFromTerm,
+        CancellationToken cancellationToken) =>
+        ExecuteImpactAsync(() => productService.GetGroupMainProductRemovalImpactAsync(new GroupMainProductRemovalInput
+        {
+            GroupId = groupId,
+            MainProductId = mainProductId,
+            EffectiveFromYear = effectiveFromYear,
+            EffectiveFromTerm = effectiveFromTerm
+        }, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveMainProductFromGroup(
+        GroupMainProductRemovalInput input, CancellationToken cancellationToken) =>
+        await ExecuteAndRedirectAsync(
+            () => productService.RemoveMainProductFromGroupAsync(input, Actor, cancellationToken),
+            "Ana ürün seçili dönemden itibaren grubun ürün gamlarından çıkarıldı; geçmiş korundu.");
+
     [HttpGet("/code-suggestion")]
     public async Task<IActionResult> SuggestCode(ProductType type, string code, int? mainProductInstanceId, CancellationToken cancellationToken)
     {
@@ -97,5 +186,17 @@ public class ProductsController(IProductManagementService productService, IProdu
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    private static async Task<IActionResult> ExecuteImpactAsync(Func<Task<ManagementImpactViewModel>> action)
+    {
+        try
+        {
+            return new JsonResult(await action());
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
     }
 }

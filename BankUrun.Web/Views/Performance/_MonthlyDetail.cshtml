@@ -1,41 +1,29 @@
 @model BankUrun.Web.ViewModels.DashboardMonthlyDetailViewModel
 @functions {
-    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
-    private static string Calculation(BankUrun.Web.Models.MainProductCalculationType type) => type == BankUrun.Web.Models.MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+    private static string Calculation(BankUrun.Web.Models.MainProductCalculationType type) =>
+        type == BankUrun.Web.Models.MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
 }
 <div class="performance-product-detail">
-    <div class="performance-detail-heading"><div><h3>@Model.Title</h3><p>@Model.Subtitle · @Calculation(Model.CalculationType)</p></div></div>
-    <details class="performance-detail-disclosure">
-        <summary><span>Aylık gidişatı göster</span><small>6 aylık hedef, gerçekleşme ve H/G</small></summary>
-        <div class="performance-monthly-detail">
-            <div class="detail-section-heading"><h3>Aylık gidişat</h3><p>Gerçekleşme ve batch tarihi salt okunurdur.</p></div>
-            <div class="performance-month-detail-grid">
-        @foreach (var month in Model.Months)
-        {
-            var width = Math.Min(month.HgRatioPercent ?? 0, 100);
-            <article class="performance-month-card @(month.ActualValue.HasValue ? "good" : "pending")">
-                <div><strong>@month.MonthName</strong><span>@(month.ActualAsOfDate?.ToString("dd.MM.yyyy") ?? "Batch bekleniyor")</span></div>
-                <dl><dt>Hedef</dt><dd>@month.TargetValue.ToString("N2")</dd><dt>Gerçekleşme</dt><dd>@Text(month.ActualValue)</dd><dt>H/G</dt><dd>@(month.HgRatioPercent.HasValue ? $"%{month.HgRatioPercent:N2}" : "—")</dd></dl>
-                <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
-            </article>
-        }
-            </div>
+    <div class="performance-detail-heading">
+        <div>
+            <h3>@Model.Title</h3>
+            <p>@Model.Subtitle · @Calculation(Model.CalculationType)</p>
         </div>
-    </details>
-    <details class="performance-detail-disclosure">
-        <summary><span>Alt ürün katkılarını göster</span><small>Hedef ve gerçekleşmeye katkı sağlayan ürünler</small></summary>
-        <div class="sub-product-contribution-section">
-            <div class="detail-section-heading"><h3>Alt ürün katkıları</h3><p>Ortak alt ürünün değeri bağlı olduğu her ana ürüne tam olarak katılır.</p></div>
-            @if (Model.Contributions.Count == 0) { <div class="inline-empty-state">Alt ürün bağlantısı yok.</div> }
-            else
-            {
-                <div class="sub-product-contribution-grid">
-                @foreach (var item in Model.Contributions)
-                {
-                    <article><div><strong>@item.Code</strong><span>@item.Name</span></div><dl><dt>Hedef</dt><dd>@item.TargetValue.ToString("N2")</dd><dt>Gerçekleşme</dt><dd>@Text(item.ActualValue)</dd></dl></article>
-                }
-                </div>
-            }
-        </div>
-    </details>
+    </div>
+    <div class="performance-detail-actions" role="group" aria-label="Detay bölümleri">
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-lazy-performance-section="months"
+                data-lazy-performance-url="@ViewData["MonthsUrl"]"
+                aria-expanded="false">
+            Aylık gidişatı göster
+        </button>
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-lazy-performance-section="contributions"
+                data-lazy-performance-url="@ViewData["ContributionsUrl"]"
+                aria-expanded="false">
+            Alt ürün katkılarını göster
+        </button>
+    </div>
+    <div class="performance-detail-section-target" data-lazy-performance-target="months" hidden></div>
+    <div class="performance-detail-section-target" data-lazy-performance-target="contributions" hidden></div>
 </div>

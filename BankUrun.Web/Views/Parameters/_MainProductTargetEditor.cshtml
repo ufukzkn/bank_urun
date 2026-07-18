@@ -1,0 +1,21 @@
+@model BankUrun.Web.ViewModels.MainProductTargetEditorViewModel
+
+<form asp-controller="Parameters" asp-action="UpdateMainProductTargets" method="post" class="monthly-target-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ParameterId" value="@Model.ParameterId" />
+    <input type="hidden" name="PortfolioId" value="@Model.PortfolioId" />
+    <div class="sub-target-editor-heading"><strong>@Model.PortfolioLabel</strong><span>@Model.Year / @Model.Term. Dönem · @Model.MainProductLabel</span></div>
+    <div class="monthly-metric-grid">
+    @for (var index = 0; index < Model.Months.Count; index++)
+    {
+        var month = Model.Months[index];
+        <div class="month-metric-card">
+            <div class="month-metric-heading"><strong>@month.MonthName</strong><span class="@(month.HasStoredTarget ? "" : "is-waiting")">@(month.HasStoredTarget ? "Hedef girildi" : "Yeni hedef")</span></div>
+            <input type="hidden" name="Months[@index].Month" value="@month.Month" />
+            <label><span>Ana ürün hedefi</span><input class="form-control form-control-sm numeric-input" type="number" name="Months[@index].TargetValue" value="@month.TargetValue" min="0" step="0.01" required /></label>
+        </div>
+    }
+    </div>
+    <p class="inline-help-note">Alt ürünlerin hedefi bulunmaz. Bu hedef, portföydeki bağlı alt ürün gerçekleşmeleriyle karşılaştırılır.</p>
+    <div class="detail-command-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Bu portföyün ana ürün hedeflerini güncellemek istediğinize emin misiniz?">Ana ürün hedeflerini kaydet</button></div>
+</form>

@@ -13,6 +13,5 @@ public class MainProductParameter
 
     public GroupDefinition Group { get; set; } = null!;
     public MainProductInstance MainProductInstance { get; set; } = null!;
-    public ICollection<MainProductSegmentRule> SegmentRules { get; set; } = new List<MainProductSegmentRule>();
-    public ICollection<BranchMainProductMonthlyMetric> MonthlyMetrics { get; set; } = new List<BranchMainProductMonthlyMetric>();
+    public ICollection<PortfolioMainProductMonthlyTarget> PortfolioMonthlyTargets { get; set; } = new List<PortfolioMainProductMonthlyTarget>();
 }

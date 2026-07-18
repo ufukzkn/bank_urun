@@ -1,308 +1,94 @@
 @using BankUrun.Web.Models
 @model BankUrun.Web.ViewModels.ProductIndexViewModel
-
 @{
     ViewData["Title"] = "Ürün Kataloğu";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
 }
 
-<section class="page-title">
-    <div>
-        <h1>Ürün Kataloğu</h1>
-        <p>Ana ürün, alt ürün ve dönem bağlantıları.</p>
+<section class="page-title"><div><h1>Ürün Kataloğu</h1><p>Ana ürün, alt ürün ve grup bazlı ürün gamlarını yönetin.</p></div></section>
+@if (TempData["Success"] is string success) { <div class="alert alert-success action-alert page-alert" role="alert">@success</div> }
+@if (TempData["Error"] is string error) { <div class="alert alert-danger action-alert page-alert" role="alert">@error</div> }
+
+<div data-product-management>
+    <nav class="segmented-control segmented-control--large catalog-mode-picker" aria-label="Ürün kataloğu çalışma biçimi" data-segmented-control>
+        <button class="is-active" type="button" data-segmented-value="products" data-product-mode="products" aria-pressed="true"><span>Ana ürün / alt ürün</span><small>Dönemsel ürün bağlantılarını yönetin</small></button>
+        <button type="button" data-segmented-value="gamuts" data-product-mode="gamuts" aria-pressed="false"><span>Ürün gamları</span><small>Grupların ürün kapsamını yönetin</small></button>
+    </nav>
+
+    <div data-product-mode-panel="products">
+        <section class="workspace-grid compact-workspace-grid">
+            <div class="surface-panel create-panel compact-create-panel product-create-panel" data-product-create>
+                <div class="panel-heading"><div><h2>Ürün oluştur</h2><p>Ana ürün veya seçili ana ürün altında alt ürün ekleyin.</p></div></div>
+                <form asp-action="CreateProduct" method="post" class="stack-form compact-stack-form">
+                    @Html.AntiForgeryToken()
+                    <div class="segmented-control segmented-control--compact" role="group" aria-label="Oluşturulacak ürün türü" data-segmented-control data-segmented-input="#productType"><button class="is-active" type="button" data-segmented-value="Main" aria-pressed="true">Ana ürün</button><button type="button" data-segmented-value="Sub" aria-pressed="false">Alt ürün</button><input type="hidden" name="Type" id="productType" value="@ProductType.Main" /></div>
+                    <div class="segmented-field"><span>Kod oluşturma biçimi</span><div class="segmented-control segmented-control--compact" role="group" aria-label="Ürün kodu oluşturma biçimi" data-segmented-control data-segmented-input="#codeMode"><button class="is-active" type="button" data-segmented-value="Auto" aria-pressed="true">Otomatik</button><button type="button" data-segmented-value="Manual" aria-pressed="false">Manuel</button><input type="hidden" name="CodeMode" id="codeMode" value="Auto" /></div></div>
+                    <label id="createMainProductWrap" class="sub-product-field"><span>Bağlı ana ürün</span><div class="combo" id="mainProductCombo"><input class="form-control combobox-input" type="search" id="createMainProductSearch" placeholder="Kod, ad veya yıl/dönem ara" autocomplete="off" /><div class="combo-menu" id="mainProductOptions" role="listbox">@foreach (var product in activeMainProducts) { <button class="combo-option" type="button" role="option" data-id="@product.Id" data-label="@product.Label"><strong>@product.Code</strong><span>@product.Name</span><small>@product.Year/@product.Term</small></button> }<div class="combo-empty">Uygun ana ürün yok</div></div></div><input type="hidden" name="MainProductInstanceId" id="createMainProductId" /></label>
+                    <label id="manualCodeWrap" class="manual-code-wrap"><span>Manuel kod</span><input class="form-control code-input" type="text" name="ManualCode" id="manualCode" maxlength="2" autocomplete="off" /><small id="codeSuggestion" class="form-text"></small></label>
+                    <label><span>Ad</span><input class="form-control" type="text" name="Name" maxlength="180" required /></label>
+                    <div class="form-row" id="periodFields"><label><span>Yıl</span><input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required /></label><label><span>Dönem</span><select class="form-select" name="Term" required><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select></label></div>
+                    <button class="btn btn-primary" type="submit">Ürünü oluştur</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="surface-panel table-panel compact-list-panel" data-list="products">
+            <div class="table-toolbar compact-table-toolbar"><label class="toolbar-search"><span>Liste içinde ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Kod, ana ürün veya alt ürün adı" /></label><label><span>Yıl</span><input class="form-control" type="number" data-list-filter="year" min="2000" max="2100" /></label><label><span>Dönem</span><input class="form-control" type="number" data-list-filter="term" min="1" max="2" /></label><label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label><label class="check-line"><input class="form-check-input" type="checkbox" data-list-filter="includeInactive" /><span>Pasifler</span></label><label class="check-line"><input class="form-check-input" type="checkbox" data-list-filter="showMainProducts" checked /><span>Ana ürünler</span></label><label class="check-line"><input class="form-check-input" type="checkbox" data-list-filter="showSubProducts" checked /><span>Alt ürünler</span></label></div>
+            <div class="table-responsive"><table class="table product-table"><thead><tr><th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="mainCode">Ana ürün <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="subCode">Alt kod <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="subName">Alt ürün adı <span></span></button></th><th class="text-end">İşlem</th></tr></thead><tbody>
+            @for (var index = 0; index < Model.Rows.Count; index++)
+            {
+                var row = Model.Rows[index];
+                var detailId = $"product-detail-{row.MainProductInstanceId}-{row.SubProductInstanceId ?? 0}-{index}";
+                <tr class="list-row product-row" data-detail-id="@detailId" data-year="@row.Year" data-term="@row.Term" data-main-code="@row.MainProductCode" data-sub-code="@(row.SubProductCode ?? "")" data-sub-name="@(row.SubProductName ?? "")" data-has-sub="@(row.SubProductId.HasValue ? "true" : "false")" data-active="@((row.MainProductActive && (!row.SubProductId.HasValue || row.SubProductActive == true)) ? "true" : "false")" data-search="@($"{row.Year} {row.Term} {row.MainProductCode} {row.MainProductName} {row.SubProductCode} {row.SubProductName}".ToUpperInvariant())"><td>@row.Year</td><td>@row.Term</td><td><strong>@row.MainProductCode</strong><small>@row.MainProductName</small></td><td>@(row.SubProductCode ?? "—")</td><td>@(row.SubProductName ?? "Alt ürün yok")</td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td></tr>
+                <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="6"><div class="collapse" id="@detailId"><div class="actions-panel"><div class="status-line"><span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>@if (row.SubProductId.HasValue) { <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span> }</div><div class="actions-cell">
+                    <span class="action-group-title">Ana ürün</span>
+                    <form asp-action="RenameProduct" method="post" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><input class="form-control form-control-sm code-edit-input" name="Code" value="@row.MainProductCode" maxlength="2" /><input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" /><button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Ana ürün kodu ve adı bütün dönemlerde güncellenecek. Emin misiniz?">Güncelle</button></form>
+                    <form asp-action="DeactivateProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürün bütün dönemlerde pasifleştirilecek ve yeni performans hesaplarından çıkarılacak; bağlı alt ürünler ile geçmiş hedef/gerçekleşmeler korunacak. Emin misiniz?">Pasifleştir</button></form>
+                    <form asp-action="DeleteProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" /><input type="hidden" name="DeleteScope" value="Single" /><button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Ana ürünün yalnız seçili dönem kaydı silinecek." data-impact-url="@Url.Action("ProductDeleteImpact", "Products", new { productId = row.MainProductId, type = ProductType.Main, mainProductInstanceId = row.MainProductInstanceId, deleteScope = "Single" })">Dönemi sil</button></form>
+                    <form asp-action="DeleteProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" /><input type="hidden" name="DeleteScope" value="All" /><button class="btn btn-sm btn-danger" type="submit" data-confirm="Ana ürün bütün dönem, parametre, hedef ve atamalarıyla silinecek. Yalnız yetim alt ürünler temizlenecek." data-confirm-code="@row.MainProductCode" data-impact-url="@Url.Action("ProductDeleteImpact", "Products", new { productId = row.MainProductId, type = ProductType.Main, mainProductInstanceId = row.MainProductInstanceId, deleteScope = "All" })">Sistemden sil</button></form>
+                    @if (row.SubProductId.HasValue)
+                    {
+                        <span class="action-group-title">Alt ürün</span>
+                        <form asp-action="RenameProduct" method="post" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Sub" /><input type="hidden" name="ProductId" value="@row.SubProductId" /><input class="form-control form-control-sm code-edit-input" name="Code" value="@row.SubProductCode" maxlength="2" /><input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" /><button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Bu alt ürün koduna sahip bütün bağlantılar güncellenecek. Emin misiniz?">Güncelle</button></form>
+                        <form asp-action="DeactivateProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Sub" /><input type="hidden" name="ProductId" value="@row.SubProductId" /><button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Alt ürün bütün ana ürün bağlantılarında pasifleştirilecek ve yeni gerçekleşme katkılarından çıkarılacak; geçmiş ham gerçekleşmeler korunacak. Emin misiniz?">Pasifleştir</button></form>
+                        <form asp-action="DeleteProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Sub" /><input type="hidden" name="ProductId" value="@row.SubProductId" /><input type="hidden" name="SubProductInstanceId" value="@row.SubProductInstanceId" /><input type="hidden" name="DeleteScope" value="Single" /><button class="btn btn-sm btn-outline-danger" type="submit" data-confirm="Alt ürünün seçili ana ürün/dönem bağlantısı kaldırılacak." data-impact-url="@Url.Action("ProductDeleteImpact", "Products", new { productId = row.SubProductId, type = ProductType.Sub, subProductInstanceId = row.SubProductInstanceId, deleteScope = "Single" })">Bağlantıyı sil</button></form>
+                    }
+                </div></div></div></td></tr>
+            }
+            <tr class="empty-row @(Model.Rows.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="6" class="empty-cell">Filtreye uygun ürün yok.</td></tr>
+            </tbody></table></div>
+            @await Html.PartialAsync("_ListPager")
+        </section>
     </div>
-</section>
 
-<section class="workspace-grid compact-workspace-grid">
-    <div class="surface-panel create-panel compact-create-panel product-create-panel" data-product-create>
-        <div class="panel-heading">
-            <div>
-                <h1>Ürün oluştur</h1>
-                <p>Ana ürün veya seçili ana ürün altında alt ürün ekle.</p>
-            </div>
-        </div>
+    <div class="d-none" data-product-mode-panel="gamuts">
+        <section class="workspace-grid compact-workspace-grid gamut-create-grid">
+            <div class="surface-panel create-panel compact-create-panel"><div class="panel-heading"><div><h2>Ürün gamı oluştur</h2><p>Gruba özel ürün kapsamı tanımlayın.</p></div></div><form asp-action="SaveProductGamut" method="post" class="stack-form compact-stack-form">@Html.AntiForgeryToken()<label><span>Grup</span><select class="form-select" name="GroupId" required>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.Label</option> }</select></label><div class="form-row compact-form-row"><label><span>Gam kodu</span><input class="form-control code-input" name="Code" maxlength="2" pattern="[A-Za-z0-9]{2}" placeholder="BI" required /></label><label><span>Gam adı</span><input class="form-control" name="Name" maxlength="120" required /></label></div><input type="hidden" name="IsActive" value="true" /><button class="btn btn-primary" type="submit">Ürün gamı oluştur</button></form></div>
+            <div class="surface-panel create-panel compact-create-panel"><div class="panel-heading"><div><h2>Ürünü gruptan çıkar</h2><p>Bütün gam atamalarını seçili dönemden itibaren kapatır; geçmişi korur.</p></div></div><form asp-action="RemoveMainProductFromGroup" method="post" class="stack-form compact-stack-form" data-group-product-removal data-impact-template="@Url.Action("GroupMainProductRemovalImpact", "Products")">@Html.AntiForgeryToken()<label><span>Grup</span><select class="form-select" name="GroupId" required>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.Label</option> }</select></label><label><span>Ana ürün</span><select class="form-select" name="MainProductId" required>@foreach (var product in Model.MainProductDefinitions.Where(item => item.IsActive)) { <option value="@product.Id">@product.Label</option> }</select></label><div class="form-row compact-form-row"><label><span>Başlangıç yılı</span><input class="form-control" type="number" name="EffectiveFromYear" min="2000" max="2100" value="2026" required /></label><label><span>Dönem</span><select class="form-select" name="EffectiveFromTerm"><option value="1">1. Dönem</option><option value="2" selected>2. Dönem</option></select></label></div><button class="btn btn-outline-danger" type="submit" data-confirm="Ana ürün seçili dönemden itibaren grubun bütün ürün gamlarından çıkarılacak.">Atamayı kaldır, geçmişi koru</button></form></div>
+        </section>
 
-        <form asp-action="CreateProduct" method="post" class="stack-form compact-stack-form">
-            @Html.AntiForgeryToken()
-            <div class="creation-type-picker" role="group" aria-label="Oluşturulacak ürün türü">
-                <button class="is-active" type="button" data-product-create-type="Main" aria-pressed="true">Ana ürün</button>
-                <button type="button" data-product-create-type="Sub" aria-pressed="false">Alt ürün</button>
-            </div>
-            <input type="hidden" name="Type" id="productType" value="@ProductType.Main" />
-            <div class="form-row single-control-row">
-                <label>
-                    <span>Kod</span>
-                    <select class="form-select" name="CodeMode" id="codeMode">
-                        <option value="Auto">Otomatik üret</option>
-                        <option value="Manual">Manuel gir</option>
-                    </select>
-                </label>
-            </div>
-
-            <label id="createMainProductWrap" class="sub-product-field">
-                <span>Bağlı ana ürün</span>
-                <div class="combo" id="mainProductCombo">
-                    <input class="form-control combobox-input" type="search" id="createMainProductSearch" placeholder="Kod, ad veya yıl/dönem ara" autocomplete="off" />
-                    <div class="combo-menu" id="mainProductOptions" role="listbox">
-                        @foreach (var product in activeMainProducts)
-                        {
-                            <button class="combo-option" type="button" role="option" data-id="@product.Id" data-label="@product.Label">
-                                <strong>@product.Code</strong>
-                                <span>@product.Name</span>
-                                <small>@product.Year/@product.Term</small>
-                            </button>
-                        }
-                        <div class="combo-empty">Uygun ana ürün yok</div>
+        <section class="surface-panel table-panel compact-list-panel" data-list="productGamuts">
+            <div class="panel-heading table-panel-heading"><div><h2>Ürün gamları</h2><p>Bağlı ana ürünler ve etkin dönem aralıkları.</p></div></div>
+            <div class="table-toolbar compact-table-toolbar"><label class="toolbar-search"><span>Ürün gamlarında ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Grup, gam veya ana ürün" /></label><label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label></div>
+            <div class="table-responsive"><table class="table compact-table product-gamut-table"><thead><tr><th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="gamut">Ürün gamı <span></span></button></th><th>Bağlı ana ürünler</th><th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="portfolioCount">Portföy <span></span></button></th><th><button class="sort-button" type="button" data-list-sort="active">Durum <span></span></button></th><th class="text-end">İşlem</th></tr></thead><tbody>
+            @foreach (var gamut in Model.ProductGamuts)
+            {
+                var detailId = $"product-gamut-{gamut.Id}";
+                var search = $"{gamut.GroupNo} {gamut.GroupName} {gamut.Code} {gamut.Name} {string.Join(' ', gamut.Assignments.Select(item => item.MainProductCode + ' ' + item.MainProductName))}".ToUpperInvariant();
+                <tr class="list-row" data-detail-id="@detailId" data-search="@search" data-group="@($"{gamut.GroupNo} {gamut.GroupName}")" data-gamut="@($"{gamut.Code} {gamut.Name}")" data-portfolio-count="@gamut.PortfolioCount" data-active="@(gamut.IsActive ? 1 : 0)"><td><strong>@gamut.GroupNo</strong><small>@gamut.GroupName</small></td><td><strong>@gamut.Code</strong><small>@gamut.Name</small></td><td>@await Html.PartialAsync("_RelationBadges", gamut.Assignments.Select(assignment => new BankUrun.Web.ViewModels.RelationBadgeViewModel { Label = $"{assignment.MainProductCode} · {assignment.MainProductName}", Title = assignment.EffectivePeriodLabel }).ToArray())</td><td class="text-end numeric-cell">@gamut.PortfolioCount</td><td><span class="status-pill @(gamut.IsActive ? "active" : "passive")">@(gamut.IsActive ? "Aktif" : "Pasif")</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td></tr>
+                <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="6"><div class="collapse" id="@detailId"><div class="compact-detail-panel gamut-detail-panel">
+                    <form asp-action="SaveProductGamut" method="post" class="compact-edit-form">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@gamut.Id" /><input type="hidden" name="GroupId" value="@gamut.GroupId" /><div class="compact-form-grid"><label><span>Kod</span><input class="form-control form-control-sm code-input" name="Code" value="@gamut.Code" maxlength="2" required /></label><label class="compact-name-field"><span>Ad</span><input class="form-control form-control-sm" name="Name" value="@gamut.Name" maxlength="120" required /></label><label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@gamut.IsActive" /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label></div><div class="detail-command-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Ürün gamı bütün dönemlerde güncellenecek. Kod değişirse bağlı portföy kodları da değişir; pasifleştirilirse gamı kullanan portföyler performans hesaplarından çıkar. Hedef ve gerçekleşmeler korunur. Emin misiniz?">Gamı güncelle</button><button class="btn btn-sm btn-outline-danger" type="submit" form="delete-gamut-@gamut.Id" data-confirm="Ürün gamı ve bütün ana ürün atamaları kalıcı olarak silinecek." data-impact-url="@Url.Action("ProductGamutDeleteImpact", "Products", new { id = gamut.Id })">Gamı sil</button></div></form><form id="delete-gamut-@gamut.Id" asp-action="DeleteProductGamut" method="post">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@gamut.Id" /></form>
+                    <div class="relation-management-block"><div class="detail-section-heading"><h3>Ana ürün atamaları</h3><p>Bitiş dönemi girerek atamayı kapatabilir ve geçmişi koruyabilirsiniz.</p></div><form asp-action="SaveProductGamutAssignment" method="post" class="inline-relation-form">@Html.AntiForgeryToken()<input type="hidden" name="ProductGamutId" value="@gamut.Id" /><select class="form-select form-select-sm" name="MainProductId" required>@foreach (var product in Model.MainProductDefinitions.Where(item => item.IsActive)) { <option value="@product.Id">@product.Label</option> }</select><input class="form-control form-control-sm" type="number" name="EffectiveFromYear" value="2026" min="2000" max="2100" aria-label="Başlangıç yılı" required /><select class="form-select form-select-sm" name="EffectiveFromTerm"><option value="1">1</option><option value="2" selected>2</option></select><button class="btn btn-sm btn-outline-primary" type="submit">Ana ürün ekle</button></form>
+                    @foreach (var assignment in gamut.Assignments)
+                    {
+                        <div class="relation-edit-row"><form asp-action="SaveProductGamutAssignment" method="post" class="inline-relation-form">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@assignment.Id" /><input type="hidden" name="ProductGamutId" value="@gamut.Id" /><input type="hidden" name="MainProductId" value="@assignment.MainProductId" /><strong>@assignment.MainProductCode · @assignment.MainProductName</strong><input class="form-control form-control-sm" type="number" name="EffectiveFromYear" value="@assignment.EffectiveFromYear" min="2000" max="2100" /><select class="form-select form-select-sm" name="EffectiveFromTerm"><option value="1" selected="@(assignment.EffectiveFromTerm == 1)">1</option><option value="2" selected="@(assignment.EffectiveFromTerm == 2)">2</option></select><input class="form-control form-control-sm" type="number" name="EffectiveToYear" value="@assignment.EffectiveToYear" min="2000" max="2100" placeholder="Bitiş yılı" /><select class="form-select form-select-sm" name="EffectiveToTerm"><option value="">—</option><option value="1" selected="@(assignment.EffectiveToTerm == 1)">1</option><option value="2" selected="@(assignment.EffectiveToTerm == 2)">2</option></select><button class="btn btn-sm btn-outline-secondary" type="submit" data-confirm="Ana ürün atamasının geçerli dönem aralığı değiştirilecek; bu gamı kullanan portföylerin ürün kapsamı etkilenecek. Hedef ve gerçekleşme kayıtları silinmeyecek. Emin misiniz?">Aralığı kaydet</button><button class="btn btn-sm btn-outline-danger" type="submit" form="delete-assignment-@assignment.Id" data-confirm="Atama kalıcı kaldırılacak; hedef ve gerçekleşmeler korunacak." data-impact-url="@Url.Action("ProductGamutAssignmentRemovalImpact", "Products", new { id = assignment.Id })">Kalıcı kaldır</button></form><form id="delete-assignment-@assignment.Id" asp-action="DeleteProductGamutAssignment" method="post">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@assignment.Id" /></form></div>
+                    }
                     </div>
-                </div>
-                <input type="hidden" name="MainProductInstanceId" id="createMainProductId" />
-            </label>
-
-            <label id="manualCodeWrap" class="manual-code-wrap">
-                <span>Manuel kod</span>
-                <input class="form-control code-input" type="text" name="ManualCode" id="manualCode" maxlength="2" autocomplete="off" />
-                <small id="codeSuggestion" class="form-text"></small>
-            </label>
-
-            <label>
-                <span>Ad</span>
-                <input class="form-control" type="text" name="Name" maxlength="180" required />
-            </label>
-
-            <div class="form-row" id="periodFields">
-                <label>
-                    <span>Yıl</span>
-                    <input class="form-control" type="number" name="Year" min="2000" max="2100" value="2026" required />
-                </label>
-                <label>
-                    <span>Dönem</span>
-                    <select class="form-select" name="Term" required><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select>
-                </label>
-            </div>
-
-            <button class="btn btn-primary" type="submit">Ürünü oluştur</button>
-        </form>
-
-        @if (TempData["Success"] is string success)
-        {
-            <div class="alert alert-success action-alert" role="alert">@success</div>
-        }
-
-        @if (TempData["Error"] is string error)
-        {
-            <div class="alert alert-danger action-alert" role="alert">@error</div>
-        }
-    </div>
-</section>
-
-<section class="surface-panel table-panel compact-list-panel" data-list="products">
-    <div class="table-toolbar compact-table-toolbar" id="listFilterForm">
-        <label class="toolbar-search">
-            <span>Liste içinde ara</span>
-            <input class="form-control" type="search" data-list-filter="search" id="filterSearch" placeholder="Kod, ana ürün veya alt ürün adı" />
-        </label>
-        <label>
-            <span>Yıl</span>
-            <input class="form-control" type="number" data-list-filter="year" id="filterYear" min="2000" max="2100" />
-        </label>
-        <label>
-            <span>Dönem</span>
-            <input class="form-control" type="number" data-list-filter="term" id="filterTerm" min="1" max="2" />
-        </label>
-        <label>
-            <span>Sayfa</span>
-            <select class="form-select" data-list-page-size id="pageSize">
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-            </select>
-        </label>
-        <label class="check-line">
-            <input class="form-check-input" type="checkbox" data-list-filter="includeInactive" id="includeInactive" />
-            <span>Pasifler</span>
-        </label>
-        <label class="check-line">
-            <input class="form-check-input" type="checkbox" data-list-filter="showMainProducts" id="showMainProducts" checked />
-            <span>Ana ürünler</span>
-        </label>
-        <label class="check-line">
-            <input class="form-check-input" type="checkbox" data-list-filter="showSubProducts" id="showSubProducts" checked />
-            <span>Alt ürünler</span>
-        </label>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table product-table">
-            <thead>
-                <tr>
-                    <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-list-sort="mainCode">Ana Kod <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-list-sort="subCode">Alt Kod <span></span></button></th>
-                    <th><button class="sort-button" type="button" data-list-sort="subName">Alt Ürün Adı <span></span></button></th>
-                    <th class="text-end">İşlem</th>
-                </tr>
-            </thead>
-            <tbody id="productTableBody">
-            @if (Model.Rows.Count == 0)
-            {
-                <tr class="empty-row">
-                    <td colspan="6" class="empty-cell">Ürün yok</td>
-                </tr>
+                </div></div></td></tr>
             }
-            @for (var rowIndex = 0; rowIndex < Model.Rows.Count; rowIndex++)
-            {
-                var row = Model.Rows[rowIndex];
-                var detailsId = $"row-actions-{row.MainProductInstanceId}-{row.SubProductInstanceId ?? 0}-{rowIndex}";
-                var searchText = $"{row.Year} {row.Term} {row.MainProductCode} {row.MainProductName} {row.SubProductCode} {row.SubProductName}".ToUpperInvariant();
-                <tr class="list-row product-row"
-                    data-detail-id="@detailsId"
-                    data-year="@row.Year"
-                    data-term="@row.Term"
-                    data-main-code="@row.MainProductCode"
-                    data-sub-code="@(row.SubProductCode ?? "")"
-                    data-sub-name="@(row.SubProductName ?? "")"
-                    data-has-sub="@(row.SubProductId.HasValue ? "true" : "false")"
-                    data-active="@((row.MainProductActive && (!row.SubProductId.HasValue || row.SubProductActive == true)) ? "true" : "false")"
-                    data-search="@searchText">
-                    <td>@row.Year</td>
-                    <td>@row.Term</td>
-                    <td>
-                        <strong>@row.MainProductCode</strong>
-                        <small>@row.MainProductName</small>
-                    </td>
-                    <td>
-                        @if (row.SubProductId.HasValue)
-                        {
-                            <strong>@row.SubProductCode</strong>
-                        }
-                        else
-                        {
-                            <span class="muted">-</span>
-                        }
-                    </td>
-                    <td>
-                        @if (row.SubProductId.HasValue)
-                        {
-                            <span>@row.SubProductName</span>
-                        }
-                        else
-                        {
-                            <span class="muted">Alt ürün yok</span>
-                        }
-                    </td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailsId" aria-expanded="false" aria-controls="@detailsId">Detay</button>
-                    </td>
-                </tr>
-                <tr class="list-detail-row actions-row" data-detail-for="@detailsId">
-                    <td colspan="6">
-                        <div class="collapse" id="@detailsId">
-                            <div class="actions-panel">
-                                <div class="status-line">
-                                    <span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>
-                                    @if (row.SubProductId.HasValue)
-                                    {
-                                        <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span>
-                                    }
-                                </div>
-                                <div class="actions-cell">
-                                    <span class="action-group-title">Ana ürün</span>
-                                    <form asp-action="RenameProduct" method="post" class="inline-form">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Type" value="@ProductType.Main" />
-                                        <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <input class="form-control form-control-sm code-edit-input" name="Code" value="@row.MainProductCode" maxlength="2" />
-                                        <input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" />
-                                        <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Ana ürün bilgisini değiştirmek istediğinize emin misiniz?">Güncelle</button>
-                                    </form>
-                                    <form asp-action="DeactivateProduct" method="post" class="button-form">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Type" value="@ProductType.Main" />
-                                        <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürünü ve alt ürünlerini pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
-                                    </form>
-                                    <form asp-action="DeleteProduct" method="post" class="button-form">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Type" value="@ProductType.Main" />
-                                        <input type="hidden" name="ProductId" value="@row.MainProductId" />
-                                        <input type="hidden" name="MainProductInstanceId" value="@row.MainProductInstanceId" />
-                                        <input type="hidden" name="DeleteScope" value="Single" class="delete-scope" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-action-type="delete" data-confirm="Bu ana ürünü silmek istediğinize emin misiniz?">Sil</button>
-                                    </form>
-
-                                    @if (row.SubProductId.HasValue)
-                                    {
-                                        <span class="action-group-title">Alt ürün</span>
-                                        <form asp-action="RenameProduct" method="post" class="inline-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
-                                            <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <input class="form-control form-control-sm code-edit-input" name="Code" value="@row.SubProductCode" maxlength="2" />
-                                            <input class="form-control form-control-sm" name="Name" value="@row.SubProductName" maxlength="180" />
-                                            <button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Bu alt ürün koduna sahip tüm satırlar güncellenecek. Emin misiniz?">Güncelle</button>
-                                        </form>
-                                        <form asp-action="DeactivateProduct" method="post" class="button-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
-                                            <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Alt ürünü pasifleştirmek istediğinize emin misiniz?">Pasifleştir</button>
-                                        </form>
-                                        <form asp-action="DeleteProduct" method="post" class="button-form">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="Type" value="@ProductType.Sub" />
-                                            <input type="hidden" name="ProductId" value="@row.SubProductId" />
-                                            <input type="hidden" name="SubProductInstanceId" value="@row.SubProductInstanceId" />
-                                            <input type="hidden" name="DeleteScope" value="Single" class="delete-scope" />
-                                            <button class="btn btn-sm btn-outline-danger" type="submit" data-action-type="delete" data-confirm="Bu alt ürünü silmek istediğinize emin misiniz?">Sil</button>
-                                        </form>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            }
-            <tr id="noClientRows" class="empty-row d-none" data-list-empty>
-                <td colspan="6" class="empty-cell">Filtreye uygun ürün yok</td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="pagination-bar">
-        <div class="pagination-summary" id="paginationSummary" data-list-summary>Ürünler hazırlanıyor</div>
-        <div class="pager-buttons">
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="first" aria-label="İlk sayfa" title="İlk sayfa">«</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="previous" aria-label="Önceki sayfa" title="Önceki sayfa">‹</button>
-            <span id="pageIndicator" data-list-page-indicator>1 / 1</span>
-            <input class="form-control form-control-sm page-jump" type="number" id="pageJump" min="1" value="1" data-list-page-jump aria-label="Sayfa numarası" />
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-list-page="jump">Git</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="next" aria-label="Sonraki sayfa" title="Sonraki sayfa">›</button>
-            <button class="btn btn-sm btn-outline-secondary icon-btn" type="button" data-list-page="last" aria-label="Son sayfa" title="Son sayfa">»</button>
-        </div>
-    </div>
-</section>
-
-<div class="action-toast-backdrop" id="actionToastBackdrop"></div>
-<div class="toast-container action-toast-container">
-    <div id="actionConfirmToast" class="toast action-confirm-toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-            <strong class="me-auto" id="toastTitle">İşlemi onayla</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Kapat"></button>
-        </div>
-        <div class="toast-body">
-            <p id="toastMessage" class="toast-message">Bu işlemi yapmak istediğinize emin misiniz?</p>
-            <div class="toast-actions" id="standardToastActions">
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-toast-cancel>Vazgeç</button>
-                <button class="btn btn-sm btn-primary" type="button" data-toast-confirm>Onayla</button>
-            </div>
-            <div class="toast-actions d-none" id="deleteToastActions">
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-toast-cancel>Vazgeç</button>
-                <button class="btn btn-sm btn-outline-danger" type="button" data-delete-scope="Single">Seçili instance'ı sil</button>
-                <button class="btn btn-sm btn-danger" type="button" data-delete-scope="All">Tüm tablodan sil</button>
-            </div>
-        </div>
+            <tr class="empty-row @(Model.ProductGamuts.Count == 0 ? "" : "d-none")" data-list-empty><td colspan="6" class="empty-cell">Filtreye uygun ürün gamı yok.</td></tr>
+            </tbody></table></div>
+            @await Html.PartialAsync("_ListPager")
+        </section>
     </div>
 </div>

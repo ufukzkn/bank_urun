@@ -1,0 +1,26 @@
+@model BankUrun.Web.ViewModels.DashboardMonthlyDetailViewModel
+@functions {
+    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+}
+<div class="sub-product-contribution-section">
+    <div class="detail-section-heading">
+        <h3>Alt ürün katkıları</h3>
+        <p>Alt ürünlerin hedefi yoktur; ortak alt ürün her bağlı ana ürüne tam gerçekleşme katkısı sağlar.</p>
+    </div>
+    @if (Model.Contributions.Count == 0)
+    {
+        <div class="inline-empty-state">Alt ürün bağlantısı yok.</div>
+    }
+    else
+    {
+        <div class="sub-product-contribution-grid">
+            @foreach (var item in Model.Contributions)
+            {
+                <article>
+                    <div><strong>@item.Code</strong><span>@item.Name</span></div>
+                    <dl><dt>Gerçekleşme</dt><dd>@Text(item.ActualValue)</dd></dl>
+                </article>
+            }
+        </div>
+    }
+</div>

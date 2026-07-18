@@ -1,0 +1,22 @@
+@model BankUrun.Web.ViewModels.MainProductTargetPageViewModel
+
+@if (Model.Rows.Count == 0)
+{
+    <tr class="empty-row"><td colspan="9" class="empty-cell">Filtreye uygun portföy ana ürün hedefi bulunamadı.</td></tr>
+}
+@foreach (var row in Model.Rows)
+{
+    var detailId = $"main-product-target-{row.PortfolioId}-{row.ParameterId}";
+    <tr class="list-row" data-detail-id="@detailId">
+        <td>@row.Year</td>
+        <td>@row.Term. Dönem</td>
+        <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
+        <td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td>
+        <td><strong>@row.PortfolioCode</strong><small>@row.PortfolioName</small></td>
+        <td>@await Html.PartialAsync("_RelationBadges", new[] { new BankUrun.Web.ViewModels.RelationBadgeViewModel { Label = $"{row.ProductGamutCode} · {row.ProductGamutName}", Title = row.ProductGamutName } })</td>
+        <td><strong>@row.MainProductCode</strong><small>@row.MainProductName</small></td>
+        <td class="text-end numeric-cell"><strong>@row.PeriodTarget.ToString("N2")</strong><small>@row.EnteredMonthCount / 6 ay</small></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" data-main-target-detail data-parameter-id="@row.ParameterId" data-portfolio-id="@row.PortfolioId">Detay</button></td>
+    </tr>
+    <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="9"><div class="collapse" id="@detailId"><div class="main-product-target-detail" data-main-target-editor><div class="inline-empty-state">Aylık hedefler detay açıldığında yüklenir.</div></div></div></td></tr>
+}

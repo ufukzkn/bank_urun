@@ -17,30 +17,142 @@ public class PerformanceController(IDashboardService dashboardService) : Control
         int? branchId,
         int? year,
         int? term,
-        int? mainProductInstanceId,
+        int? mainProductId,
+        int? productGamutId,
+        int? portfolioTypeId,
         CancellationToken cancellationToken) =>
         PartialView("_Snapshot", await dashboardService.GetSnapshotAsync(
-            mode, groupId, branchId, year, term, mainProductInstanceId, cancellationToken));
+            mode, groupId, branchId, year, term, mainProductId,
+            productGamutId, portfolioTypeId, cancellationToken));
 
     [HttpGet]
     public async Task<IActionResult> BranchProductMonthlyDetail(
         int branchId,
         int mainProductInstanceId,
+        string? section,
         CancellationToken cancellationToken)
     {
         var model = await dashboardService.GetBranchProductMonthlyDetailAsync(
             branchId, mainProductInstanceId, cancellationToken);
-        return model is null ? NotFound() : PartialView("_MonthlyDetail", model);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        if (section == "months")
+        {
+            return PartialView("_MonthlySeries", model);
+        }
+
+        if (section == "contributions")
+        {
+            return PartialView("_SubProductContributions", model);
+        }
+
+        ViewData["MonthsUrl"] = Url.Action(nameof(BranchProductMonthlyDetail), new
+        {
+            branchId,
+            mainProductInstanceId,
+            section = "months"
+        });
+        ViewData["ContributionsUrl"] = Url.Action(nameof(BranchProductMonthlyDetail), new
+        {
+            branchId,
+            mainProductInstanceId,
+            section = "contributions"
+        });
+        return PartialView("_MonthlyDetail", model);
     }
 
     [HttpGet]
     public async Task<IActionResult> MainProductMonthlyDetail(
         int mainProductInstanceId,
         int? groupId,
+        string? section,
         CancellationToken cancellationToken)
     {
         var model = await dashboardService.GetMainProductMonthlyDetailAsync(
             mainProductInstanceId, groupId, cancellationToken);
-        return model is null ? NotFound() : PartialView("_MonthlyDetail", model);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        if (section == "months")
+        {
+            return PartialView("_MonthlySeries", model);
+        }
+
+        if (section == "contributions")
+        {
+            return PartialView("_SubProductContributions", model);
+        }
+
+        ViewData["MonthsUrl"] = Url.Action(nameof(MainProductMonthlyDetail), new
+        {
+            mainProductInstanceId,
+            groupId,
+            section = "months"
+        });
+        ViewData["ContributionsUrl"] = Url.Action(nameof(MainProductMonthlyDetail), new
+        {
+            mainProductInstanceId,
+            groupId,
+            section = "contributions"
+        });
+        return PartialView("_MonthlyDetail", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> PortfolioDetail(
+        int portfolioId,
+        int year,
+        int term,
+        string? section,
+        CancellationToken cancellationToken)
+    {
+        var model = await dashboardService.GetPortfolioDetailAsync(portfolioId, year, term, cancellationToken);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        if (section == "products")
+        {
+            return PartialView("_PortfolioProductBreakdown", model);
+        }
+
+        if (section == "months")
+        {
+            return PartialView("_PortfolioMonthlySeries", model);
+        }
+
+        if (section == "contributions")
+        {
+            return PartialView("_PortfolioContributions", model);
+        }
+
+        ViewData["ProductsUrl"] = Url.Action(nameof(PortfolioDetail), new
+        {
+            portfolioId,
+            year,
+            term,
+            section = "products"
+        });
+        ViewData["MonthsUrl"] = Url.Action(nameof(PortfolioDetail), new
+        {
+            portfolioId,
+            year,
+            term,
+            section = "months"
+        });
+        ViewData["ContributionsUrl"] = Url.Action(nameof(PortfolioDetail), new
+        {
+            portfolioId,
+            year,
+            term,
+            section = "contributions"
+        });
+        return PartialView("_PortfolioDetail", model);
     }
 }

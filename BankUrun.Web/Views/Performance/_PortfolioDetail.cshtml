@@ -1,0 +1,27 @@
+@model BankUrun.Web.ViewModels.DashboardPortfolioDetailViewModel
+<div class="performance-product-detail">
+    <div class="performance-detail-heading">
+        <div>
+            <h3>@Model.Title</h3>
+            <p>@Model.Subtitle · @Model.Year / @Model.Term. Dönem</p>
+        </div>
+    </div>
+    <p class="inline-help-note">Aşağıdaki bölümler yalnız ilgili düğmeye bastığınızda yüklenir.</p>
+    <div class="performance-detail-actions" role="group" aria-label="Portföy detay bölümleri">
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-lazy-performance-section="products"
+                data-lazy-performance-url="@ViewData["ProductsUrl"]"
+                aria-expanded="false">Ana ürün kırılımını göster</button>
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-lazy-performance-section="months"
+                data-lazy-performance-url="@ViewData["MonthsUrl"]"
+                aria-expanded="false">Aylık gidişatı göster</button>
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                data-lazy-performance-section="contributions"
+                data-lazy-performance-url="@ViewData["ContributionsUrl"]"
+                aria-expanded="false">Alt ürün katkılarını göster</button>
+    </div>
+    <div class="performance-detail-section-target" data-lazy-performance-target="products" hidden></div>
+    <div class="performance-detail-section-target" data-lazy-performance-target="months" hidden></div>
+    <div class="performance-detail-section-target" data-lazy-performance-target="contributions" hidden></div>
+</div>

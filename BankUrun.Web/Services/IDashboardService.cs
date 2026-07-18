@@ -12,7 +12,9 @@ public interface IDashboardService
         int? branchId,
         int? year,
         int? term,
-        int? mainProductInstanceId,
+        int? mainProductId,
+        int? productGamutId,
+        int? portfolioTypeId,
         CancellationToken cancellationToken = default);
     Task<DashboardMonthlyDetailViewModel?> GetBranchProductMonthlyDetailAsync(
         int branchId,
@@ -21,5 +23,10 @@ public interface IDashboardService
     Task<DashboardMonthlyDetailViewModel?> GetMainProductMonthlyDetailAsync(
         int mainProductInstanceId,
         int? groupId,
+        CancellationToken cancellationToken = default);
+    Task<DashboardPortfolioDetailViewModel?> GetPortfolioDetailAsync(
+        int portfolioId,
+        int year,
+        int term,
         CancellationToken cancellationToken = default);
 }

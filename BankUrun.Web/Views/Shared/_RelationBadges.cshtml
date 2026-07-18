@@ -1,0 +1,8 @@
+@model BankUrun.Web.ViewModels.RelationBadgeViewModel[]
+
+<div class="linked-product-badges">
+    @foreach (var badge in Model)
+    {
+        <span title="@badge.Title">@badge.Label</span>
+    }
+</div>

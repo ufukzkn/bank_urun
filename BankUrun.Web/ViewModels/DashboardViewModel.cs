@@ -5,14 +5,55 @@ namespace BankUrun.Web.ViewModels;
 public class DashboardIndexViewModel
 {
     public IReadOnlyList<ParameterGroupOptionViewModel> Groups { get; set; } = [];
-    public IReadOnlyList<ParameterBranchOptionViewModel> Branches { get; set; } = [];
-    public IReadOnlyList<ParameterProductOptionViewModel> Products { get; set; } = [];
+    public IReadOnlyList<DashboardBranchOptionViewModel> Branches { get; set; } = [];
+    public IReadOnlyList<DashboardProductOptionViewModel> Products { get; set; } = [];
+    public IReadOnlyList<DashboardProductGamutOptionViewModel> ProductGamuts { get; set; } = [];
+    public IReadOnlyList<DashboardPortfolioTypeOptionViewModel> PortfolioTypes { get; set; } = [];
     public IReadOnlyList<DashboardPeriodOptionViewModel> Periods { get; set; } = [];
     public PerformanceMode SelectedMode { get; set; } = PerformanceMode.BranchProduct;
-    public int SelectedYear { get; set; }
-    public int SelectedTerm { get; set; }
+    public int? SelectedYear { get; set; }
+    public int? SelectedTerm { get; set; }
     public DateOnly BatchDate { get; set; }
     public DashboardSnapshotViewModel Snapshot { get; set; } = new();
+}
+
+public class DashboardBranchOptionViewModel
+{
+    public int Id { get; set; }
+    public int GroupId { get; set; }
+    public string BranchCode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string GroupNo { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+    public GroupType GroupType { get; set; }
+    public string Label => $"{BranchCode} - {Name}";
+}
+
+public class DashboardProductOptionViewModel
+{
+    public int Id { get; set; }
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Label => $"{Code} - {Name}";
+}
+
+public class DashboardProductGamutOptionViewModel
+{
+    public int Id { get; set; }
+    public int GroupId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Label => $"{Code} - {Name}";
+}
+
+public class DashboardPortfolioTypeOptionViewModel
+{
+    public int Id { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Label => $"{Code} - {Name}";
 }
 
 public class DashboardPeriodOptionViewModel
@@ -32,8 +73,11 @@ public class DashboardSnapshotViewModel
     public string BranchName { get; set; } = string.Empty;
     public string GroupNo { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
-    public int Year { get; set; }
-    public int Term { get; set; }
+    public int? Year { get; set; }
+    public int? Term { get; set; }
+    public string PeriodScopeLabel => Year.HasValue
+        ? Term.HasValue ? $"{Year} / {Term}. Dönem" : $"{Year} / Tüm dönemler"
+        : Term.HasValue ? $"Tüm yıllar / {Term}. Dönem" : "Tüm yıllar / Tüm dönemler";
     public decimal AssignedScore { get; set; }
     public decimal? EarnedScore { get; set; }
     public decimal? SuccessPercent { get; set; }
@@ -43,10 +87,13 @@ public class DashboardSnapshotViewModel
     public IReadOnlyList<DashboardBranchPerformanceViewModel> Branches { get; set; } = [];
     public IReadOnlyList<DashboardProductPerformanceViewModel> BranchProducts { get; set; } = [];
     public IReadOnlyList<DashboardMainProductPerformanceViewModel> MainProducts { get; set; } = [];
+    public IReadOnlyList<DashboardPortfolioPerformanceViewModel> Portfolios { get; set; } = [];
 }
 
 public class DashboardBranchPerformanceViewModel
 {
+    public int Year { get; set; }
+    public int Term { get; set; }
     public int GroupId { get; set; }
     public string GroupNo { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
@@ -66,6 +113,8 @@ public class DashboardBranchPerformanceViewModel
 
 public class DashboardProductPerformanceViewModel
 {
+    public int Year { get; set; }
+    public int Term { get; set; }
     public int GroupId { get; set; }
     public string GroupNo { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
@@ -73,6 +122,7 @@ public class DashboardProductPerformanceViewModel
     public string BranchCode { get; set; } = string.Empty;
     public string BranchName { get; set; } = string.Empty;
     public int MainProductInstanceId { get; set; }
+    public int MainProductId { get; set; }
     public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
     public MainProductCalculationType CalculationType { get; set; }
@@ -86,12 +136,17 @@ public class DashboardProductPerformanceViewModel
     public int SegmentRankCandidateCount { get; set; }
     public bool HasCompleteBatchData { get; set; }
     public bool HasSubProductConfiguration { get; set; }
+    public bool HasCompleteTargetData { get; set; }
+    public bool HasParameterConfiguration { get; set; }
     public int SubProductCount { get; set; }
 }
 
 public class DashboardMainProductPerformanceViewModel
 {
+    public int Year { get; set; }
+    public int Term { get; set; }
     public int MainProductInstanceId { get; set; }
+    public int MainProductId { get; set; }
     public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
     public int SubProductCount { get; set; }
@@ -106,6 +161,40 @@ public class DashboardMainProductPerformanceViewModel
     public int RankCandidateCount { get; set; }
     public bool HasCompleteBatchData { get; set; }
     public bool HasSubProductConfiguration { get; set; }
+    public bool HasCompleteTargetData { get; set; }
+    public bool HasParameterConfiguration { get; set; }
+}
+
+public class DashboardPortfolioPerformanceViewModel
+{
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public int GroupId { get; set; }
+    public string GroupNo { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+    public int BranchId { get; set; }
+    public string BranchCode { get; set; } = string.Empty;
+    public string BranchName { get; set; } = string.Empty;
+    public int PortfolioId { get; set; }
+    public string PortfolioCode { get; set; } = string.Empty;
+    public string PortfolioName { get; set; } = string.Empty;
+    public int ProductGamutId { get; set; }
+    public string ProductGamutCode { get; set; } = string.Empty;
+    public string ProductGamutName { get; set; } = string.Empty;
+    public int PortfolioTypeId { get; set; }
+    public string PortfolioTypeCode { get; set; } = string.Empty;
+    public string PortfolioTypeName { get; set; } = string.Empty;
+    public decimal CriterionScore { get; set; }
+    public decimal? HgoScore { get; set; }
+    public decimal? TotalScore { get; set; }
+    public decimal? SuccessPercent { get; set; }
+    public bool HasCompletePeriodData { get; set; }
+    public int CompleteProductCount { get; set; }
+    public int ProductCount { get; set; }
+    public int? OfficialRank { get; set; }
+    public int OfficialRankCandidateCount { get; set; }
+    public int? BranchRank { get; set; }
+    public int BranchRankCandidateCount { get; set; }
 }
 
 public class DashboardMonthlyDetailViewModel
@@ -133,6 +222,32 @@ public class DashboardSubProductContributionViewModel
     public int SubProductId { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public decimal? ActualValue { get; set; }
+}
+
+public class DashboardPortfolioDetailViewModel
+{
+    public int PortfolioId { get; set; }
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Subtitle { get; set; } = string.Empty;
+    public IReadOnlyList<DashboardPortfolioProductDetailViewModel> Products { get; set; } = [];
+}
+
+public class DashboardPortfolioProductDetailViewModel
+{
+    public int MainProductInstanceId { get; set; }
+    public string ProductCode { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public MainProductCalculationType CalculationType { get; set; }
+    public bool HasParameterConfiguration { get; set; }
+    public bool HasCompleteTargetData { get; set; }
+    public decimal CriterionScore { get; set; }
     public decimal TargetValue { get; set; }
     public decimal? ActualValue { get; set; }
+    public decimal? HgRatioPercent { get; set; }
+    public decimal? TotalScore { get; set; }
+    public IReadOnlyList<DashboardProductMonthViewModel> Months { get; set; } = [];
+    public IReadOnlyList<DashboardSubProductContributionViewModel> Contributions { get; set; } = [];
 }

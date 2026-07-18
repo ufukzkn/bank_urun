@@ -23,33 +23,20 @@ public class ParametersController(IParameterManagementService parameterService) 
     }
 
     [HttpGet]
-    public async Task<IActionResult> SubProductRows([FromQuery] SubProductTargetQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> MainProductTargetRows([FromQuery] MainProductTargetQuery query, CancellationToken cancellationToken)
     {
-        var page = await parameterService.GetSubProductPageAsync(query, cancellationToken);
+        var page = await parameterService.GetMainProductTargetPageAsync(query, cancellationToken);
         Response.Headers.Append("X-Total-Count", page.TotalCount.ToString());
         Response.Headers.Append("X-Total-Pages", page.TotalPages.ToString());
         Response.Headers.Append("X-Page", page.Page.ToString());
-        return PartialView("_SubProductTargetRows", page);
+        return PartialView("_MainProductTargetRows", page);
     }
 
     [HttpGet]
-    public async Task<IActionResult> SubProductTargetEditor(int subProductId, int branchId, int year, int term, CancellationToken cancellationToken)
+    public async Task<IActionResult> MainProductTargetEditor(int parameterId, int portfolioId, CancellationToken cancellationToken)
     {
-        try { return PartialView("_SubProductTargetEditor", await parameterService.GetSubProductTargetEditorAsync(subProductId, branchId, year, term, cancellationToken)); }
+        try { return PartialView("_MainProductTargetEditor", await parameterService.GetMainProductTargetEditorAsync(parameterId, portfolioId, cancellationToken)); }
         catch (InvalidOperationException) { return NotFound(); }
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> TargetEditor(int parameterId, int branchId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return PartialView("_TargetEditor", await parameterService.GetTargetEditorAsync(parameterId, branchId, cancellationToken));
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
     }
 
     [HttpPost]
@@ -64,21 +51,12 @@ public class ParametersController(IParameterManagementService parameterService) 
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateTargets(MonthlyTargetsInput input, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateMainProductTargets(PortfolioMainProductTargetsInput input, CancellationToken cancellationToken)
     {
         return await ExecuteAndRedirectAsync(
             ModelState.IsValid,
-            () => parameterService.UpdateTargetsAsync(input, Actor, cancellationToken),
-            "Aylık hedefler güncellendi.");
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateSubProductTargets(SubProductMonthlyTargetsInput input, CancellationToken cancellationToken)
-    {
-        return await ExecuteAndRedirectAsync(ModelState.IsValid,
-            () => parameterService.UpdateSubProductTargetsAsync(input, Actor, cancellationToken),
-            "Alt ürün aylık hedefleri güncellendi.");
+            () => parameterService.UpdateMainProductTargetsAsync(input, Actor, cancellationToken),
+            "Portföy ana ürün hedefleri güncellendi.");
     }
 
     [HttpPost]
@@ -90,6 +68,10 @@ public class ParametersController(IParameterManagementService parameterService) 
             () => parameterService.DeleteParameterAsync(input, Actor, cancellationToken),
             "Ana ürün parametresi silindi.");
     }
+
+    [HttpGet]
+    public Task<IActionResult> ParameterDeleteImpact(int id, CancellationToken cancellationToken) =>
+        ExecuteImpactAsync(() => parameterService.GetParameterDeleteImpactAsync(id, cancellationToken));
 
     private string Actor => User.Identity?.Name ?? "local-user";
 
@@ -112,5 +94,17 @@ public class ParametersController(IParameterManagementService parameterService) 
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    private static async Task<IActionResult> ExecuteImpactAsync(Func<Task<ManagementImpactViewModel>> action)
+    {
+        try
+        {
+            return new JsonResult(await action());
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
     }
 }

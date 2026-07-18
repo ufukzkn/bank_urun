@@ -1,0 +1,25 @@
+@model BankUrun.Web.ViewModels.DashboardMonthlyDetailViewModel
+@functions {
+    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+}
+<div class="performance-monthly-detail">
+    <div class="detail-section-heading">
+        <h3>Aylık gidişat</h3>
+        <p>Gerçekleşme ve batch tarihi salt okunurdur.</p>
+    </div>
+    <div class="performance-month-detail-grid">
+        @foreach (var month in Model.Months)
+        {
+            var width = Math.Min(month.HgRatioPercent ?? 0, 100);
+            <article class="performance-month-card @(month.ActualValue.HasValue ? "good" : "pending")">
+                <div><strong>@month.MonthName</strong><span>@(month.ActualAsOfDate?.ToString("dd.MM.yyyy") ?? "Batch bekleniyor")</span></div>
+                <dl>
+                    <dt>Hedef</dt><dd>@month.TargetValue.ToString("N2")</dd>
+                    <dt>Gerçekleşme</dt><dd>@Text(month.ActualValue)</dd>
+                    <dt>H/G</dt><dd>@(month.HgRatioPercent.HasValue ? $"%{month.HgRatioPercent:N2}" : "—")</dd>
+                </dl>
+                <div class="dashboard-bar-track"><div class="dashboard-bar-fill" style="width:@width.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></div></div>
+            </article>
+        }
+    </div>
+</div>

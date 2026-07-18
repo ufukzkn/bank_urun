@@ -8,7 +8,7 @@
 }
 
 <section class="page-title dashboard-page-title">
-    <div><h1>Dönemsel performans</h1><p>Şubeleri, şube–ürün sonuçlarını ve ana ürünlerin genel performansını karşılaştırın.</p></div>
+    <div><h1>Dönemsel performans</h1><p>Şube, şube–ürün, ana ürün ve portföy sonuçlarını aynı dönem yapısıyla karşılaştırın.</p></div>
     <span class="batch-date">Batch tarihi <strong>@Model.BatchDate.ToString("dd.MM.yyyy")</strong></span>
 </section>
 
@@ -17,11 +17,13 @@
          data-default-mode="BranchProduct"
          data-snapshot-url="@Url.Action("Snapshot", "Performance")"
          data-branch-detail-url="@Url.Action("BranchProductMonthlyDetail", "Performance")"
-         data-main-detail-url="@Url.Action("MainProductMonthlyDetail", "Performance")">
-    <nav class="performance-mode-picker" aria-label="Performans karşılaştırma biçimi" data-performance-mode-picker>
-        <button type="button" data-performance-mode="Branch" aria-pressed="false"><span>Şube performansı</span><small>Şubeleri ürünlerden bağımsız kıyasla</small></button>
-        <button class="is-active" type="button" data-performance-mode="BranchProduct" aria-pressed="true"><span>Şube–ürün performansı</span><small>Şube ve ana ürün ilişkisini incele</small></button>
-        <button type="button" data-performance-mode="MainProduct" aria-pressed="false"><span>Ana ürün performansı</span><small>Tüm şubelerin ürün toplamını gör</small></button>
+         data-main-detail-url="@Url.Action("MainProductMonthlyDetail", "Performance")"
+         data-portfolio-detail-url="@Url.Action("PortfolioDetail", "Performance")">
+    <nav class="segmented-control segmented-control--large performance-mode-picker" aria-label="Performans karşılaştırma biçimi" data-segmented-control data-performance-mode-picker>
+        <button type="button" data-segmented-value="Branch" data-performance-mode="Branch" aria-pressed="false"><span>Şube performansı</span><small>Şubeleri ürünlerden bağımsız kıyasla</small></button>
+        <button class="is-active" type="button" data-segmented-value="BranchProduct" data-performance-mode="BranchProduct" aria-pressed="true"><span>Şube–ürün performansı</span><small>Şube ve ana ürün ilişkisini incele</small></button>
+        <button type="button" data-segmented-value="MainProduct" data-performance-mode="MainProduct" aria-pressed="false"><span>Ana ürün performansı</span><small>Tüm şubelerin ürün toplamını gör</small></button>
+        <button type="button" data-segmented-value="Portfolio" data-performance-mode="Portfolio" aria-pressed="false"><span>Portföy performansı</span><small>Portföyleri ürün gamı içinde karşılaştır</small></button>
     </nav>
 
     <div class="surface-panel dashboard-context-panel">
@@ -31,9 +33,11 @@
         </div>
         <div class="dashboard-context-grid performance-context-grid">
             <label><span>Yıl</span><select class="form-select" data-dashboard-filter="year">
+                <option value="">Tüm yıllar</option>
                 @foreach (var year in years) { <option value="@year" selected="@(year == Model.SelectedYear)">@year</option> }
             </select></label>
             <label><span>Dönem</span><select class="form-select" data-dashboard-filter="term">
+                <option value="">Tüm dönemler</option>
                 @foreach (var term in terms)
                 {
                     var availableYears = string.Join(",", Model.Periods.Where(period => period.Term == term).Select(period => period.Year));
@@ -60,17 +64,19 @@
             <label class="dashboard-product-field" data-filter-field="product">
                 <span>Ana ürün</span><div class="combo generic-combo">
                     <input class="form-control" type="search" autocomplete="off" value="Tüm ana ürünler" placeholder="Ürün kodu veya adı" data-combo-input />
-                    <input type="hidden" value="" data-combo-value data-dashboard-filter="mainProductInstanceId" />
+                    <input type="hidden" value="" data-combo-value data-dashboard-filter="mainProductId" />
                     <div class="combo-menu dashboard-product-menu">
                         <button class="combo-option" type="button" data-combo-option data-id="" data-label="Tüm ana ürünler"><strong>Tümü</strong><span>Tüm ana ürünleri göster</span></button>
                         @foreach (var product in Model.Products)
                         {
-                            <button class="combo-option" type="button" data-combo-option data-id="@product.Id" data-label="@($"{product.Code} - {product.Name}")" data-year="@product.Year" data-term="@product.Term"><strong>@product.Code</strong><span>@product.Name</span><small>@product.Year / @product.Term. Dönem</small></button>
+                            <button class="combo-option" type="button" data-combo-option data-id="@product.Id" data-label="@($"{product.Code} - {product.Name}")"><strong>@product.Code</strong><span>@product.Name</span></button>
                         }
                         <div class="combo-empty">Bu dönemde ana ürün bulunamadı.</div>
                     </div>
                 </div>
             </label>
+            <label class="dashboard-gamut-field d-none" data-filter-field="gamut"><span>Ürün gamı</span><select class="form-select" data-dashboard-filter="productGamutId"><option value="">Tüm ürün gamları</option>@foreach (var gamut in Model.ProductGamuts) { <option value="@gamut.Id" data-group-id="@gamut.GroupId">@gamut.Code - @gamut.Name</option> }</select></label>
+            <label class="dashboard-portfolio-type-field d-none" data-filter-field="portfolioType"><span>Portföy tipi</span><select class="form-select" data-dashboard-filter="portfolioTypeId"><option value="">Tüm portföy tipleri</option>@foreach (var type in Model.PortfolioTypes) { <option value="@type.Id">@type.Code - @type.Name</option> }</select></label>
         </div>
     </div>
 

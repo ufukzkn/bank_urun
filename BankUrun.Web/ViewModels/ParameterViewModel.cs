@@ -7,9 +7,11 @@ public class ParameterIndexViewModel
 {
     public IReadOnlyList<ParameterGroupOptionViewModel> Groups { get; set; } = [];
     public IReadOnlyList<ParameterProductOptionViewModel> Products { get; set; } = [];
+    public IReadOnlyList<ParameterGamutOptionViewModel> ProductGamuts { get; set; } = [];
+    public IReadOnlyList<ParameterPortfolioOptionViewModel> Portfolios { get; set; } = [];
     public IReadOnlyList<int> Years { get; set; } = [];
     public ParameterPageViewModel Page { get; set; } = new();
-    public SubProductTargetPageViewModel SubProductPage { get; set; } = new();
+    public MainProductTargetPageViewModel TargetPage { get; set; } = new();
 }
 
 public class ParameterGroupOptionViewModel
@@ -17,13 +19,14 @@ public class ParameterGroupOptionViewModel
     public int Id { get; set; }
     public string GroupNo { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public GroupSegment GroupSegment { get; set; }
+    public GroupType GroupType { get; set; }
     public string Label => $"{GroupNo} - {Name}";
 }
 
 public class ParameterProductOptionViewModel
 {
     public int Id { get; set; }
+    public int MainProductId { get; set; }
     public int Year { get; set; }
     public int Term { get; set; }
     public string Code { get; set; } = string.Empty;
@@ -31,16 +34,25 @@ public class ParameterProductOptionViewModel
     public string Label => $"{Year}/{Term} · {Code} - {Name}";
 }
 
-public class ParameterBranchOptionViewModel
+public class ParameterGamutOptionViewModel
 {
     public int Id { get; set; }
     public int GroupId { get; set; }
-    public string BranchCode { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
     public string GroupNo { get; set; } = string.Empty;
-    public string GroupName { get; set; } = string.Empty;
-    public GroupSegment GroupSegment { get; set; }
-    public string Label => $"{BranchCode} - {Name}";
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Label => $"{Code} - {Name}";
+}
+
+public class ParameterPortfolioOptionViewModel
+{
+    public int Id { get; set; }
+    public int GroupId { get; set; }
+    public int ProductGamutId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string BranchCode { get; set; } = string.Empty;
+    public string Label => $"{Code} - {Name}";
 }
 
 public class ParameterQuery
@@ -70,49 +82,17 @@ public class ParameterRowViewModel
     public int ParameterId { get; set; }
     public int GroupId { get; set; }
     public int MainProductInstanceId { get; set; }
+    public int MainProductId { get; set; }
     public int Year { get; set; }
     public int Term { get; set; }
     public string GroupNo { get; set; } = string.Empty;
     public string GroupName { get; set; } = string.Empty;
-    public GroupSegment GroupSegment { get; set; }
+    public GroupType GroupType { get; set; }
     public string MainProductCode { get; set; } = string.Empty;
     public string MainProductName { get; set; } = string.Empty;
     public MainProductCalculationType CalculationType { get; set; }
     public decimal CriterionScore { get; set; }
     public bool IsActive { get; set; }
-    public IReadOnlyList<MainProductSegmentRuleViewModel> Rules { get; set; } = [];
-    public IReadOnlyList<ParameterBranchOptionViewModel> Branches { get; set; } = [];
-}
-
-public class MainProductSegmentRuleViewModel
-{
-    public int Id { get; set; }
-    public PerformanceSegment PerformanceSegment { get; set; }
-    public int SortOrder { get; set; }
-    public decimal TargetShare { get; set; }
-    public decimal SizeShare { get; set; }
-    public decimal ScaleShare { get; set; }
-    public decimal AllocatedScore { get; set; }
-    public decimal HgoWeight { get; set; }
-    public decimal DevelopmentWeight { get; set; }
-    public decimal SizeWeight { get; set; }
-}
-
-public class ParameterTargetEditorViewModel
-{
-    public int ParameterId { get; set; }
-    public int BranchId { get; set; }
-    public string BranchLabel { get; set; } = string.Empty;
-    public IReadOnlyList<ParameterMonthlyMetricViewModel> Months { get; set; } = [];
-}
-
-public class ParameterMonthlyMetricViewModel
-{
-    public int Month { get; set; }
-    public string MonthName { get; set; } = string.Empty;
-    public decimal TargetValue { get; set; }
-    public decimal? ActualValue { get; set; }
-    public DateOnly? ActualAsOfDate { get; set; }
 }
 
 public class MainProductParameterInput
@@ -132,50 +112,80 @@ public class MainProductParameterInput
     public decimal CriterionScore { get; set; }
 
     public bool IsActive { get; set; } = true;
-
-    public List<MainProductSegmentRuleInput> Rules { get; set; } = [];
 }
 
-public class MainProductSegmentRuleInput
+public class MainProductTargetQuery
 {
-    [Range(1, int.MaxValue)]
-    public int Id { get; set; }
-
-    [EnumDataType(typeof(PerformanceSegment))]
-    public PerformanceSegment PerformanceSegment { get; set; }
-
-    [Range(1, int.MaxValue)]
-    public int SortOrder { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal TargetShare { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal SizeShare { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal ScaleShare { get; set; }
-
-    [Range(typeof(decimal), "0", "9999999999999999")]
-    public decimal AllocatedScore { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal HgoWeight { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal DevelopmentWeight { get; set; }
-
-    [Range(typeof(decimal), "0", "100")]
-    public decimal SizeWeight { get; set; }
+    public int? GroupId { get; set; }
+    public int? ProductGamutId { get; set; }
+    public int? PortfolioId { get; set; }
+    public int? MainProductId { get; set; }
+    public int? Year { get; set; }
+    public int? Term { get; set; }
+    public string Search { get; set; } = string.Empty;
+    public string SortKey { get; set; } = "year";
+    public string SortDirection { get; set; } = "desc";
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
 }
 
-public class MonthlyTargetsInput
+public class MainProductTargetPageViewModel
+{
+    public IReadOnlyList<MainProductTargetRowViewModel> Rows { get; set; } = [];
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; } = 1;
+}
+
+public class MainProductTargetRowViewModel
+{
+    public int PortfolioId { get; set; }
+    public int ParameterId { get; set; }
+    public int MainProductId { get; set; }
+    public int ProductGamutId { get; set; }
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public string GroupNo { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+    public string BranchCode { get; set; } = string.Empty;
+    public string BranchName { get; set; } = string.Empty;
+    public string PortfolioCode { get; set; } = string.Empty;
+    public string PortfolioName { get; set; } = string.Empty;
+    public string ProductGamutCode { get; set; } = string.Empty;
+    public string ProductGamutName { get; set; } = string.Empty;
+    public string MainProductCode { get; set; } = string.Empty;
+    public string MainProductName { get; set; } = string.Empty;
+    public decimal PeriodTarget { get; set; }
+    public int EnteredMonthCount { get; set; }
+}
+
+public class MainProductTargetEditorViewModel
+{
+    public int ParameterId { get; set; }
+    public int PortfolioId { get; set; }
+    public int Year { get; set; }
+    public int Term { get; set; }
+    public string PortfolioLabel { get; set; } = string.Empty;
+    public string MainProductLabel { get; set; } = string.Empty;
+    public IReadOnlyList<ParameterMonthlyTargetViewModel> Months { get; set; } = [];
+}
+
+public class ParameterMonthlyTargetViewModel
+{
+    public int Month { get; set; }
+    public string MonthName { get; set; } = string.Empty;
+    public decimal TargetValue { get; set; }
+    public bool HasStoredTarget { get; set; }
+}
+
+public class PortfolioMainProductTargetsInput
 {
     [Range(1, int.MaxValue)]
     public int ParameterId { get; set; }
 
     [Range(1, int.MaxValue)]
-    public int BranchId { get; set; }
+    public int PortfolioId { get; set; }
 
     public List<MonthlyTargetInput> Months { get; set; } = [];
 }
@@ -193,65 +203,4 @@ public class ParameterIdInput
 {
     [Range(1, int.MaxValue)]
     public int Id { get; set; }
-}
-
-public class SubProductTargetQuery
-{
-    public int? GroupId { get; set; }
-    public int? MainProductInstanceId { get; set; }
-    public int? Year { get; set; }
-    public int? Term { get; set; }
-    public string Search { get; set; } = string.Empty;
-    public string SortKey { get; set; } = "year";
-    public string SortDirection { get; set; } = "desc";
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
-}
-
-public class SubProductTargetPageViewModel
-{
-    public IReadOnlyList<SubProductTargetRowViewModel> Rows { get; set; } = [];
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 10;
-    public int TotalCount { get; set; }
-    public int TotalPages { get; set; } = 1;
-}
-
-public class SubProductTargetRowViewModel
-{
-    public int SubProductId { get; set; }
-    public string SubProductCode { get; set; } = string.Empty;
-    public string SubProductName { get; set; } = string.Empty;
-    public int Year { get; set; }
-    public int Term { get; set; }
-    public IReadOnlyList<SubProductParentViewModel> ParentProducts { get; set; } = [];
-    public IReadOnlyList<ParameterBranchOptionViewModel> Branches { get; set; } = [];
-}
-
-public class SubProductParentViewModel
-{
-    public int MainProductInstanceId { get; set; }
-    public string Code { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-}
-
-public class SubProductTargetEditorViewModel
-{
-    public int SubProductId { get; set; }
-    public int BranchId { get; set; }
-    public int Year { get; set; }
-    public int Term { get; set; }
-    public string SubProductCode { get; set; } = string.Empty;
-    public string SubProductName { get; set; } = string.Empty;
-    public string BranchLabel { get; set; } = string.Empty;
-    public IReadOnlyList<ParameterMonthlyMetricViewModel> Months { get; set; } = [];
-}
-
-public class SubProductMonthlyTargetsInput
-{
-    [Range(1, int.MaxValue)] public int SubProductId { get; set; }
-    [Range(1, int.MaxValue)] public int BranchId { get; set; }
-    [Range(2000, 2100)] public int Year { get; set; }
-    [Range(1, 2)] public int Term { get; set; }
-    public List<MonthlyTargetInput> Months { get; set; } = [];
 }

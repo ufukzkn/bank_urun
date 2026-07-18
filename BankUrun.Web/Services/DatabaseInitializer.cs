@@ -10,7 +10,7 @@ public class DatabaseInitializer(
     IWebHostEnvironment environment,
     ILogger<DatabaseInitializer> logger) : IDatabaseInitializer
 {
-    private const string SeedMarker = "mock-v18";
+    private const string SeedMarker = "mock-v20";
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
