@@ -1,8 +1,8 @@
-# Şube Performans Dashboard ve Parametre Yönetimi
+# Şube, Portföy ve Ürün Performans Yönetimi
 
-ASP.NET Core MVC ve PostgreSQL ile şube, yıl ve yarıyıl bağlamında ana ürün performansını görüntüleyen ve ana ürün parametrelerini yöneten örnek iç operasyon uygulaması.
+ASP.NET Core MVC ve PostgreSQL ile şube, portföy, ürün gamı ve ana ürün performansını yıl/yarıyıl bağlamında yöneten örnek iç operasyon uygulaması.
 
-Uygulamanın varsayılan ekranı salt okunur `/Performance` dashboard'udur. Şube, şube–ürün ve tüm şubelerden toplanan ana ürün sonuçları üç ayrı görünümde karşılaştırılır. Ana ürün değerleri bağlı alt ürünlerin şube/ay hedef ve gerçekleşmelerinden üretilir. Ana ürün kuralları ile alt ürün hedefleri `/Parameters` ekranının iki çalışma modundan yönetilir. Aylık kırılımlar yalnız detay istendiğinde yüklenir; batch gerçekleşmeleri salt okunur tutulur. Dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
+Uygulamanın varsayılan ekranı salt okunur `/Performance` dashboard'udur. Şube, şube–ürün, tüm şubelerden toplanan ana ürün ve portföy sonuçları dört ayrı görünümde karşılaştırılır. Hedefler portföy + ana ürün seviyesinde, batch gerçekleşmeleri portföy + stabil alt ürün seviyesinde tutulur. Aynı alt ürün birden fazla ana ürünü beslediğinde tek ham gerçekleşme kaydı her ana ürüne tam katkı verir. Aylık kırılımlar yalnız ilgili detay düğmesine basıldığında yüklenir; dönem sonucu ve sıralamalar saklanmaz, güncel girdilerden hesaplanır.
 
 ## Docker ile Tek Komut Kurulum
 
@@ -37,7 +37,7 @@ docker compose down -v
 
 > `docker compose down -v` PostgreSQL verisini ve pgAdmin ayar volume'unu kalıcı olarak siler. Kullanıcı verisi olan ortamda çalıştırmayın.
 
-Mock seed, `audit_logs` içindeki `mock-v18` işaretiyle korunur. Dengeli demo seti 4 grup, 62 şube, 12 puanlanan ana ürün, ortak alt ürün bağlantıları ve 2024-2026 arasındaki iki dönemleri içerir. Normal container restart'larında aynı sürüm tekrar uygulanmaz. Compose yalnız sürekli çalışan `postgres`, `web` ve `pgadmin` servislerini içerir; ayrı migrate veya seed container'ı yoktur. Tamamen temiz mock kurulum gerektiğinde volume'ları silip Compose'u yeniden başlatın.
+Mock seed, `audit_logs` içindeki `mock-v20` işaretiyle korunur. Dengeli demo seti 4 grup, 62 şube, 12 ana ürün, grup bazlı BI/KO/PR ürün gamları, ST/UZ/OZ portföy tipleri, 198 portföy ve 2024-2026 arasındaki altı yıl–dönem kombinasyonunu içerir. Normal container restart'larında aynı sürüm tekrar uygulanmaz. Compose yalnız sürekli çalışan `postgres`, `web` ve `pgadmin` servislerini içerir; ayrı migrate veya seed container'ı yoktur.
 
 ## Bağlantı Bilgileri
 
@@ -108,34 +108,41 @@ Portable dosyalar `.tools\postgres`, veritabanı verisi `.data\postgres` altınd
 
 ## Sayfalar
 
-- `/Parameters`: Grup + ana ürün + dönem için toplam puan ve Kurumsal/Ticari/Kobi/Bireysel/Diğer segment dağıtımlarının yönetimi. Aylık hedef/batch kırılımı detay içindeki `Ay verisi gir` alanından açılır.
-- `/Performance`: Şube, şube–ürün ve ana ürün genel toplamlarını üç modda gösterir. Satır detayları aylık alt ürün katkılarını ihtiyaç anında yükler.
-- `/Products`: Ana ürün, alt ürün ve dönem instance yönetimi.
-- `/Organization`: Grup ve şube tanımları.
+- `/Parameters`: Ana ürün kriteri/hesaplama yöntemi ile portföy + ana ürün aylık hedeflerini yönetir. Alt ürün batch gerçekleşmeleri salt okunurdur.
+- `/Performance`: Şube, şube–ürün, ana ürün ve portföy sonuçlarını dört modda gösterir. Tüm yıllar ve tüm dönemler seçildiğinde her dönem ayrı satır kalır.
+- `/Products`: Ana/alt ürünler, ürün gamları ve dönemsel gam–ana ürün atamalarını yönetir.
+- `/Organization`: Grup, şube, portföy, portföy tipi ve dönemsel şube–ürün istisnalarını yönetir.
 - `/Dashboard` ve `/Scores`: Geriye uyumluluk için `/Performance` sayfasına yönlenir.
 
 ## Hesaplama Kuralları
 
 - Dönem 1 Ocak-Haziran, dönem 2 Temmuz-Aralık aylarını kapsar.
-- `Average`: Altı aylık hedef ve gerçekleşme ortalaması alınır.
-- `Cumulative`: Altı aylık hedef ve gerçekleşme toplamı alınır.
+- `Average`: Portföy + ana ürün için altı aylık hedef ve gerçekleşme ortalaması alınır.
+- `Cumulative`: Portföy + ana ürün için altı aylık hedef ve gerçekleşme toplamı alınır.
+- Bir ana ürünün aylık gerçekleşmesi, portföyde ona bağlı bütün stabil alt ürün gerçekleşmelerinin toplamıdır.
+- Aynı stabil alt ürün birden fazla ana ürünü besleyebilir; ham değer bölünmeden her birine katkı verir.
 - Hedef dönem kapanmadan görülebilir; gerçekleşme ve puan ancak dönem kapandıktan ve altı aylık batch tamamlandıktan sonra oluşur.
 - `H/G = gerçekleşme / hedef`; hedef sıfırsa oran ve puan sıfırdır.
 - `HGO puanı = kriter puanı × min(H/G, 1)`.
 - İlk sürümde toplam puan HGO puanına eşittir ve kriter puanını aşmaz.
 - Eksik batch ayı bulunan satır sıralamaya katılmaz.
-- Segment sırası aynı grup, yıl, dönem ve üründeki şubelerin yalnız toplam puanına göre `DENSE_RANK` mantığıyla hesaplanır.
+- Şube sırası grup + yıl + dönem; şube–ürün sırası grup + yıl + dönem + ana ürün; ana ürün sırası seçili grup kapsamı + yıl + dönem; portföy resmî sırası grup + ürün gamı + yıl + dönem havuzunda `DENSE_RANK` ile hesaplanır.
+- Portföy şube içi sırası, şube + yıl + dönem içinde `toplam puan / atanmış kriter` başarı oranına göredir.
 
 ## Temel Veritabanı Tabloları
 
 - `product_definitions`: Ana/alt ürün kodu ve güncel adı.
 - `main_product_instances`: Ana ürünün yıl/dönem kaydı.
 - `sub_product_instances`: Alt ürünün ana ürün instance bağlantısı.
-- `group_definitions`: Grup tanımları ve segment bilgisi.
+- `group_definitions`: Grup tanımları ve hesaplamaya etki etmeyen grup tipi.
 - `branches`: Gruba bağlı şubeler.
 - `main_product_parameters`: Grup + ana ürün instance hesaplama tipi ve kriter puanı.
-- `main_product_segment_rules`: Parametrenin segment sırası, hedef/büyüklük/ölçek payları, puan tahsisi ve HGO/gelişim/büyüklük ağırlıkları.
-- `branch_main_product_monthly_metrics`: Aynı gruptaki parametre ve şubeyi bağlayan aylık hedef ve batch gerçekleşmesi.
+- `product_gamuts`: Gruba bağlı BI/KO/PR gibi ürün gamları.
+- `product_gamut_main_product_assignments`: Ürün gamının dönemsel ana ürün kapsamı.
+- `portfolios`: Şube, ürün gamı ve portföy tipine bağlı performans birimleri.
+- `portfolio_main_product_monthly_targets`: Portföy + ana ürün aylık hedefleri.
+- `portfolio_sub_product_monthly_metrics`: Portföy + stabil alt ürün aylık batch gerçekleşmeleri.
+- `branch_main_product_exclusions`: Ana ürünü belirli şubeden dönemsel çıkaran istisnalar.
 - `audit_logs`: Yönetim işlemleri ve seed işaretleri.
 
 Şemayı pgAdmin'de `Databases > bank_urun > Schemas > public > Tables` yolundan görebilirsiniz. SQL ile tablo listesini almak için:
