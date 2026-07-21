@@ -16,9 +16,7 @@
          data-dashboard
          data-default-mode="BranchProduct"
          data-snapshot-url="@Url.Action("Snapshot", "Performance")"
-         data-branch-detail-url="@Url.Action("BranchProductMonthlyDetail", "Performance")"
-         data-main-detail-url="@Url.Action("MainProductMonthlyDetail", "Performance")"
-         data-portfolio-detail-url="@Url.Action("PortfolioDetail", "Performance")">
+         data-rows-url="@Url.Action("Rows", "Performance")">
     <nav class="segmented-control segmented-control--large performance-mode-picker" aria-label="Performans karşılaştırma biçimi" data-segmented-control data-performance-mode-picker>
         <button type="button" data-segmented-value="Branch" data-performance-mode="Branch" aria-pressed="false"><span>Şube performansı</span><small>Şubeleri ürünlerden bağımsız kıyasla</small></button>
         <button class="is-active" type="button" data-segmented-value="BranchProduct" data-performance-mode="BranchProduct" aria-pressed="true"><span>Şube–ürün performansı</span><small>Şube ve ana ürün ilişkisini incele</small></button>
@@ -29,7 +27,12 @@
     <div class="surface-panel dashboard-context-panel">
         <div class="dashboard-context-heading-row">
             <div class="dashboard-context-copy"><h2>Performans araması</h2><p>Görünüme göre filtreler otomatik uyarlanır; seçimler URL’ye yazılmaz.</p></div>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-dashboard-clear>Filtreleri temizle</button>
+            <div class="dashboard-context-actions">
+                <button class="btn btn-sm btn-outline-primary" type="button" data-dashboard-refresh>
+                    Yenile
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-dashboard-clear>Filtreleri temizle</button>
+            </div>
         </div>
         <div class="dashboard-context-grid performance-context-grid">
             <label><span>Yıl</span><select class="form-select" data-dashboard-filter="year">
@@ -81,6 +84,18 @@
     </div>
 
     <div class="performance-mode-stage" data-performance-mode-stage>
-        <div data-dashboard-snapshot>@await Html.PartialAsync("_Snapshot", Model.Snapshot)</div>
+        <div data-dashboard-snapshot aria-live="polite">
+            <div class="surface-panel performance-dashboard-skeleton" role="status" aria-label="Performans sonuçları yükleniyor">
+                <span class="performance-skeleton-line is-short"></span>
+                <span class="performance-skeleton-line"></span>
+                <span class="performance-skeleton-line"></span>
+                <span class="performance-skeleton-line"></span>
+            </div>
+        </div>
     </div>
+    <noscript>
+        <div class="surface-panel dashboard-empty-state">
+            Performans sonuçlarını görüntülemek için JavaScript etkin olmalıdır.
+        </div>
+    </noscript>
 </section>

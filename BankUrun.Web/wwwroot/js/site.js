@@ -308,7 +308,16 @@ document.addEventListener("submit", (event) => {
   const message = submitter?.dataset.confirm || form.dataset.confirm;
   if (message) {
     event.preventDefault();
-    if (form.matches("[data-group-product-removal]") && form.dataset.impactTemplate && submitter) {
+    if (form.matches("[data-product-scope-removal]") && form.dataset.impactTemplate && submitter) {
+      const values = new FormData(form);
+      const params = new URLSearchParams();
+      ["Scope", "GroupId", "ProductGamutId", "BranchId", "MainProductId", "EffectiveFromYear", "EffectiveFromTerm"]
+        .forEach((field) => {
+          const value = values.get(field);
+          if (value) params.set(field, value);
+        });
+      submitter.dataset.impactUrl = `${form.dataset.impactTemplate}?${params}`;
+    } else if (form.matches("[data-group-product-removal]") && form.dataset.impactTemplate && submitter) {
       const values = new FormData(form);
       const params = new URLSearchParams({
         groupId: values.get("GroupId") || "",
@@ -497,10 +506,11 @@ function setupRemoteList(root, options) {
   const load = async (resetPage = true) => {
     if (resetPage) state.page = 1;
     requestController?.abort();
-    requestController = new AbortController();
+    const currentController = new AbortController();
+    requestController = currentController;
     root.classList.add("is-loading");
     try {
-      const result = await options.remote({ state, filterValue, signal: requestController.signal });
+      const result = await options.remote({ state, filterValue, signal: currentController.signal });
       if (tableBody) tableBody.innerHTML = result.html;
       setupGenericCombos(tableBody || root);
       options.afterLoad?.(tableBody || root);
@@ -513,7 +523,9 @@ function setupRemoteList(root, options) {
         tableBody.innerHTML = `<tr class="empty-row"><td colspan="${options.colspan || 9}" class="empty-cell">Liste yüklenemedi. Lütfen yeniden deneyin.</td></tr>`;
       }
     } finally {
-      root.classList.remove("is-loading");
+      if (requestController === currentController) {
+        root.classList.remove("is-loading");
+      }
     }
   };
   const changePage = (page) => {
@@ -725,6 +737,26 @@ if (productManagement) {
   };
   buttons.forEach((button) => button.addEventListener("click", () => setMode(button.dataset.productMode || "products")));
   if (window.sessionStorage.getItem("bankurun.product-mode") === "gamuts") setMode("gamuts");
+
+  const removalForm = productManagement.querySelector("[data-product-scope-removal]");
+  const removalScope = removalForm?.querySelector('input[name="Scope"]');
+  const scopeHelp = removalForm?.querySelector("[data-removal-scope-help]");
+  const helpText = {
+    Group: "Grup seçimi, ürünün gruptaki bütün gam atamalarını seçilen dönemden itibaren kapatır.",
+    ProductGamut: "Ürün gamı seçimi, yalnız seçilen gamdaki ürün atamasını kapatır.",
+    Branch: "Şube seçimi, ürünü yalnız seçilen şubenin performans kapsamı dışında bırakır."
+  };
+  const syncRemovalScope = () => {
+    const scope = removalScope?.value || "Group";
+    removalForm?.querySelectorAll("[data-removal-scope-field]").forEach((field) => {
+      const active = field.dataset.removalScopeField === scope;
+      field.classList.toggle("d-none", !active);
+      field.querySelectorAll("select, input").forEach((input) => { input.disabled = !active; });
+    });
+    if (scopeHelp) scopeHelp.textContent = helpText[scope] || "";
+  };
+  removalScope?.addEventListener("change", syncRemovalScope);
+  syncRemovalScope();
 }
 
 setupList(document.querySelector('[data-list="groups"]'), {
@@ -933,12 +965,22 @@ if (dashboardRoot) {
   const gamutValue = dashboardRoot.querySelector('[data-dashboard-filter="productGamutId"]');
   const portfolioTypeValue = dashboardRoot.querySelector('[data-dashboard-filter="portfolioTypeId"]');
   const clearButton = dashboardRoot.querySelector("[data-dashboard-clear]");
+  const refreshButton = dashboardRoot.querySelector("[data-dashboard-refresh]");
   const storageKey = "bankurun.performance-context";
   const defaultYear = yearValue?.value || "";
   const defaultTerm = termValue?.value || "";
-  let requestController = null;
+  const panelCache = new Map();
+  const detailCache = new Map();
+  const detailRequestControllers = new Set();
+  const cacheLifetime = 60_000;
+  const maxPanelCacheEntries = 8;
+  const maxDetailCacheEntries = 32;
+  let dashboardRequestController = null;
+  let dashboardRequestGeneration = 0;
+  let detailCacheGeneration = 0;
+  let dashboardRefreshTimer = null;
+  let activePanelKey = "";
   let currentMode = dashboardRoot.dataset.defaultMode || "BranchProduct";
-  let hasRestoredContext = false;
 
   const setComboValue = (value, input, option, emptyLabel = "") => {
     if (value) value.value = option?.dataset.id || "";
@@ -970,7 +1012,7 @@ if (dashboardRoot) {
       option.classList.toggle("d-none", hidden);
     });
     const current = branchOptions.find((option) => option.dataset.id === branchValue?.value && option.dataset.contextHidden !== "true");
-    if (!current) setComboValue(branchValue, branchInput, null, "");
+    if (supportsBranch && !current) setComboValue(branchValue, branchInput, null, "");
   };
   const syncProductContext = () => {
     productOptions.forEach((option) => {
@@ -999,18 +1041,128 @@ if (dashboardRoot) {
     syncPortfolioContext();
   };
 
-  const setupPerformanceList = (name, defaultKey, label, defaultDirection = "asc") => setupList(snapshot?.querySelector(`[data-list="${name}"]`), {
-    defaultSort: { key: defaultKey, direction: defaultDirection },
-    descendingKeys: ["year", "term", "criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount", "officialRank", "branchRank"],
-    numericKeys: ["year", "term", "criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount", "officialRank", "branchRank"],
-    label,
-    matches: (row, value) => !value("search") || (row.dataset.search || "").includes(value("search").toUpperCase()),
+  const putCache = (cache, key, value, limit, expiresAt = Date.now() + cacheLifetime) => {
+    cache.delete(key);
+    if (expiresAt <= Date.now()) return;
+    cache.set(key, { value, expiresAt });
+    while (cache.size > limit) {
+      cache.delete(cache.keys().next().value);
+    }
+  };
+  const takeCache = (cache, key) => {
+    const entry = cache.get(key);
+    if (!entry) return null;
+    cache.delete(key);
+    if (entry.expiresAt <= Date.now()) return null;
+    cache.set(key, entry);
+    return entry.value;
+  };
+  const responseCacheExpiresAt = (response) => {
+    const remaining = Number(response.headers.get("X-Performance-Cache-Max-Age-Ms"));
+    const boundedRemaining = Number.isFinite(remaining)
+      ? Math.min(cacheLifetime, Math.max(0, remaining))
+      : cacheLifetime;
+    return Date.now() + boundedRemaining;
+  };
+  const clearCaches = () => {
+    panelCache.clear();
+    detailCache.clear();
+    detailCacheGeneration += 1;
+    detailRequestControllers.forEach((controller) => controller.abort());
+    detailRequestControllers.clear();
+  };
+  const scopeParams = (mode = currentMode) => new URLSearchParams({
+    Mode: mode,
+    GroupId: groupValue?.value || "",
+    BranchId: mode === "BranchProduct" || mode === "Portfolio" ? (branchValue?.value || "") : "",
+    Year: yearValue?.value || "",
+    Term: termValue?.value || "",
+    MainProductId: mode === "BranchProduct" || mode === "MainProduct" ? (productValue?.value || "") : "",
+    ProductGamutId: mode === "Portfolio" ? (gamutValue?.value || "") : "",
+    PortfolioTypeId: mode === "Portfolio" ? (portfolioTypeValue?.value || "") : ""
   });
+  const panelKey = () => Array.from(scopeParams().entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+  const persistContext = () => {
+    window.sessionStorage.setItem(storageKey, JSON.stringify({
+      groupId: groupValue?.value || "",
+      branchId: branchValue?.value || "",
+      year: yearValue?.value || "",
+      term: termValue?.value || "",
+      mainProductId: productValue?.value || "",
+      productGamutId: gamutValue?.value || "",
+      portfolioTypeId: portfolioTypeValue?.value || "",
+      mode: currentMode
+    }));
+  };
+  const performanceListConfig = (mode) => ({
+    Branch: { name: "performanceBranches", label: "şube", colspan: 10, pageSize: 25 },
+    BranchProduct: { name: "performanceBranchProducts", label: "sonuç", colspan: 13, pageSize: 25 },
+    MainProduct: { name: "performanceMainProducts", label: "ana ürün", colspan: 13, pageSize: 10 },
+    Portfolio: { name: "performancePortfolios", label: "portföy", colspan: 14, pageSize: 25 }
+  })[mode];
   const initializeSnapshot = () => {
-    setupPerformanceList("performanceBranches", "total", "şube", "desc");
-    setupPerformanceList("performanceBranchProducts", "total", "sonuç", "desc");
-    setupPerformanceList("performanceMainProducts", "total", "ana ürün", "desc");
-    setupPerformanceList("performancePortfolios", "total", "portföy", "desc");
+    const panel = snapshot?.querySelector("[data-dashboard-mode]");
+    const mode = panel?.dataset.dashboardMode || currentMode;
+    const config = performanceListConfig(mode);
+    const listRoot = config ? panel?.querySelector(`[data-list="${config.name}"]`) : null;
+    if (!listRoot || listRoot.dataset.remoteListReady === "true") return;
+    listRoot.dataset.remoteListReady = "true";
+    let rowsRequestGeneration = 0;
+    const closeVisiblePerformanceDetails = () => {
+      listRoot.querySelectorAll(".list-row").forEach(closeDetail);
+    };
+    listRoot.addEventListener("input", (event) => {
+      if (event.target.matches("[data-list-filter]")) closeVisiblePerformanceDetails();
+    });
+    listRoot.addEventListener("change", (event) => {
+      if (event.target.matches("[data-list-filter], [data-list-page-size]")) closeVisiblePerformanceDetails();
+    });
+    listRoot.addEventListener("click", (event) => {
+      if (event.target.closest("[data-list-sort], [data-list-page]")) closeVisiblePerformanceDetails();
+    });
+    setupList(listRoot, {
+      defaultSort: { key: "total", direction: "desc" },
+      descendingKeys: ["year", "term", "criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount", "officialRank", "branchRank"],
+      numericKeys: ["year", "term", "criterion", "target", "actual", "ratio", "hgo", "total", "rank", "subCount", "branchCount", "officialRank", "branchRank"],
+      label: config.label,
+      colspan: config.colspan,
+      remote: async ({ state, filterValue, signal }) => {
+        const requestGeneration = ++rowsRequestGeneration;
+        const params = scopeParams(mode);
+        params.set("Search", filterValue("search"));
+        params.set("SortKey", state.sort.key);
+        params.set("SortDirection", state.sort.direction);
+        params.set("Page", state.page.toString());
+        params.set("PageSize", listRoot.querySelector("[data-list-page-size]")?.value || config.pageSize.toString());
+        params.set("ForceRefresh", "false");
+        listRoot.setAttribute("aria-busy", "true");
+        try {
+          const response = await fetch(`${dashboardRoot.dataset.rowsUrl}?${params}`, { signal });
+          if (!response.ok) throw new Error("Performans satırları yüklenemedi.");
+          const html = await response.text();
+          if (requestGeneration !== rowsRequestGeneration) {
+            throw new DOMException("Geçersiz performans cevabı.", "AbortError");
+          }
+          panel.dataset.performanceCacheExpiresAt = String(responseCacheExpiresAt(response));
+          const totalCount = Number(response.headers.get("X-Total-Count") || 0);
+          const countChip = panel.querySelector("[data-performance-result-count]");
+          if (countChip) countChip.textContent = `${totalCount} sonuç`;
+          return {
+            html,
+            totalCount,
+            totalPages: Number(response.headers.get("X-Total-Pages") || 1),
+            page: Number(response.headers.get("X-Page") || 1)
+          };
+        } finally {
+          if (requestGeneration === rowsRequestGeneration) {
+            listRoot.setAttribute("aria-busy", "false");
+          }
+        }
+      }
+    });
   };
 
   try {
@@ -1026,18 +1178,9 @@ if (dashboardRoot) {
     if (storedBranch) setComboValue(branchValue, branchInput, storedBranch);
     const storedProduct = productOptions.find((option) => option.dataset.id === String(stored?.mainProductId || "") && option.dataset.contextHidden !== "true");
     if (storedProduct) setComboValue(productValue, productInput, storedProduct, "Tüm ana ürünler");
+    syncPortfolioContext();
     if (stored?.productGamutId && gamutValue?.querySelector(`option[value="${stored.productGamutId}"]:not(:disabled)`)) gamutValue.value = stored.productGamutId;
     if (stored?.portfolioTypeId && portfolioTypeValue?.querySelector(`option[value="${stored.portfolioTypeId}"]`)) portfolioTypeValue.value = stored.portfolioTypeId;
-    hasRestoredContext = Boolean(stored) && (
-      (groupValue?.value || "") !== ""
-      || (branchValue?.value || "") !== ""
-      || (yearValue?.value || "") !== defaultYear
-      || (termValue?.value || "") !== defaultTerm
-      || (productValue?.value || "") !== ""
-      || (gamutValue?.value || "") !== ""
-      || (portfolioTypeValue?.value || "") !== ""
-      || currentMode !== (dashboardRoot.dataset.defaultMode || "BranchProduct")
-    );
   } catch {
     window.sessionStorage.removeItem(storageKey);
     syncTermContext();
@@ -1045,55 +1188,125 @@ if (dashboardRoot) {
     syncProductContext();
   }
 
-  const refreshDashboard = async () => {
-    requestController?.abort();
-    requestController = new AbortController();
-    dashboardRoot.classList.add("is-loading");
-    window.sessionStorage.setItem(storageKey, JSON.stringify({
-      groupId: groupValue?.value || "",
-      branchId: branchValue?.value || "",
-      year: yearValue?.value || "",
-      term: termValue?.value || "",
-      mainProductId: productValue?.value || "",
-      productGamutId: gamutValue?.value || "",
-      portfolioTypeId: portfolioTypeValue?.value || "",
-      mode: currentMode
-    }));
-    const params = new URLSearchParams({
-      mode: currentMode,
-      groupId: groupValue?.value || "",
-      branchId: currentMode === "BranchProduct" || currentMode === "Portfolio" ? (branchValue?.value || "") : "",
-      year: yearValue?.value || "",
-      term: termValue?.value || "",
-      mainProductId: currentMode === "BranchProduct" || currentMode === "MainProduct" ? (productValue?.value || "") : "",
-      productGamutId: currentMode === "Portfolio" ? (gamutValue?.value || "") : "",
-      portfolioTypeId: currentMode === "Portfolio" ? (portfolioTypeValue?.value || "") : ""
-    });
-    try {
-      const response = await fetch(`${dashboardRoot.dataset.snapshotUrl}?${params}`, { signal: requestController.signal });
-      if (!response.ok) throw new Error("Dashboard yüklenemedi.");
-      if (snapshot) {
-        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!reduceMotion) {
-          if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
-          snapshot.classList.add("is-leaving");
-          await new Promise((resolve) => window.setTimeout(resolve, 90));
-        }
-        snapshot.innerHTML = await response.text();
-        initializeSnapshot();
-        snapshot.classList.remove("is-leaving");
-        snapshot.classList.add("is-entering");
-        if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
-        window.requestAnimationFrame(() => snapshot.classList.remove("is-entering"));
-        window.setTimeout(() => { if (modeStage) modeStage.style.height = "auto"; }, 220);
+  const transitionSnapshot = async (
+    content,
+    targetKey,
+    generation,
+    isCached,
+    cacheExpiresAt = Date.now() + cacheLifetime) => {
+    if (!snapshot) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const outgoing = snapshot.firstElementChild;
+    if (!reduceMotion && outgoing) {
+      if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
+      snapshot.classList.add("is-leaving");
+      await new Promise((resolve) => window.setTimeout(resolve, 90));
+    }
+    snapshot.classList.remove("is-leaving");
+    if (generation !== dashboardRequestGeneration) {
+      if (modeStage) modeStage.style.height = "auto";
+      throw new DOMException("Geçersiz performans cevabı.", "AbortError");
+    }
+    if (outgoing && activePanelKey && activePanelKey !== targetKey) {
+      const expiresAt = Number(outgoing.dataset.performanceCacheExpiresAt || 0);
+      putCache(panelCache, activePanelKey, outgoing, maxPanelCacheEntries, expiresAt);
+    }
+    if (isCached) {
+      snapshot.replaceChildren(content);
+    } else {
+      snapshot.innerHTML = content;
+      const loadedPanel = snapshot.firstElementChild;
+      if (loadedPanel) {
+        loadedPanel.dataset.performanceCacheExpiresAt = String(cacheExpiresAt);
       }
+      initializeSnapshot();
+    }
+    activePanelKey = targetKey;
+    if (!reduceMotion) {
+      snapshot.classList.add("is-entering");
+      if (modeStage) modeStage.style.height = `${snapshot.offsetHeight}px`;
+      window.requestAnimationFrame(() => snapshot.classList.remove("is-entering"));
+      window.setTimeout(() => {
+        if (modeStage && generation === dashboardRequestGeneration) modeStage.style.height = "auto";
+      }, 220);
+    } else if (modeStage) {
+      modeStage.style.height = "auto";
+    }
+  };
+
+  const refreshDashboard = async ({ forceRefresh = false, useCache = true } = {}) => {
+    window.clearTimeout(dashboardRefreshTimer);
+    dashboardRefreshTimer = null;
+    const generation = ++dashboardRequestGeneration;
+    dashboardRequestController?.abort();
+    dashboardRequestController = new AbortController();
+    const targetKey = panelKey();
+    persistContext();
+
+    if (useCache && !forceRefresh && targetKey !== activePanelKey) {
+      const cachedPanel = takeCache(panelCache, targetKey);
+      if (cachedPanel) {
+        dashboardRoot.setAttribute("aria-busy", "true");
+        try {
+          await transitionSnapshot(cachedPanel, targetKey, generation, true);
+        } catch (error) {
+          if (error.name !== "AbortError") throw error;
+        } finally {
+          if (generation === dashboardRequestGeneration) {
+            dashboardRoot.classList.remove("is-loading");
+            dashboardRoot.setAttribute("aria-busy", "false");
+            refreshButton?.removeAttribute("disabled");
+          }
+        }
+        return;
+      }
+    }
+
+    dashboardRoot.classList.add("is-loading");
+    dashboardRoot.setAttribute("aria-busy", "true");
+    refreshButton?.setAttribute("disabled", "");
+    const config = performanceListConfig(currentMode);
+    const params = scopeParams();
+    params.set("Search", "");
+    params.set("SortKey", "total");
+    params.set("SortDirection", "desc");
+    params.set("Page", "1");
+    params.set("PageSize", config.pageSize.toString());
+    params.set("ForceRefresh", String(forceRefresh));
+    try {
+      const response = await fetch(`${dashboardRoot.dataset.snapshotUrl}?${params}`, {
+        signal: dashboardRequestController.signal,
+        headers: forceRefresh ? { "X-Performance-Force-Refresh": "1" } : {}
+      });
+      if (!response.ok) throw new Error("Dashboard yüklenemedi.");
+      const html = await response.text();
+      if (generation !== dashboardRequestGeneration) {
+        throw new DOMException("Geçersiz performans cevabı.", "AbortError");
+      }
+      await transitionSnapshot(
+        html,
+        targetKey,
+        generation,
+        false,
+        responseCacheExpiresAt(response));
     } catch (error) {
-      if (error.name !== "AbortError" && snapshot) {
+      if (error.name !== "AbortError" && snapshot && generation === dashboardRequestGeneration) {
+        snapshot.classList.remove("is-leaving", "is-entering");
+        if (modeStage) modeStage.style.height = "auto";
         snapshot.innerHTML = '<div class="surface-panel dashboard-empty-state">Dashboard verisi yüklenemedi. Lütfen yeniden deneyin.</div>';
+        activePanelKey = targetKey;
       }
     } finally {
-      dashboardRoot.classList.remove("is-loading");
+      if (generation === dashboardRequestGeneration) {
+        dashboardRoot.classList.remove("is-loading");
+        dashboardRoot.setAttribute("aria-busy", "false");
+        refreshButton?.removeAttribute("disabled");
+      }
     }
+  };
+  const scheduleDashboardRefresh = () => {
+    window.clearTimeout(dashboardRefreshTimer);
+    dashboardRefreshTimer = window.setTimeout(() => refreshDashboard(), 250);
   };
 
   modeButtons.forEach((button) => button.addEventListener("click", () => {
@@ -1107,14 +1320,14 @@ if (dashboardRoot) {
     setComboValue(branchValue, branchInput, null, "");
     syncBranchContext();
     syncPortfolioContext();
-    refreshDashboard();
+    scheduleDashboardRefresh();
   });
-  branchValue?.addEventListener("change", refreshDashboard);
-  yearValue?.addEventListener("change", () => { syncTermContext(); syncProductContext(); refreshDashboard(); });
-  termValue?.addEventListener("change", () => { syncProductContext(); refreshDashboard(); });
-  productValue?.addEventListener("change", refreshDashboard);
-  gamutValue?.addEventListener("change", refreshDashboard);
-  portfolioTypeValue?.addEventListener("change", refreshDashboard);
+  branchValue?.addEventListener("change", scheduleDashboardRefresh);
+  yearValue?.addEventListener("change", () => { syncTermContext(); syncProductContext(); scheduleDashboardRefresh(); });
+  termValue?.addEventListener("change", () => { syncProductContext(); scheduleDashboardRefresh(); });
+  productValue?.addEventListener("change", scheduleDashboardRefresh);
+  gamutValue?.addEventListener("change", scheduleDashboardRefresh);
+  portfolioTypeValue?.addEventListener("change", scheduleDashboardRefresh);
   clearButton?.addEventListener("click", () => {
     if (yearValue) yearValue.value = defaultYear;
     if (termValue) termValue.value = defaultTerm;
@@ -1129,6 +1342,11 @@ if (dashboardRoot) {
     currentMode = "BranchProduct";
     syncModeUi();
     refreshDashboard();
+  });
+  refreshButton?.addEventListener("click", () => {
+    clearCaches();
+    activePanelKey = "";
+    refreshDashboard({ forceRefresh: true, useCache: false });
   });
   snapshot?.addEventListener("click", async (event) => {
     const sectionButton = event.target.closest("[data-lazy-performance-section]");
@@ -1147,17 +1365,35 @@ if (dashboardRoot) {
       const url = sectionButton.dataset.lazyPerformanceUrl;
       if (!url) return;
       target.hidden = false;
+      const cachedHtml = takeCache(detailCache, url);
+      if (cachedHtml !== null) {
+        target.innerHTML = cachedHtml;
+        target.dataset.loaded = "true";
+        sectionButton.setAttribute("aria-expanded", "true");
+        return;
+      }
       target.dataset.loading = "true";
       target.innerHTML = '<div class="inline-loading-state">Detay yükleniyor…</div>';
       sectionButton.setAttribute("aria-expanded", "true");
+      const requestGeneration = detailCacheGeneration;
+      const detailController = new AbortController();
+      detailRequestControllers.add(detailController);
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: detailController.signal });
         if (!response.ok) throw new Error("Performans detayı yüklenemedi.");
-        target.innerHTML = await response.text();
+        const html = await response.text();
+        if (requestGeneration !== detailCacheGeneration) {
+          throw new DOMException("Geçersiz performans detayı.", "AbortError");
+        }
+        putCache(detailCache, url, html, maxDetailCacheEntries);
+        target.innerHTML = html;
         target.dataset.loaded = "true";
-      } catch {
-        target.innerHTML = '<div class="inline-empty-state">Detay yüklenemedi. Lütfen yeniden deneyin.</div>';
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          target.innerHTML = '<div class="inline-empty-state">Detay yüklenemedi. Lütfen yeniden deneyin.</div>';
+        }
       } finally {
+        detailRequestControllers.delete(detailController);
         target.dataset.loading = "false";
       }
       return;
@@ -1166,6 +1402,13 @@ if (dashboardRoot) {
     const inspectButton = event.target.closest("[data-inspect-branch]");
     if (inspectButton) {
       if (groupValue) groupValue.value = inspectButton.dataset.groupId || "";
+      if (yearValue && yearValue.querySelector(`option[value="${inspectButton.dataset.year}"]`)) {
+        yearValue.value = inspectButton.dataset.year || "";
+      }
+      syncTermContext();
+      if (termValue && termValue.querySelector(`option[value="${inspectButton.dataset.term}"]:not(:disabled)`)) {
+        termValue.value = inspectButton.dataset.term || "";
+      }
       syncBranchContext();
       const option = branchOptions.find((item) => item.dataset.id === inspectButton.dataset.branchId);
       setComboValue(branchValue, branchInput, option, inspectButton.dataset.branchLabel || "");
@@ -1174,43 +1417,10 @@ if (dashboardRoot) {
       refreshDashboard();
       return;
     }
-    const detailButton = event.target.closest("[data-monthly-detail]");
-    if (!detailButton) return;
-    const detailRow = detailRowFor(detailButton.closest(".list-row"));
-    const target = detailRow?.querySelector("[data-monthly-detail-target]");
-    if (!target || target.dataset.loaded === "true" || target.dataset.loading === "true") return;
-    target.dataset.loading = "true";
-    try {
-      const params = new URLSearchParams({
-        mainProductInstanceId: detailButton.dataset.productId || ""
-      });
-      let detailUrl = dashboardRoot.dataset.mainDetailUrl;
-      if (detailButton.dataset.monthlyDetail === "portfolio") {
-        params.delete("mainProductInstanceId");
-        params.set("portfolioId", detailButton.dataset.portfolioId || "");
-        params.set("year", detailButton.dataset.year || "");
-        params.set("term", detailButton.dataset.term || "");
-        detailUrl = dashboardRoot.dataset.portfolioDetailUrl;
-      } else if (detailButton.dataset.monthlyDetail === "branch") {
-        params.set("branchId", detailButton.dataset.branchId || "");
-        detailUrl = dashboardRoot.dataset.branchDetailUrl;
-      } else if (groupValue?.value) {
-        params.set("groupId", groupValue.value);
-      }
-      const response = await fetch(`${detailUrl}?${params}`);
-      if (!response.ok) throw new Error("Aylık detay yüklenemedi.");
-      target.innerHTML = await response.text();
-      target.dataset.loaded = "true";
-    } catch {
-      target.innerHTML = '<div class="inline-empty-state">Aylık detay yüklenemedi. Lütfen yeniden deneyin.</div>';
-    } finally {
-      target.dataset.loading = "false";
-    }
   });
   syncTermContext();
   syncModeUi();
-  initializeSnapshot();
-  if (hasRestoredContext) refreshDashboard();
+  refreshDashboard();
 }
 
 codeMode?.addEventListener("change", toggleManualCode);

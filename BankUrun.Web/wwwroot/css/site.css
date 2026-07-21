@@ -2611,6 +2611,39 @@ label span {
 [data-dashboard-snapshot].is-leaving { opacity: 0; transform: translateY(-5px); }
 [data-dashboard-snapshot].is-entering { opacity: 0; transform: translateY(7px); }
 .performance-mode-content { min-width: 0; }
+.dashboard-context-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.performance-dashboard-skeleton {
+  display: grid;
+  gap: .8rem;
+  min-height: 260px;
+  overflow: hidden;
+  padding: 1.25rem;
+}
+
+.performance-skeleton-line {
+  animation: performance-skeleton-pulse 1.25s ease-in-out infinite;
+  background: linear-gradient(90deg, #edf2f5 25%, #f8fafb 50%, #edf2f5 75%);
+  background-size: 220% 100%;
+  border-radius: .45rem;
+  display: block;
+  height: 42px;
+}
+
+.performance-skeleton-line.is-short {
+  height: 28px;
+  width: min(360px, 65%);
+}
+
+@keyframes performance-skeleton-pulse {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
 
 .dashboard-workspace {
   grid-template-columns: minmax(0, 1fr);
@@ -2632,6 +2665,14 @@ label span {
 }
 
 .performance-search-panel { overflow: hidden; }
+.performance-search-panel[aria-busy="true"] {
+  cursor: progress;
+}
+.performance-search-panel[aria-busy="true"] .performance-table-scroll,
+.performance-search-panel[aria-busy="true"] .pagination-bar {
+  opacity: .52;
+  pointer-events: none;
+}
 .performance-search-panel > .performance-table-scroll {
   max-width: 100%;
   min-width: 0;
@@ -2723,6 +2764,7 @@ label span {
   .segmented-control > button,
   .performance-mode-stage,
   [data-dashboard-snapshot] { transition: none !important; transform: none !important; }
+  .performance-skeleton-line { animation: none !important; }
 }
 
 @media (max-width: 1180px) {
@@ -2745,6 +2787,8 @@ label span {
   .performance-product-toolbar,
   .branch-summary-grid,
   .role-score-grid { grid-template-columns: 1fr; }
+  .dashboard-context-actions { align-items: stretch; width: 100%; }
+  .dashboard-context-actions .btn { flex: 1; }
 }
 
 /* Performance tables keep their text readable and scroll only inside the table shell. */

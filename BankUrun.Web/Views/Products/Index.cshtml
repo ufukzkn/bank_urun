@@ -64,7 +64,28 @@
     <div class="d-none" data-product-mode-panel="gamuts">
         <section class="workspace-grid compact-workspace-grid gamut-create-grid">
             <div class="surface-panel create-panel compact-create-panel"><div class="panel-heading"><div><h2>Ürün gamı oluştur</h2><p>Gruba özel ürün kapsamı tanımlayın.</p></div></div><form asp-action="SaveProductGamut" method="post" class="stack-form compact-stack-form">@Html.AntiForgeryToken()<label><span>Grup</span><select class="form-select" name="GroupId" required>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.Label</option> }</select></label><div class="form-row compact-form-row"><label><span>Gam kodu</span><input class="form-control code-input" name="Code" maxlength="2" pattern="[A-Za-z0-9]{2}" placeholder="BI" required /></label><label><span>Gam adı</span><input class="form-control" name="Name" maxlength="120" required /></label></div><input type="hidden" name="IsActive" value="true" /><button class="btn btn-primary" type="submit">Ürün gamı oluştur</button></form></div>
-            <div class="surface-panel create-panel compact-create-panel"><div class="panel-heading"><div><h2>Ürünü gruptan çıkar</h2><p>Bütün gam atamalarını seçili dönemden itibaren kapatır; geçmişi korur.</p></div></div><form asp-action="RemoveMainProductFromGroup" method="post" class="stack-form compact-stack-form" data-group-product-removal data-impact-template="@Url.Action("GroupMainProductRemovalImpact", "Products")">@Html.AntiForgeryToken()<label><span>Grup</span><select class="form-select" name="GroupId" required>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.Label</option> }</select></label><label><span>Ana ürün</span><select class="form-select" name="MainProductId" required>@foreach (var product in Model.MainProductDefinitions.Where(item => item.IsActive)) { <option value="@product.Id">@product.Label</option> }</select></label><div class="form-row compact-form-row"><label><span>Başlangıç yılı</span><input class="form-control" type="number" name="EffectiveFromYear" min="2000" max="2100" value="2026" required /></label><label><span>Dönem</span><select class="form-select" name="EffectiveFromTerm"><option value="1">1. Dönem</option><option value="2" selected>2. Dönem</option></select></label></div><button class="btn btn-outline-danger" type="submit" data-confirm="Ana ürün seçili dönemden itibaren grubun bütün ürün gamlarından çıkarılacak.">Atamayı kaldır, geçmişi koru</button></form></div>
+            <div class="surface-panel create-panel compact-create-panel">
+                <div class="panel-heading"><div><h2>Ana ürünü kapsamdan çıkar</h2><p>Grup, ürün gamı veya şube kapsamını seçin; geçmiş dönemler korunur.</p></div></div>
+                <form asp-action="RemoveMainProductFromScope" method="post" class="stack-form compact-stack-form" data-product-scope-removal data-impact-template="@Url.Action("MainProductScopeRemovalImpact", "Products")">
+                    @Html.AntiForgeryToken()
+                    <div class="segmented-field">
+                        <span>Çıkarma kapsamı</span>
+                        <div class="segmented-control segmented-control--compact segmented-control--mini" role="group" aria-label="Ana ürün çıkarma kapsamı" data-segmented-control data-segmented-input="#mainProductRemovalScope">
+                            <button class="is-active" type="button" data-segmented-value="Group" aria-pressed="true">Grup</button>
+                            <button type="button" data-segmented-value="ProductGamut" aria-pressed="false">Ürün gamı</button>
+                            <button type="button" data-segmented-value="Branch" aria-pressed="false">Şube</button>
+                            <input type="hidden" id="mainProductRemovalScope" name="Scope" value="Group" />
+                        </div>
+                    </div>
+                    <label data-removal-scope-field="Group"><span>Grup</span><select class="form-select" name="GroupId" required>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.Label</option> }</select></label>
+                    <label class="d-none" data-removal-scope-field="ProductGamut"><span>Ürün gamı</span><select class="form-select" name="ProductGamutId" required disabled>@foreach (var gamut in Model.ProductGamuts) { <option value="@gamut.Id">@gamut.GroupNo · @gamut.Code - @gamut.Name</option> }</select></label>
+                    <label class="d-none" data-removal-scope-field="Branch"><span>Şube</span><select class="form-select" name="BranchId" required disabled>@foreach (var branch in Model.Branches) { <option value="@branch.Id">@branch.Label</option> }</select></label>
+                    <label><span>Ana ürün</span><select class="form-select" name="MainProductId" required>@foreach (var product in Model.MainProductDefinitions.Where(item => item.IsActive)) { <option value="@product.Id">@product.Label</option> }</select></label>
+                    <div class="form-row compact-form-row"><label><span>Başlangıç yılı</span><input class="form-control" type="number" name="EffectiveFromYear" min="2000" max="2100" value="2026" required /></label><label><span>Dönem</span><select class="form-select" name="EffectiveFromTerm"><option value="1">1. Dönem</option><option value="2" selected>2. Dönem</option></select></label></div>
+                    <small class="form-text" data-removal-scope-help>Grup seçimi, ürünün gruptaki bütün gam atamalarını seçilen dönemden itibaren kapatır.</small>
+                    <button class="btn btn-outline-danger" type="submit" data-confirm="Ana ürün seçilen kapsamdan ve dönemden itibaren çıkarılacak; geçmiş atamalar ile ölçüm verileri korunacak.">Atamayı kaldır, geçmişi koru</button>
+                </form>
+            </div>
         </section>
 
         <section class="surface-panel table-panel compact-list-panel" data-list="productGamuts">

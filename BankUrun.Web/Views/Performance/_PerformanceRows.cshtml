@@ -1,0 +1,222 @@
+@using BankUrun.Web.Models
+@using BankUrun.Web.ViewModels
+@model BankUrun.Web.ViewModels.DashboardSnapshotViewModel
+@{
+    var branchRows = Model.GetResults<DashboardBranchPerformanceViewModel>().Items;
+    var branchProductRows = Model.GetResults<DashboardProductPerformanceViewModel>().Items;
+    var mainProductRows = Model.GetResults<DashboardMainProductPerformanceViewModel>().Items;
+    var portfolioRows = Model.GetResults<DashboardPortfolioPerformanceViewModel>().Items;
+}
+@functions {
+    private static string Calculation(MainProductCalculationType type) =>
+        type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+
+    private static string Text(decimal? value) =>
+        value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+
+    private static string Tone(decimal? ratio) => ratio switch
+    {
+        >= 90 => "performance-tone-excellent",
+        >= 80 => "performance-tone-good",
+        >= 70 => "performance-tone-watch",
+        not null => "performance-tone-low",
+        _ => "performance-tone-pending"
+    };
+}
+
+@if (Model.Mode == PerformanceMode.Branch)
+{
+    @foreach (var row in branchRows)
+    {
+        var detailId = $"branch-performance-{row.Year}-{row.Term}-{row.BranchId}";
+        <tr class="list-row @Tone(row.SuccessPercent)" data-detail-id="@detailId">
+            <td class="numeric-cell">@row.Year</td>
+            <td class="numeric-cell">@row.Term</td>
+            <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
+            <td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td>
+            <td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td>
+            <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
+            <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
+            <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N2}" : "—")</span></td>
+            <td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+        </tr>
+        <tr class="list-detail-row" data-detail-for="@detailId">
+            <td colspan="10">
+                <div class="collapse" id="@detailId">
+                    <div class="branch-inline-detail">
+                        <div>
+                            <strong>@row.CompleteProductCount / @row.ProductCount ana ürün tamamlandı</strong>
+                            <span>@(row.HasCompletePeriodData ? "Dönem batch'i tamamlandı." : "Eksik hedef veya alt ürün batch'i bulunuyor.")</span>
+                        </div>
+                        <button class="btn btn-sm btn-primary" type="button"
+                                data-inspect-branch
+                                data-group-id="@row.GroupId"
+                                data-branch-id="@row.BranchId"
+                                data-year="@row.Year"
+                                data-term="@row.Term"
+                                data-branch-label="@($"{row.BranchCode} - {row.BranchName}")">
+                            Şubeyi incele
+                        </button>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    }
+    @if (branchRows.Count == 0)
+    {
+        <tr class="empty-row" data-list-empty><td colspan="10" class="empty-cell">Filtreye uygun şube bulunamadı.</td></tr>
+    }
+}
+else if (Model.Mode == PerformanceMode.BranchProduct)
+{
+    @foreach (var row in branchProductRows)
+    {
+        var detailId = $"branch-product-{row.Year}-{row.Term}-{row.BranchId}-{row.MainProductInstanceId}";
+        var monthsUrl = Url.Action("BranchProductMonthlyDetail", "Performance", new { row.BranchId, row.MainProductInstanceId, section = "months" });
+        var contributionsUrl = Url.Action("BranchProductMonthlyDetail", "Performance", new { row.BranchId, row.MainProductInstanceId, section = "contributions" });
+        <tr class="list-row @Tone(row.HgRatioPercent)" data-detail-id="@detailId">
+            <td class="numeric-cell">@row.Year</td>
+            <td class="numeric-cell">@row.Term</td>
+            <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
+            <td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td>
+            <td>
+                <strong>@row.ProductCode</strong><small>@row.ProductName</small>
+                <span class="calculation-badge">@Calculation(row.CalculationType)</span>
+                @if (!row.HasParameterConfiguration) { <span class="data-waiting-badge">Parametre bekleniyor</span> }
+                else if (!row.HasSubProductConfiguration) { <span class="data-waiting-badge">Alt ürün bağlantısı yok</span> }
+                else if (!row.HasCompleteTargetData) { <span class="data-waiting-badge">Hedef bekleniyor</span> }
+                else if (!row.HasCompleteBatchData) { <span class="data-waiting-badge">Veri bekleniyor</span> }
+            </td>
+            <td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td>
+            <td class="text-end numeric-cell">@row.TargetValue.ToString("N2")</td>
+            <td class="text-end numeric-cell">@Text(row.ActualValue)</td>
+            <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td>
+            <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
+            <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
+            <td class="text-end numeric-cell">@(row.SegmentRank.HasValue ? $"{row.SegmentRank} / {row.SegmentRankCandidateCount}" : "—")</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+        </tr>
+        <tr class="list-detail-row" data-detail-for="@detailId">
+            <td colspan="13">
+                <div class="collapse" id="@detailId">
+                    <div class="performance-product-detail">
+                        <div class="performance-detail-heading">
+                            <div><h3>@row.ProductCode · @row.ProductName</h3><p>@row.BranchCode · @row.BranchName · @Calculation(row.CalculationType)</p></div>
+                        </div>
+                        <div class="performance-detail-actions" role="group" aria-label="Detay bölümleri">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="months" data-lazy-performance-url="@monthsUrl" aria-expanded="false">Aylık gidişatı göster</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="contributions" data-lazy-performance-url="@contributionsUrl" aria-expanded="false">Alt ürün katkılarını göster</button>
+                        </div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="months" hidden></div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="contributions" hidden></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    }
+    @if (branchProductRows.Count == 0)
+    {
+        <tr class="empty-row" data-list-empty><td colspan="13" class="empty-cell">Filtreye uygun şube–ürün sonucu bulunamadı.</td></tr>
+    }
+}
+else if (Model.Mode == PerformanceMode.MainProduct)
+{
+    @foreach (var row in mainProductRows)
+    {
+        var detailId = $"main-product-{row.Year}-{row.Term}-{row.MainProductInstanceId}";
+        var monthsUrl = Url.Action("MainProductMonthlyDetail", "Performance", new { row.MainProductInstanceId, groupId = Model.GroupId, section = "months" });
+        var contributionsUrl = Url.Action("MainProductMonthlyDetail", "Performance", new { row.MainProductInstanceId, groupId = Model.GroupId, section = "contributions" });
+        <tr class="list-row @Tone(row.HgRatioPercent)" data-detail-id="@detailId">
+            <td class="numeric-cell">@row.Year</td>
+            <td class="numeric-cell">@row.Term</td>
+            <td>
+                <strong>@row.ProductCode</strong><small>@row.ProductName</small>
+                @if (!row.HasParameterConfiguration) { <span class="data-waiting-badge">Parametre bekleniyor</span> }
+                else if (!row.HasSubProductConfiguration) { <span class="data-waiting-badge">Alt ürün bağlantısı yok</span> }
+                else if (!row.HasCompleteTargetData) { <span class="data-waiting-badge">Hedef bekleniyor</span> }
+                else if (!row.HasCompleteBatchData) { <span class="data-waiting-badge">Veri bekleniyor</span> }
+            </td>
+            <td class="text-end numeric-cell">@row.SubProductCount</td>
+            <td class="text-end numeric-cell">@row.BranchCount</td>
+            <td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td>
+            <td class="text-end numeric-cell">@row.TargetValue.ToString("N2")</td>
+            <td class="text-end numeric-cell">@Text(row.ActualValue)</td>
+            <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td>
+            <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
+            <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
+            <td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+        </tr>
+        <tr class="list-detail-row" data-detail-for="@detailId">
+            <td colspan="13">
+                <div class="collapse" id="@detailId">
+                    <div class="performance-product-detail">
+                        <div class="performance-detail-heading">
+                            <div><h3>@row.ProductCode · @row.ProductName</h3><p>@Model.GroupName · @row.Year / @row.Term. Dönem</p></div>
+                        </div>
+                        <div class="performance-detail-actions" role="group" aria-label="Detay bölümleri">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="months" data-lazy-performance-url="@monthsUrl" aria-expanded="false">Aylık gidişatı göster</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="contributions" data-lazy-performance-url="@contributionsUrl" aria-expanded="false">Alt ürün katkılarını göster</button>
+                        </div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="months" hidden></div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="contributions" hidden></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    }
+    @if (mainProductRows.Count == 0)
+    {
+        <tr class="empty-row" data-list-empty><td colspan="13" class="empty-cell">Filtreye uygun ana ürün sonucu bulunamadı.</td></tr>
+    }
+}
+else
+{
+    @foreach (var row in portfolioRows)
+    {
+        var detailId = $"portfolio-{row.Year}-{row.Term}-{row.PortfolioId}";
+        var productsUrl = Url.Action("PortfolioDetail", "Performance", new { row.PortfolioId, row.Year, row.Term, section = "products" });
+        var monthsUrl = Url.Action("PortfolioDetail", "Performance", new { row.PortfolioId, row.Year, row.Term, section = "months" });
+        var contributionsUrl = Url.Action("PortfolioDetail", "Performance", new { row.PortfolioId, row.Year, row.Term, section = "contributions" });
+        <tr class="list-row @Tone(row.SuccessPercent)" data-detail-id="@detailId">
+            <td class="numeric-cell">@row.Year</td>
+            <td class="numeric-cell">@row.Term</td>
+            <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
+            <td><strong>@row.BranchCode</strong><small>@row.BranchName</small></td>
+            <td><strong>@row.PortfolioCode</strong><small>@row.PortfolioName</small></td>
+            <td><span class="calculation-badge">@row.PortfolioTypeCode</span><small>@row.PortfolioTypeName</small></td>
+            <td><strong>@row.ProductGamutCode</strong><small>@row.ProductGamutName</small></td>
+            <td class="text-end numeric-cell">@row.CriterionScore.ToString("N2")</td>
+            <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
+            <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
+            <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N2}" : "—")</span></td>
+            <td class="text-end numeric-cell">@(row.OfficialRank.HasValue ? $"{row.OfficialRank} / {row.OfficialRankCandidateCount}" : "—")</td>
+            <td class="text-end numeric-cell">@(row.BranchRank.HasValue ? $"{row.BranchRank} / {row.BranchRankCandidateCount}" : "—")</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
+        </tr>
+        <tr class="list-detail-row" data-detail-for="@detailId">
+            <td colspan="14">
+                <div class="collapse" id="@detailId">
+                    <div class="performance-product-detail">
+                        <div class="performance-detail-heading">
+                            <div><h3>@row.PortfolioCode · @row.PortfolioName</h3><p>@row.BranchCode · @row.BranchName · @row.Year / @row.Term. Dönem</p></div>
+                        </div>
+                        <div class="performance-detail-actions" role="group" aria-label="Portföy detay bölümleri">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="products" data-lazy-performance-url="@productsUrl" aria-expanded="false">Ana ürün kırılımını göster</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="months" data-lazy-performance-url="@monthsUrl" aria-expanded="false">Aylık gidişatı göster</button>
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-lazy-performance-section="contributions" data-lazy-performance-url="@contributionsUrl" aria-expanded="false">Alt ürün katkılarını göster</button>
+                        </div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="products" hidden></div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="months" hidden></div>
+                        <div class="performance-detail-section-target" data-lazy-performance-target="contributions" hidden></div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    }
+    @if (portfolioRows.Count == 0)
+    {
+        <tr class="empty-row" data-list-empty><td colspan="14" class="empty-cell">Filtreye uygun portföy sonucu bulunamadı.</td></tr>
+    }
+}
