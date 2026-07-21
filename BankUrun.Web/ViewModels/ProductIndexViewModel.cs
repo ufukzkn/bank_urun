@@ -8,8 +8,19 @@ public class ProductIndexViewModel
     public IReadOnlyList<ProductRowViewModel> Rows { get; set; } = [];
     public IReadOnlyList<MainProductOptionViewModel> MainProducts { get; set; } = [];
     public IReadOnlyList<ProductGroupOptionViewModel> Groups { get; set; } = [];
+    public IReadOnlyList<ProductBranchOptionViewModel> Branches { get; set; } = [];
     public IReadOnlyList<ProductDefinitionOptionViewModel> MainProductDefinitions { get; set; } = [];
     public IReadOnlyList<ProductGamutRowViewModel> ProductGamuts { get; set; } = [];
+}
+
+public class ProductBranchOptionViewModel
+{
+    public int Id { get; set; }
+    public int GroupId { get; set; }
+    public string GroupNo { get; set; } = string.Empty;
+    public string BranchCode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Label => $"{GroupNo} · {BranchCode} - {Name}";
 }
 
 public class ProductGroupOptionViewModel
@@ -192,6 +203,52 @@ public class GroupMainProductRemovalInput
 {
     [Range(1, int.MaxValue)]
     public int GroupId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int MainProductId { get; set; }
+
+    [Range(2000, 2100)]
+    public int EffectiveFromYear { get; set; }
+
+    [Range(1, 2)]
+    public int EffectiveFromTerm { get; set; }
+}
+
+public enum MainProductRemovalScope
+{
+    Group,
+    ProductGamut,
+    Branch
+}
+
+public class MainProductScopeRemovalInput
+{
+    [EnumDataType(typeof(MainProductRemovalScope))]
+    public MainProductRemovalScope Scope { get; set; } = MainProductRemovalScope.Group;
+
+    [Range(1, int.MaxValue)]
+    public int? GroupId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int? ProductGamutId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int? BranchId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int MainProductId { get; set; }
+
+    [Range(2000, 2100)]
+    public int EffectiveFromYear { get; set; }
+
+    [Range(1, 2)]
+    public int EffectiveFromTerm { get; set; }
+}
+
+public class ProductGamutMainProductRemovalInput
+{
+    [Range(1, int.MaxValue)]
+    public int ProductGamutId { get; set; }
 
     [Range(1, int.MaxValue)]
     public int MainProductId { get; set; }

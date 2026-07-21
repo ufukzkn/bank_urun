@@ -14,7 +14,6 @@ public class DashboardIndexViewModel
     public int? SelectedYear { get; set; }
     public int? SelectedTerm { get; set; }
     public DateOnly BatchDate { get; set; }
-    public DashboardSnapshotViewModel Snapshot { get; set; } = new();
 }
 
 public class DashboardBranchOptionViewModel
@@ -63,6 +62,60 @@ public class DashboardPeriodOptionViewModel
     public string Label => $"{Year} / {Term}. Dönem";
 }
 
+public sealed class PerformanceQuery
+{
+    public PerformanceMode Mode { get; set; } = PerformanceMode.BranchProduct;
+    public int? GroupId { get; set; }
+    public int? BranchId { get; set; }
+    public int? Year { get; set; }
+    public int? Term { get; set; }
+    public int? MainProductId { get; set; }
+    public int? ProductGamutId { get; set; }
+    public int? PortfolioTypeId { get; set; }
+    public string? Search { get; set; }
+    public string? SortKey { get; set; }
+    public string? SortDirection { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 25;
+    public bool ForceRefresh { get; set; }
+}
+
+public interface IPerformancePage
+{
+    int TotalCount { get; }
+    int Page { get; }
+    int PageSize { get; }
+    int TotalPages { get; }
+    int ItemCount { get; }
+}
+
+public sealed class PerformancePage<T> : IPerformancePage
+{
+    public IReadOnlyList<T> Items { get; init; } = [];
+    public int TotalCount { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
+    public int ItemCount => Items.Count;
+}
+
+public sealed class DashboardPerformanceTimingViewModel
+{
+    public bool CacheHit { get; set; }
+    public int PeriodCount { get; set; }
+    public int FactCount { get; set; }
+    public int CandidateCount { get; set; }
+    public int ReturnedCount { get; set; }
+    public double DatabaseMilliseconds { get; set; }
+    public double CalculationMilliseconds { get; set; }
+    public double TotalMilliseconds { get; set; }
+    public double CacheRemainingMilliseconds { get; set; }
+
+    public string ServerTiming =>
+        FormattableString.Invariant(
+            $"db;dur={DatabaseMilliseconds:0.##}, calc;dur={CalculationMilliseconds:0.##}, total;dur={TotalMilliseconds:0.##}");
+}
+
 public class DashboardSnapshotViewModel
 {
     public PerformanceMode Mode { get; set; } = PerformanceMode.BranchProduct;
@@ -84,10 +137,15 @@ public class DashboardSnapshotViewModel
     public bool HasCompletePeriodData { get; set; }
     public int? BranchRank { get; set; }
     public int RankedBranchCount { get; set; }
-    public IReadOnlyList<DashboardBranchPerformanceViewModel> Branches { get; set; } = [];
-    public IReadOnlyList<DashboardProductPerformanceViewModel> BranchProducts { get; set; } = [];
-    public IReadOnlyList<DashboardMainProductPerformanceViewModel> MainProducts { get; set; } = [];
-    public IReadOnlyList<DashboardPortfolioPerformanceViewModel> Portfolios { get; set; } = [];
+    public IPerformancePage Results { get; set; } = new PerformancePage<object>();
+    public int TotalCount => Results.TotalCount;
+    public int TotalPages => Results.TotalPages;
+    public int Page => Results.Page;
+    public int PageSize => Results.PageSize;
+    public DashboardPerformanceTimingViewModel Timing { get; set; } = new();
+
+    public PerformancePage<T> GetResults<T>() =>
+        Results as PerformancePage<T> ?? new PerformancePage<T>();
 }
 
 public class DashboardBranchPerformanceViewModel

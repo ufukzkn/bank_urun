@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BankUrun.Web.Controllers;
 
-public class OrganizationController(IOrganizationService organizationService) : Controller
+public class OrganizationController(
+    IOrganizationService organizationService,
+    IPerformanceCacheInvalidator performanceCacheInvalidator) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
@@ -158,6 +160,7 @@ public class OrganizationController(IOrganizationService organizationService) : 
         try
         {
             await action();
+            performanceCacheInvalidator.Invalidate();
             TempData["Success"] = successMessage;
         }
         catch (InvalidOperationException ex)

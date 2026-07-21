@@ -18,4 +18,6 @@ public interface IProductManagementService
     Task DeleteProductGamutAssignmentAsync(LinkIdInput input, string actor, CancellationToken cancellationToken = default);
     Task<ManagementImpactViewModel> GetGroupMainProductRemovalImpactAsync(GroupMainProductRemovalInput input, CancellationToken cancellationToken = default);
     Task RemoveMainProductFromGroupAsync(GroupMainProductRemovalInput input, string actor, CancellationToken cancellationToken = default);
+    Task<ManagementImpactViewModel> GetProductGamutMainProductRemovalImpactAsync(ProductGamutMainProductRemovalInput input, CancellationToken cancellationToken = default);
+    Task RemoveMainProductFromProductGamutAsync(ProductGamutMainProductRemovalInput input, string actor, CancellationToken cancellationToken = default);
 }

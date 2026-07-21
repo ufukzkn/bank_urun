@@ -3,6 +3,8 @@ using BankUrun.Web.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,12 +18,27 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.Fastest);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IProductCodeService, ProductCodeService>();
 builder.Services.AddScoped<IProductManagementService, ProductManagementService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<PerformanceFactCache>();
+builder.Services.AddSingleton<IPerformanceFactCache>(
+    serviceProvider => serviceProvider.GetRequiredService<PerformanceFactCache>());
+builder.Services.AddSingleton<IPerformanceCacheInvalidator>(
+    serviceProvider => serviceProvider.GetRequiredService<PerformanceFactCache>());
 builder.Services.AddScoped<IMainProductPeriodCalculator, MainProductPeriodCalculator>();
 builder.Services.AddScoped<IParameterManagementService, ParameterManagementService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
@@ -54,6 +71,7 @@ if (app.Configuration.GetValue("UseHttpsRedirection", true))
 {
     app.UseHttpsRedirection();
 }
+app.UseResponseCompression();
 app.UseStaticFiles();
 app.UseRouting();
 

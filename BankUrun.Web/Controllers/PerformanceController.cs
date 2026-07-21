@@ -1,5 +1,6 @@
 using BankUrun.Web.Services;
 using BankUrun.Web.Models;
+using BankUrun.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BankUrun.Web.Controllers;
@@ -12,18 +13,29 @@ public class PerformanceController(IDashboardService dashboardService) : Control
 
     [HttpGet]
     public async Task<IActionResult> Snapshot(
-        PerformanceMode mode,
-        int? groupId,
-        int? branchId,
-        int? year,
-        int? term,
-        int? mainProductId,
-        int? productGamutId,
-        int? portfolioTypeId,
-        CancellationToken cancellationToken) =>
-        PartialView("_Snapshot", await dashboardService.GetSnapshotAsync(
-            mode, groupId, branchId, year, term, mainProductId,
-            productGamutId, portfolioTypeId, cancellationToken));
+        [FromQuery] PerformanceQuery query,
+        CancellationToken cancellationToken)
+    {
+        query.ForceRefresh = query.ForceRefresh
+            && string.Equals(
+                Request.Headers["X-Performance-Force-Refresh"],
+                "1",
+                StringComparison.Ordinal);
+        var model = await dashboardService.GetSnapshotAsync(query, cancellationToken);
+        SetPerformanceHeaders(model);
+        return PartialView("_Snapshot", model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Rows(
+        [FromQuery] PerformanceQuery query,
+        CancellationToken cancellationToken)
+    {
+        query.ForceRefresh = false;
+        var model = await dashboardService.GetSnapshotAsync(query, cancellationToken);
+        SetPerformanceHeaders(model);
+        return PartialView("_PerformanceRows", model);
+    }
 
     [HttpGet]
     public async Task<IActionResult> BranchProductMonthlyDetail(
@@ -32,8 +44,15 @@ public class PerformanceController(IDashboardService dashboardService) : Control
         string? section,
         CancellationToken cancellationToken)
     {
-        var model = await dashboardService.GetBranchProductMonthlyDetailAsync(
-            branchId, mainProductInstanceId, cancellationToken);
+        var model = section switch
+        {
+            "months" => await dashboardService.GetBranchProductMonthsAsync(
+                branchId, mainProductInstanceId, cancellationToken),
+            "contributions" => await dashboardService.GetBranchProductContributionsAsync(
+                branchId, mainProductInstanceId, cancellationToken),
+            _ => await dashboardService.GetBranchProductDetailHeaderAsync(
+                branchId, mainProductInstanceId, cancellationToken)
+        };
         if (model is null)
         {
             return NotFound();
@@ -71,8 +90,15 @@ public class PerformanceController(IDashboardService dashboardService) : Control
         string? section,
         CancellationToken cancellationToken)
     {
-        var model = await dashboardService.GetMainProductMonthlyDetailAsync(
-            mainProductInstanceId, groupId, cancellationToken);
+        var model = section switch
+        {
+            "months" => await dashboardService.GetMainProductMonthsAsync(
+                mainProductInstanceId, groupId, cancellationToken),
+            "contributions" => await dashboardService.GetMainProductContributionsAsync(
+                mainProductInstanceId, groupId, cancellationToken),
+            _ => await dashboardService.GetMainProductDetailHeaderAsync(
+                mainProductInstanceId, groupId, cancellationToken)
+        };
         if (model is null)
         {
             return NotFound();
@@ -111,7 +137,17 @@ public class PerformanceController(IDashboardService dashboardService) : Control
         string? section,
         CancellationToken cancellationToken)
     {
-        var model = await dashboardService.GetPortfolioDetailAsync(portfolioId, year, term, cancellationToken);
+        var model = section switch
+        {
+            "products" => await dashboardService.GetPortfolioProductsAsync(
+                portfolioId, year, term, cancellationToken),
+            "months" => await dashboardService.GetPortfolioMonthsAsync(
+                portfolioId, year, term, cancellationToken),
+            "contributions" => await dashboardService.GetPortfolioContributionsAsync(
+                portfolioId, year, term, cancellationToken),
+            _ => await dashboardService.GetPortfolioDetailHeaderAsync(
+                portfolioId, year, term, cancellationToken)
+        };
         if (model is null)
         {
             return NotFound();
@@ -154,5 +190,18 @@ public class PerformanceController(IDashboardService dashboardService) : Control
             section = "contributions"
         });
         return PartialView("_PortfolioDetail", model);
+    }
+
+    private void SetPerformanceHeaders(DashboardSnapshotViewModel model)
+    {
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Server-Timing"] = model.Timing.ServerTiming;
+        Response.Headers["X-Total-Count"] = model.TotalCount.ToString();
+        Response.Headers["X-Total-Pages"] = model.TotalPages.ToString();
+        Response.Headers["X-Page"] = model.Page.ToString();
+        Response.Headers["X-Performance-Cache"] = model.Timing.CacheHit ? "hit" : "miss";
+        Response.Headers["X-Performance-Cache-Max-Age-Ms"] =
+            Math.Floor(model.Timing.CacheRemainingMilliseconds).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
     }
 }

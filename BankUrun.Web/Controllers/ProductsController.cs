@@ -5,7 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BankUrun.Web.Controllers;
 
-public class ProductsController(IProductManagementService productService, IProductCodeService codeService) : Controller
+public class ProductsController(
+    IProductManagementService productService,
+    IOrganizationService organizationService,
+    IProductCodeService codeService,
+    IPerformanceCacheInvalidator performanceCacheInvalidator) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
@@ -151,6 +155,27 @@ public class ProductsController(IProductManagementService productService, IProdu
             () => productService.RemoveMainProductFromGroupAsync(input, Actor, cancellationToken),
             "Ana ürün seçili dönemden itibaren grubun ürün gamlarından çıkarıldı; geçmiş korundu.");
 
+    [HttpGet]
+    public Task<IActionResult> MainProductScopeRemovalImpact(
+        MainProductScopeRemovalInput input, CancellationToken cancellationToken) =>
+        ExecuteImpactAsync(() => GetScopeRemovalImpactAsync(input, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveMainProductFromScope(
+        MainProductScopeRemovalInput input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Ana ürün çıkarma kapsamını ve dönemini kontrol edin.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return await ExecuteAndRedirectAsync(
+            () => RemoveFromScopeAsync(input, cancellationToken),
+            "Ana ürün seçili dönemden itibaren seçilen kapsamdan çıkarıldı; geçmiş korundu.");
+    }
+
     [HttpGet("/code-suggestion")]
     public async Task<IActionResult> SuggestCode(ProductType type, string code, int? mainProductInstanceId, CancellationToken cancellationToken)
     {
@@ -173,11 +198,68 @@ public class ProductsController(IProductManagementService productService, IProdu
 
     private string Actor => User.Identity?.Name ?? "local-user";
 
+    private Task<ManagementImpactViewModel> GetScopeRemovalImpactAsync(
+        MainProductScopeRemovalInput input, CancellationToken cancellationToken) => input.Scope switch
+    {
+        MainProductRemovalScope.Group => productService.GetGroupMainProductRemovalImpactAsync(new GroupMainProductRemovalInput
+        {
+            GroupId = RequireScopeId(input.GroupId, "Grup"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, cancellationToken),
+        MainProductRemovalScope.ProductGamut => productService.GetProductGamutMainProductRemovalImpactAsync(new ProductGamutMainProductRemovalInput
+        {
+            ProductGamutId = RequireScopeId(input.ProductGamutId, "Ürün gamı"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, cancellationToken),
+        MainProductRemovalScope.Branch => organizationService.GetBranchMainProductExclusionImpactAsync(new BranchMainProductExclusionInput
+        {
+            BranchId = RequireScopeId(input.BranchId, "Şube"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, cancellationToken),
+        _ => throw new InvalidOperationException("Geçerli bir çıkarma kapsamı seçin.")
+    };
+
+    private Task RemoveFromScopeAsync(MainProductScopeRemovalInput input, CancellationToken cancellationToken) => input.Scope switch
+    {
+        MainProductRemovalScope.Group => productService.RemoveMainProductFromGroupAsync(new GroupMainProductRemovalInput
+        {
+            GroupId = RequireScopeId(input.GroupId, "Grup"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, Actor, cancellationToken),
+        MainProductRemovalScope.ProductGamut => productService.RemoveMainProductFromProductGamutAsync(new ProductGamutMainProductRemovalInput
+        {
+            ProductGamutId = RequireScopeId(input.ProductGamutId, "Ürün gamı"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, Actor, cancellationToken),
+        MainProductRemovalScope.Branch => organizationService.UpsertBranchMainProductExclusionAsync(new BranchMainProductExclusionInput
+        {
+            BranchId = RequireScopeId(input.BranchId, "Şube"),
+            MainProductId = input.MainProductId,
+            EffectiveFromYear = input.EffectiveFromYear,
+            EffectiveFromTerm = input.EffectiveFromTerm
+        }, Actor, cancellationToken),
+        _ => throw new InvalidOperationException("Geçerli bir çıkarma kapsamı seçin.")
+    };
+
+    private static int RequireScopeId(int? value, string label) =>
+        value is > 0 ? value.Value : throw new InvalidOperationException($"{label} seçmelisiniz.");
+
     private async Task<IActionResult> ExecuteAndRedirectAsync(Func<Task> action, string successMessage)
     {
         try
         {
             await action();
+            performanceCacheInvalidator.Invalidate();
             TempData["Success"] = successMessage;
         }
         catch (InvalidOperationException ex)

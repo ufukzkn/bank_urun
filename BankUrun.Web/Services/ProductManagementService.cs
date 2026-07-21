@@ -55,6 +55,19 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
                 IsActive = product.IsActive
             })
             .ToListAsync(cancellationToken);
+        var branches = await db.Branches.AsNoTracking()
+            .Include(branch => branch.Group)
+            .OrderBy(branch => branch.Group.GroupNo)
+            .ThenBy(branch => branch.BranchCode)
+            .Select(branch => new ProductBranchOptionViewModel
+            {
+                Id = branch.Id,
+                GroupId = branch.GroupId,
+                GroupNo = branch.Group.GroupNo,
+                BranchCode = branch.BranchCode,
+                Name = branch.Name
+            })
+            .ToListAsync(cancellationToken);
         var productGamuts = await db.Set<ProductGamut>().AsNoTracking()
             .Include(gamut => gamut.Group)
             .Include(gamut => gamut.Portfolios)
@@ -95,6 +108,7 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         {
             Rows = rows,
             Groups = groups,
+            Branches = branches,
             MainProductDefinitions = mainProductDefinitions,
             ProductGamuts = productGamuts,
             MainProducts = instances
@@ -721,6 +735,62 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             .Where(item => gamutIds.Contains(item.ProductGamutId) && item.MainProductId == input.MainProductId)
             .ToListAsync(cancellationToken);
         var removalPeriod = new PerformancePeriod(input.EffectiveFromYear, input.EffectiveFromTerm);
+        var affected = ApplyAssignmentRemoval(assignments, removalPeriod);
+        AddAudit("RemoveMainProductFromGroup", "ProductDefinition", input.MainProductId.ToString(),
+            $"Ana ürün {input.GroupId} grubundan {input.EffectiveFromYear}/{input.EffectiveFromTerm} döneminden itibaren çıkarıldı; {affected} ürün gamı ataması kapatıldı.", actor);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<ManagementImpactViewModel> GetProductGamutMainProductRemovalImpactAsync(
+        ProductGamutMainProductRemovalInput input, CancellationToken cancellationToken = default)
+    {
+        ValidateEffectivePeriod(input.EffectiveFromYear, input.EffectiveFromTerm, null, null);
+        var gamut = await db.Set<ProductGamut>().AsNoTracking().Include(item => item.Group)
+            .FirstOrDefaultAsync(item => item.Id == input.ProductGamutId, cancellationToken)
+            ?? throw new InvalidOperationException("Ürün gamı bulunamadı.");
+        var product = await db.ProductDefinitions.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == input.MainProductId && item.Type == ProductType.Main, cancellationToken)
+            ?? throw new InvalidOperationException("Ana ürün bulunamadı.");
+        var assignments = await db.Set<ProductGamutMainProductAssignment>().AsNoTracking()
+            .Where(item => item.ProductGamutId == input.ProductGamutId && item.MainProductId == input.MainProductId)
+            .ToListAsync(cancellationToken);
+        var removalPeriod = new PerformancePeriod(input.EffectiveFromYear, input.EffectiveFromTerm);
+        var affected = assignments.Count(item => ProductRelationshipLifecycle.PlanRemoval(
+            item.EffectiveFromYear, item.EffectiveFromTerm, item.EffectiveToYear, item.EffectiveToTerm,
+            removalPeriod) != EffectiveAssignmentRemovalAction.None);
+        var portfolioCount = await db.Set<Portfolio>().AsNoTracking()
+            .CountAsync(item => item.ProductGamutId == input.ProductGamutId, cancellationToken);
+        return new ManagementImpactViewModel
+        {
+            Operation = "Ana ürünü ürün gamından çıkar",
+            Subject = $"{gamut.Group.GroupNo} · {gamut.Code} · {product.Code} - {product.Name}",
+            Summary = $"Ürün {input.EffectiveFromYear}/{input.EffectiveFromTerm}. dönemden itibaren yalnız bu ürün gamından çıkarılır; geçmiş atamalar ve ölçüm verileri korunur.",
+            Allowed = affected > 0,
+            Counts = [Impact("Kapatılacak ürün gamı ataması", affected), Impact("Kapsamdaki portföy", portfolioCount)],
+            Warnings = portfolioCount > 0 ? ["Ürün yeni dönemlerde bu gamı kullanan portföylerin performans hesabına katılmaz."] : [],
+            Blockers = affected == 0 ? ["Seçilen dönemde kapatılabilecek etkin bir ürün gamı ataması yok."] : []
+        };
+    }
+
+    public async Task RemoveMainProductFromProductGamutAsync(
+        ProductGamutMainProductRemovalInput input, string actor, CancellationToken cancellationToken = default)
+    {
+        var impact = await GetProductGamutMainProductRemovalImpactAsync(input, cancellationToken);
+        if (!impact.Allowed)
+            throw new InvalidOperationException(impact.Blockers.FirstOrDefault() ?? "Kapatılabilecek atama yok.");
+        var assignments = await db.Set<ProductGamutMainProductAssignment>()
+            .Where(item => item.ProductGamutId == input.ProductGamutId && item.MainProductId == input.MainProductId)
+            .ToListAsync(cancellationToken);
+        var affected = ApplyAssignmentRemoval(
+            assignments, new PerformancePeriod(input.EffectiveFromYear, input.EffectiveFromTerm));
+        AddAudit("RemoveMainProductFromProductGamut", "ProductDefinition", input.MainProductId.ToString(),
+            $"Ana ürün {input.ProductGamutId} ürün gamından {input.EffectiveFromYear}/{input.EffectiveFromTerm} döneminden itibaren çıkarıldı; {affected} atama kapatıldı.", actor);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private int ApplyAssignmentRemoval(
+        IEnumerable<ProductGamutMainProductAssignment> assignments, PerformancePeriod removalPeriod)
+    {
         var previousPeriod = removalPeriod.Previous();
         var affected = 0;
         foreach (var assignment in assignments)
@@ -739,9 +809,7 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
             }
             affected++;
         }
-        AddAudit("RemoveMainProductFromGroup", "ProductDefinition", input.MainProductId.ToString(),
-            $"Ana ürün {input.GroupId} grubundan {input.EffectiveFromYear}/{input.EffectiveFromTerm} döneminden itibaren çıkarıldı; {affected} ürün gamı ataması kapatıldı.", actor);
-        await db.SaveChangesAsync(cancellationToken);
+        return affected;
     }
 
     private async Task<ProductDefinition> GetOrCreateProductDefinitionAsync(ProductType type, string code, string name, DateTimeOffset now, CancellationToken cancellationToken)

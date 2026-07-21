@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BankUrun.Web.Controllers;
 
-public class ParametersController(IParameterManagementService parameterService) : Controller
+public class ParametersController(
+    IParameterManagementService parameterService,
+    IPerformanceCacheInvalidator performanceCacheInvalidator) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
@@ -86,6 +88,7 @@ public class ParametersController(IParameterManagementService parameterService) 
         try
         {
             await action();
+            performanceCacheInvalidator.Invalidate();
             TempData["Success"] = successMessage;
         }
         catch (InvalidOperationException ex)

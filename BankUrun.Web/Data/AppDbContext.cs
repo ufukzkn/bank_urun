@@ -56,6 +56,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.Term).HasColumnName("term").IsRequired();
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.HasIndex(item => new { item.MainProductId, item.Year, item.Term }).IsUnique();
+            entity.HasIndex(item => new { item.Year, item.Term, item.MainProductId })
+                .HasDatabaseName("ix_main_product_instances_period_scope");
             entity.HasOne(item => item.MainProduct)
                 .WithMany(product => product.MainProductInstances)
                 .HasForeignKey(item => new { item.MainProductId, item.ProductDefinitionType })
@@ -353,6 +355,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             entity.Property(item => item.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
             entity.HasIndex(item => new { item.PortfolioId, item.SubProductId, item.Year, item.Term, item.Month }).IsUnique();
+            entity.HasIndex(item => new { item.Year, item.Term, item.PortfolioId, item.SubProductId, item.Month })
+                .HasDatabaseName("ix_portfolio_metrics_period_scope");
             entity.HasOne(item => item.Portfolio).WithMany(portfolio => portfolio.SubProductMonthlyMetrics)
                 .HasForeignKey(item => item.PortfolioId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.SubProduct).WithMany(product => product.PortfolioMonthlyMetrics)
