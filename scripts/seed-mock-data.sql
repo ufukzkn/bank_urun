@@ -125,7 +125,7 @@ join group_definitions groups on groups.group_no = seed.group_no
 on conflict (branch_code) do update
 set group_id = excluded.group_id, name = excluded.name, updated_at = now();
 
--- v20 owns the complete demo scope. Deleting parameters cascades old portfolio targets.
+-- v21 owns the complete demo scope. Deleting parameters cascades old portfolio targets.
 delete from branch_main_product_exclusions;
 delete from portfolio_sub_product_monthly_metrics;
 delete from portfolio_main_product_monthly_targets;
@@ -195,7 +195,8 @@ select scope.branch_id, scope.group_id, scope.gamut_id, type.id,
        scope.gamut_code || ' Portföyü 02', true, now(), now()
 from branch_gamuts scope
 join portfolio_types type on type.code = 'ST'
-where mod(scope.branch_id, 5) = 0 and scope.gamut_code = 'BI';
+where (mod(scope.branch_id, 5) = 0 or scope.branch_code = '120')
+  and scope.gamut_code = 'BI';
 
 with target_scope as (
   select portfolio.id as portfolio_id, portfolio.group_id, portfolio.code as portfolio_code,
@@ -259,8 +260,8 @@ select metric.portfolio_id, metric.sub_product_id, 'Sub', metric.year, metric.te
 from actual_values metric;
 
 insert into audit_logs (action, entity_name, entity_key, description, actor, created_at)
-select 'SeedMockData', 'System', 'mock-v20',
-       '4 grup, 62 şube, BI/KO/PR ürün gamları, ST/UZ/OZ tipleri, portföy ana ürün hedefleri ve alt ürün gerçekleşmeleri yüklendi.',
+select 'SeedMockData', 'System', 'mock-v21',
+       '4 grup, 62 şube, çoklu grup/portföy ürün bağlamları, BI/KO/PR ürün gamları, ST/UZ/OZ tipleri, portföy ana ürün hedefleri ve alt ürün gerçekleşmeleri yüklendi.',
        'seed-script', now()
 where not exists (
   select 1 from audit_logs where action = 'SeedMockData' and entity_key = 'mock-v20'

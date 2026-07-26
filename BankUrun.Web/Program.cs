@@ -41,6 +41,8 @@ builder.Services.AddSingleton<IPerformanceCacheInvalidator>(
     serviceProvider => serviceProvider.GetRequiredService<PerformanceFactCache>());
 builder.Services.AddScoped<IMainProductPeriodCalculator, MainProductPeriodCalculator>();
 builder.Services.AddScoped<IParameterManagementService, ParameterManagementService>();
+builder.Services.AddSingleton<TargetImportPreviewStore>();
+builder.Services.AddScoped<ITargetManagementService, TargetManagementService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
 

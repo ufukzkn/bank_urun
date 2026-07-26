@@ -24,23 +24,6 @@ public class ParametersController(
         return PartialView("_ParameterRows", page);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> MainProductTargetRows([FromQuery] MainProductTargetQuery query, CancellationToken cancellationToken)
-    {
-        var page = await parameterService.GetMainProductTargetPageAsync(query, cancellationToken);
-        Response.Headers.Append("X-Total-Count", page.TotalCount.ToString());
-        Response.Headers.Append("X-Total-Pages", page.TotalPages.ToString());
-        Response.Headers.Append("X-Page", page.Page.ToString());
-        return PartialView("_MainProductTargetRows", page);
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> MainProductTargetEditor(int parameterId, int portfolioId, CancellationToken cancellationToken)
-    {
-        try { return PartialView("_MainProductTargetEditor", await parameterService.GetMainProductTargetEditorAsync(parameterId, portfolioId, cancellationToken)); }
-        catch (InvalidOperationException) { return NotFound(); }
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveParameter(MainProductParameterInput input, CancellationToken cancellationToken)
@@ -49,16 +32,6 @@ public class ParametersController(
             ModelState.IsValid,
             () => parameterService.UpsertParameterAsync(input, Actor, cancellationToken),
             input.Id == 0 ? "Ana ürün parametresi oluşturuldu." : "Ana ürün parametresi güncellendi.");
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateMainProductTargets(PortfolioMainProductTargetsInput input, CancellationToken cancellationToken)
-    {
-        return await ExecuteAndRedirectAsync(
-            ModelState.IsValid,
-            () => parameterService.UpdateMainProductTargetsAsync(input, Actor, cancellationToken),
-            "Portföy ana ürün hedefleri güncellendi.");
     }
 
     [HttpPost]

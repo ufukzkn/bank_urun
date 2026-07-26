@@ -14,12 +14,6 @@ public class ParameterManagementService(
     private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
     private static readonly CompareInfo TurkishCompare = TurkishCulture.CompareInfo;
     private static readonly int[] AllowedPageSizes = [5, 10, 25, 50];
-    private static readonly string[] TurkishMonthNames =
-    [
-        "", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-        "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-    ];
-
     public async Task<ParameterIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default)
     {
         var groups = await db.GroupDefinitions.AsNoTracking()
@@ -46,39 +40,12 @@ public class ParameterManagementService(
                 Code = instance.MainProduct.Code,
                 Name = instance.MainProduct.Name
             }).ToListAsync(cancellationToken);
-        var gamuts = await db.ProductGamuts.AsNoTracking()
-            .Include(gamut => gamut.Group)
-            .OrderBy(gamut => gamut.Group.GroupNo).ThenBy(gamut => gamut.Code)
-            .Select(gamut => new ParameterGamutOptionViewModel
-            {
-                Id = gamut.Id,
-                GroupId = gamut.GroupId,
-                GroupNo = gamut.Group.GroupNo,
-                Code = gamut.Code,
-                Name = gamut.Name
-            }).ToListAsync(cancellationToken);
-        var portfolios = await db.Portfolios.AsNoTracking()
-            .Include(portfolio => portfolio.Branch)
-            .OrderBy(portfolio => portfolio.Branch.BranchCode).ThenBy(portfolio => portfolio.Code)
-            .Select(portfolio => new ParameterPortfolioOptionViewModel
-            {
-                Id = portfolio.Id,
-                GroupId = portfolio.Branch.GroupId,
-                ProductGamutId = portfolio.ProductGamutId,
-                Code = portfolio.Code,
-                Name = portfolio.Name,
-                BranchCode = portfolio.Branch.BranchCode
-            }).ToListAsync(cancellationToken);
-
         return new ParameterIndexViewModel
         {
             Groups = groups,
             Products = products,
-            ProductGamuts = gamuts,
-            Portfolios = portfolios,
             Years = products.Select(product => product.Year).Distinct().OrderByDescending(year => year).ToList(),
-            Page = await GetPageAsync(new ParameterQuery(), cancellationToken),
-            TargetPage = await GetMainProductTargetPageAsync(new MainProductTargetQuery(), cancellationToken)
+            Page = await GetPageAsync(new ParameterQuery(), cancellationToken)
         };
     }
 
@@ -132,151 +99,6 @@ public class ParameterManagementService(
         };
     }
 
-    public async Task<MainProductTargetPageViewModel> GetMainProductTargetPageAsync(
-        MainProductTargetQuery query,
-        CancellationToken cancellationToken = default)
-    {
-        var parameters = await db.MainProductParameters.AsNoTracking()
-            .Include(item => item.Group)
-            .Include(item => item.MainProductInstance).ThenInclude(item => item.MainProduct)
-            .Where(item => item.IsActive)
-            .ToListAsync(cancellationToken);
-        var portfolios = await db.Portfolios.AsNoTracking()
-            .Include(item => item.Branch)
-            .Include(item => item.ProductGamut)
-            .Where(item => item.IsActive)
-            .ToListAsync(cancellationToken);
-        var assignments = await db.ProductGamutMainProductAssignments.AsNoTracking().ToListAsync(cancellationToken);
-        var exclusions = await db.BranchMainProductExclusions.AsNoTracking().ToListAsync(cancellationToken);
-        var targets = await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
-            .GroupBy(item => new { item.PortfolioId, item.MainProductParameterId })
-            .Select(group => new
-            {
-                group.Key.PortfolioId,
-                group.Key.MainProductParameterId,
-                Target = group.Sum(item => item.TargetValue),
-                Count = group.Count()
-            }).ToListAsync(cancellationToken);
-        var targetMap = targets.ToDictionary(item => (item.PortfolioId, item.MainProductParameterId));
-
-        var rows = new List<MainProductTargetRowViewModel>();
-        foreach (var portfolio in portfolios)
-        {
-            foreach (var parameter in parameters.Where(item => item.GroupId == portfolio.Branch.GroupId))
-            {
-                var year = parameter.MainProductInstance.Year;
-                var term = parameter.MainProductInstance.Term;
-                var mainProductId = parameter.MainProductInstance.MainProductId;
-                if (!assignments.Any(item => item.ProductGamutId == portfolio.ProductGamutId
-                    && item.MainProductId == mainProductId && IsEffective(item.EffectiveFromYear, item.EffectiveFromTerm, item.EffectiveToYear, item.EffectiveToTerm, year, term)))
-                    continue;
-                if (exclusions.Any(item => item.BranchId == portfolio.BranchId && item.MainProductId == mainProductId
-                    && IsEffective(item.EffectiveFromYear, item.EffectiveFromTerm, item.EffectiveToYear, item.EffectiveToTerm, year, term)))
-                    continue;
-
-                targetMap.TryGetValue((portfolio.Id, parameter.Id), out var target);
-                rows.Add(new MainProductTargetRowViewModel
-                {
-                    PortfolioId = portfolio.Id,
-                    ParameterId = parameter.Id,
-                    MainProductId = mainProductId,
-                    ProductGamutId = portfolio.ProductGamutId,
-                    Year = year,
-                    Term = term,
-                    GroupNo = parameter.Group.GroupNo,
-                    GroupName = parameter.Group.Name,
-                    BranchCode = portfolio.Branch.BranchCode,
-                    BranchName = portfolio.Branch.Name,
-                    PortfolioCode = portfolio.Code,
-                    PortfolioName = portfolio.Name,
-                    ProductGamutCode = portfolio.ProductGamut.Code,
-                    ProductGamutName = portfolio.ProductGamut.Name,
-                    MainProductCode = parameter.MainProductInstance.MainProduct.Code,
-                    MainProductName = parameter.MainProductInstance.MainProduct.Name,
-                    PeriodTarget = target?.Target ?? 0,
-                    EnteredMonthCount = target?.Count ?? 0
-                });
-            }
-        }
-
-        if (query.GroupId.HasValue) rows = rows.Where(row => parameters.Any(item => item.Id == row.ParameterId && item.GroupId == query.GroupId.Value)).ToList();
-        if (query.ProductGamutId.HasValue) rows = rows.Where(row => row.ProductGamutId == query.ProductGamutId.Value).ToList();
-        if (query.PortfolioId.HasValue) rows = rows.Where(row => row.PortfolioId == query.PortfolioId.Value).ToList();
-        if (query.MainProductId.HasValue) rows = rows.Where(row => row.MainProductId == query.MainProductId.Value).ToList();
-        if (query.Year.HasValue) rows = rows.Where(row => row.Year == query.Year.Value).ToList();
-        if (query.Term is 1 or 2) rows = rows.Where(row => row.Term == query.Term.Value).ToList();
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var search = query.Search.Trim();
-            rows = rows.Where(row => ContainsTurkish(
-                $"{row.GroupNo} {row.GroupName} {row.BranchCode} {row.BranchName} {row.PortfolioCode} {row.PortfolioName} {row.ProductGamutCode} {row.ProductGamutName} {row.MainProductCode} {row.MainProductName}", search)).ToList();
-        }
-
-        var comparer = StringComparer.Create(TurkishCulture, true);
-        var desc = string.Equals(query.SortDirection, "desc", StringComparison.OrdinalIgnoreCase);
-        rows = (query.SortKey?.Trim().ToLowerInvariant(), desc) switch
-        {
-            ("term", false) => rows.OrderBy(row => row.Term).ThenBy(row => row.Year).ToList(),
-            ("term", true) => rows.OrderByDescending(row => row.Term).ThenByDescending(row => row.Year).ToList(),
-            ("group", false) => rows.OrderBy(row => row.GroupNo, comparer).ToList(),
-            ("group", true) => rows.OrderByDescending(row => row.GroupNo, comparer).ToList(),
-            ("branch", false) => rows.OrderBy(row => row.BranchCode, comparer).ToList(),
-            ("branch", true) => rows.OrderByDescending(row => row.BranchCode, comparer).ToList(),
-            ("portfolio", false) => rows.OrderBy(row => row.PortfolioCode, comparer).ToList(),
-            ("portfolio", true) => rows.OrderByDescending(row => row.PortfolioCode, comparer).ToList(),
-            ("gamut", false) => rows.OrderBy(row => row.ProductGamutCode, comparer).ToList(),
-            ("gamut", true) => rows.OrderByDescending(row => row.ProductGamutCode, comparer).ToList(),
-            ("product", false) => rows.OrderBy(row => row.MainProductCode, comparer).ToList(),
-            ("product", true) => rows.OrderByDescending(row => row.MainProductCode, comparer).ToList(),
-            ("target", false) => rows.OrderBy(row => row.PeriodTarget).ToList(),
-            ("target", true) => rows.OrderByDescending(row => row.PeriodTarget).ToList(),
-            (_, false) => rows.OrderBy(row => row.Year).ThenBy(row => row.Term).ThenBy(row => row.PortfolioCode, comparer).ToList(),
-            _ => rows.OrderByDescending(row => row.Year).ThenByDescending(row => row.Term).ThenBy(row => row.PortfolioCode, comparer).ToList()
-        };
-        var pageSize = AllowedPageSizes.Contains(query.PageSize) ? query.PageSize : 10;
-        var totalPages = Math.Max(1, (int)Math.Ceiling(rows.Count / (decimal)pageSize));
-        var page = Math.Clamp(query.Page, 1, totalPages);
-        return new MainProductTargetPageViewModel
-        {
-            Rows = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(),
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = rows.Count,
-            TotalPages = totalPages
-        };
-    }
-
-    public async Task<MainProductTargetEditorViewModel> GetMainProductTargetEditorAsync(
-        int parameterId,
-        int portfolioId,
-        CancellationToken cancellationToken = default)
-    {
-        var (parameter, portfolio) = await ValidatePortfolioParameterAsync(parameterId, portfolioId, cancellationToken);
-        var stored = await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
-            .Where(item => item.PortfolioId == portfolioId && item.MainProductParameterId == parameterId)
-            .ToDictionaryAsync(item => item.Month, cancellationToken);
-        return new MainProductTargetEditorViewModel
-        {
-            ParameterId = parameterId,
-            PortfolioId = portfolioId,
-            Year = parameter.MainProductInstance.Year,
-            Term = parameter.MainProductInstance.Term,
-            PortfolioLabel = $"{portfolio.Code} - {portfolio.Name}",
-            MainProductLabel = $"{parameter.MainProductInstance.MainProduct.Code} - {parameter.MainProductInstance.MainProduct.Name}",
-            Months = calculator.GetTermMonths(parameter.MainProductInstance.Term).Select(month =>
-            {
-                stored.TryGetValue(month, out var target);
-                return new ParameterMonthlyTargetViewModel
-                {
-                    Month = month,
-                    MonthName = TurkishMonthNames[month],
-                    TargetValue = target?.TargetValue ?? 0,
-                    HasStoredTarget = target is not null
-                };
-            }).ToList()
-        };
-    }
-
     public async Task UpsertParameterAsync(MainProductParameterInput input, string actor, CancellationToken cancellationToken = default)
     {
         if (!Enum.IsDefined(input.CalculationType) || input.CriterionScore < 0)
@@ -319,61 +141,6 @@ public class ParameterManagementService(
             parameter.UpdatedAt = now;
             AddAudit("UpdateMainProductParameter", parameter.Id, $"{group.GroupNo} · {instance.Year}/{instance.Term} {instance.MainProduct.Code} parametresi güncellendi.", actor, now);
         }
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task UpdateMainProductTargetsAsync(
-        PortfolioMainProductTargetsInput input,
-        string actor,
-        CancellationToken cancellationToken = default)
-    {
-        var (parameter, portfolio) = await ValidatePortfolioParameterAsync(input.ParameterId, input.PortfolioId, cancellationToken);
-        var termMonths = calculator.GetTermMonths(parameter.MainProductInstance.Term);
-        if (input.Months.Count != termMonths.Count
-            || input.Months.Select(item => item.Month).Distinct().Count() != termMonths.Count
-            || input.Months.Select(item => item.Month).Except(termMonths).Any()
-            || input.Months.Any(item => item.TargetValue < 0))
-            throw new InvalidOperationException("Dönemin altı aylık hedeflerini eksiksiz ve geçerli girin.");
-        var now = timeProvider.GetUtcNow();
-        var stored = await db.PortfolioMainProductMonthlyTargets
-            .Where(item => item.PortfolioId == input.PortfolioId && item.MainProductParameterId == input.ParameterId)
-            .ToDictionaryAsync(item => item.Month, cancellationToken);
-        var previousTotal = Round(stored.Values.Sum(item => item.TargetValue));
-        var newTotal = Round(input.Months.Sum(item => item.TargetValue));
-        var createdCount = 0;
-        var updatedCount = 0;
-        foreach (var monthInput in input.Months)
-        {
-            if (stored.TryGetValue(monthInput.Month, out var target))
-            {
-                target.TargetValue = Round(monthInput.TargetValue);
-                target.UpdatedAt = now;
-                updatedCount++;
-            }
-            else
-            {
-                db.PortfolioMainProductMonthlyTargets.Add(new PortfolioMainProductMonthlyTarget
-                {
-                    PortfolioId = input.PortfolioId,
-                    GroupId = parameter.GroupId,
-                    MainProductParameterId = input.ParameterId,
-                    Month = monthInput.Month,
-                    TargetValue = Round(monthInput.TargetValue),
-                    CreatedAt = now,
-                    UpdatedAt = now
-                });
-                createdCount++;
-            }
-        }
-        db.AuditLogs.Add(new AuditLog
-        {
-            Action = "UpdatePortfolioMainProductTargets",
-            EntityName = nameof(PortfolioMainProductMonthlyTarget),
-            EntityKey = $"{input.PortfolioId}:{input.ParameterId}",
-            Description = $"{portfolio.Code} · {parameter.MainProductInstance.MainProduct.Code} hedefleri güncellendi; kapsam={parameter.MainProductInstance.Year}/{parameter.MainProductInstance.Term}, ay={input.Months.Count}, eklenen={createdCount}, güncellenen={updatedCount}, önceki toplam={previousTotal:N2}, yeni toplam={newTotal:N2}.",
-            Actor = actor,
-            CreatedAt = now
-        });
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -429,41 +196,6 @@ public class ParameterManagementService(
             $"{parameter.Group.GroupNo} · {parameter.MainProductInstance.Year}/{parameter.MainProductInstance.Term} {parameter.MainProductInstance.MainProduct.Code} parametresi ve {targets.Count} portföy hedefi silindi.",
             actor, timeProvider.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task<(MainProductParameter Parameter, Portfolio Portfolio)> ValidatePortfolioParameterAsync(
-        int parameterId, int portfolioId, CancellationToken cancellationToken)
-    {
-        var parameter = await db.MainProductParameters.AsNoTracking()
-            .Include(item => item.MainProductInstance).ThenInclude(item => item.MainProduct)
-            .FirstOrDefaultAsync(item => item.Id == parameterId, cancellationToken)
-            ?? throw new InvalidOperationException("Parametre bulunamadı.");
-        var portfolio = await db.Portfolios.AsNoTracking().Include(item => item.Branch).Include(item => item.ProductGamut)
-            .FirstOrDefaultAsync(item => item.Id == portfolioId, cancellationToken)
-            ?? throw new InvalidOperationException("Portföy bulunamadı.");
-        if (portfolio.Branch.GroupId != parameter.GroupId)
-            throw new InvalidOperationException("Portföy ve ana ürün parametresi aynı gruba ait olmalıdır.");
-        var year = parameter.MainProductInstance.Year;
-        var term = parameter.MainProductInstance.Term;
-        var assigned = (await db.ProductGamutMainProductAssignments.AsNoTracking()
-            .Where(item => item.ProductGamutId == portfolio.ProductGamutId && item.MainProductId == parameter.MainProductInstance.MainProductId)
-            .ToListAsync(cancellationToken))
-            .Any(item => IsEffective(item.EffectiveFromYear, item.EffectiveFromTerm, item.EffectiveToYear, item.EffectiveToTerm, year, term));
-        if (!assigned) throw new InvalidOperationException("Ana ürün seçili dönemde portföyün ürün gamına bağlı değil.");
-        var excluded = (await db.BranchMainProductExclusions.AsNoTracking()
-            .Where(item => item.BranchId == portfolio.BranchId && item.MainProductId == parameter.MainProductInstance.MainProductId)
-            .ToListAsync(cancellationToken))
-            .Any(item => IsEffective(item.EffectiveFromYear, item.EffectiveFromTerm, item.EffectiveToYear, item.EffectiveToTerm, year, term));
-        if (excluded) throw new InvalidOperationException("Ana ürün seçili dönemde bu şubeden çıkarılmış.");
-        return (parameter, portfolio);
-    }
-
-    private static bool IsEffective(int fromYear, int fromTerm, int? toYear, int? toTerm, int year, int term)
-    {
-        var key = year * 10 + term;
-        var from = fromYear * 10 + fromTerm;
-        var to = toYear.HasValue && toTerm.HasValue ? toYear.Value * 10 + toTerm.Value : int.MaxValue;
-        return key >= from && key <= to;
     }
 
     private static IOrderedEnumerable<MainProductParameter> SortParameters(
