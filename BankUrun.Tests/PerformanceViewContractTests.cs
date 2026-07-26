@@ -131,6 +131,8 @@ public class PerformanceViewContractTests
                     "performanceCacheInvalidator.Invalidate();",
                     StringComparison.Ordinal));
         });
+        var targetsController = ReadWebFile("Controllers", "TargetsController.cs");
+        Assert.Contains("performanceCacheInvalidator.Invalidate();", targetsController);
         Assert.Contains("AddSingleton<IPerformanceCacheInvalidator>", program);
     }
 
