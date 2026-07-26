@@ -42,7 +42,7 @@
                         <p class="inline-help-note">Bu parametre seçili grubun ilgili ana üründeki kriter puanını ve altı aylık hesaplama yöntemini belirler.</p>
                         <div class="detail-command-row">
                             <button class="btn btn-sm btn-primary" type="submit" data-confirm="Kriter puanı, hesaplama yöntemi ve aktiflik değişikliği yeni performans hesaplarını etkiler; portföy hedefleri ve alt ürün gerçekleşmeleri korunur. Emin misiniz?">Parametreyi kaydet</button>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-show-main-targets data-main-product-id="@row.MainProductId" data-year="@row.Year" data-term="@row.Term" data-group-id="@row.GroupId">Hedefleri yönet</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-open-targets data-targets-url="@Url.Action("Index", "Targets")" data-main-product-id="@row.MainProductId" data-year="@row.Year" data-term="@row.Term" data-group-id="@row.GroupId">Hedefleri yönet</button>
                             <button class="btn btn-sm btn-outline-danger" type="submit" form="delete-parameter-@row.ParameterId" data-confirm="Bu parametre ve ona bağlı bütün portföy hedefleri silinecek. Emin misiniz?" data-impact-url="@Url.Action("ParameterDeleteImpact", "Parameters", new { id = row.ParameterId })">Parametreyi sil</button>
                         </div>
                     </form>

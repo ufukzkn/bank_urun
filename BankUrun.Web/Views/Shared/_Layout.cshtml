@@ -19,11 +19,12 @@
             </a>
             <nav class="app-nav" aria-label="Ana menü">
                 <a class="app-nav-link @(controller == "Parameters" ? "is-active" : "")" asp-controller="Parameters" asp-action="Index">Parametreler</a>
+                <a class="app-nav-link @(controller == "Targets" ? "is-active" : "")" asp-controller="Targets" asp-action="Index">Hedef Girişi</a>
                 <a class="app-nav-link @(controller == "Performance" ? "is-active" : "")" asp-controller="Performance" asp-action="Index">Performans</a>
                 <a class="app-nav-link @(controller == "Products" ? "is-active" : "")" asp-controller="Products" asp-action="Index">Ürün Kataloğu</a>
                 <a class="app-nav-link @(controller == "Organization" ? "is-active" : "")" asp-controller="Organization" asp-action="Index">Organizasyon</a>
             </nav>
-            <div class="sidebar-note">Ana ürün performans ve parametre yönetimi</div>
+            <div class="sidebar-note">Ana ürün performans, hedef ve parametre yönetimi</div>
         </aside>
         <div class="app-main">
             <main class="app-shell" role="main">

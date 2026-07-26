@@ -2509,6 +2509,161 @@ label span {
   .inline-relation-form > * { max-width: none !important; width: 100%; }
 }
 
+.target-entry-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.target-entry-actions {
+  padding: 16px;
+}
+
+.target-action-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto auto minmax(320px, 1fr);
+}
+
+.target-entry-mode-picker {
+  margin-bottom: 0;
+  min-width: 330px;
+}
+
+.target-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.target-import-form {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.target-import-form label {
+  margin: 0;
+}
+
+.target-entry-toolbar {
+  grid-template-columns: minmax(210px, 1.4fr) repeat(8, minmax(98px, .72fr));
+}
+
+.target-management-table {
+  min-width: 1320px;
+}
+
+.target-editor-mode {
+  margin: 0 0 12px;
+  min-width: 330px;
+}
+
+.target-entry-panel {
+  min-width: 0;
+}
+
+.target-entry-panel[hidden] {
+  display: none !important;
+}
+
+.target-period-card {
+  background: #fff;
+  border: 1px solid #dce5ed;
+  border-radius: .65rem;
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  padding: 12px;
+}
+
+.target-period-card label {
+  margin: 0;
+}
+
+.target-period-card small,
+.target-editor-summary small,
+.target-import-preview-heading small {
+  color: #647587;
+}
+
+.target-quarter-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  max-width: 850px;
+}
+
+.target-editor-summary {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+}
+
+.target-editor-summary strong {
+  color: #075f92;
+  font-size: 1.1rem;
+}
+
+.target-import-preview {
+  border: 1px solid #dce5ed;
+  border-radius: .75rem;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.target-import-preview.is-valid {
+  border-color: #9dc9b1;
+}
+
+.target-import-preview.has-errors {
+  border-color: #e5b7b7;
+}
+
+.target-import-preview-heading {
+  margin-bottom: 10px;
+}
+
+.target-import-preview-heading > div {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-target-editor].is-loading {
+  opacity: .55;
+  pointer-events: none;
+}
+
+@media (max-width: 1180px) {
+  .target-action-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .target-import-form {
+    grid-column: 1 / -1;
+  }
+  .target-entry-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .target-action-grid,
+  .target-import-form,
+  .target-quarter-grid,
+  .target-entry-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .target-entry-mode-picker,
+  .target-editor-mode {
+    min-width: 0;
+    width: 100%;
+  }
+  .target-editor-summary {
+    align-items: flex-start;
+  }
+}
+
 .segmented-control {
   --segment-count: 2;
   --segment-index: 0;

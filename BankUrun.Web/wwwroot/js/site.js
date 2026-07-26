@@ -802,20 +802,7 @@ setupList(document.querySelector('[data-list="productExclusions"]'), {
 const parameterManagement = document.querySelector("[data-parameter-management]");
 if (parameterManagement) {
   const parameterRoot = parameterManagement.querySelector('[data-list="parameters"]');
-  const targetRoot = parameterManagement.querySelector('[data-list="mainProductTargets"]');
-  const modePicker = parameterManagement.querySelector("[data-segmented-control]");
-  const modeButtons = Array.from(parameterManagement.querySelectorAll("[data-parameter-mode]"));
-  const modePanels = Array.from(parameterManagement.querySelectorAll("[data-parameter-mode-panel]"));
-  let activeParameterMode = "main";
-  const setParameterMode = (mode) => {
-    activeParameterMode = mode;
-    setSegmentedControlValue(modePicker, mode);
-    modePanels.forEach((panel) => panel.classList.toggle("d-none", panel.dataset.parameterModePanel !== mode));
-    window.sessionStorage.setItem("bankurun.parameter-mode", mode);
-  };
-  modeButtons.forEach((button) => button.addEventListener("click", () => setParameterMode(button.dataset.parameterMode || "main")));
-
-  const parameterList = setupList(parameterRoot, {
+  setupList(parameterRoot, {
     defaultSort: { key: "year", direction: "desc" },
     descendingKeys: ["year", "term", "criterion", "active"],
     numericKeys: [],
@@ -843,15 +830,36 @@ if (parameterManagement) {
       };
     }
   });
+  parameterManagement.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-open-targets]");
+    if (!button) return;
+    window.sessionStorage.setItem("bankurun.target-context", JSON.stringify({
+      groupId: button.dataset.groupId || "",
+      mainProductId: button.dataset.mainProductId || "",
+      year: button.dataset.year || "",
+      term: button.dataset.term || ""
+    }));
+    window.location.assign(button.dataset.targetsUrl);
+  });
+}
+
+const targetManagement = document.querySelector("[data-target-management]");
+if (targetManagement) {
+  const targetRoot = targetManagement.querySelector('[data-list="targets"]');
+  const pageEntryMode = targetManagement.querySelector("[data-target-entry-mode]");
+  const importForm = targetManagement.querySelector("[data-target-import-form]");
+  const importPreview = targetManagement.querySelector("[data-target-import-preview]");
+
   const targetList = setupList(targetRoot, {
     defaultSort: { key: "year", direction: "desc" },
-    descendingKeys: ["year", "term", "target"],
-    numericKeys: ["year", "term", "target"],
-    label: "ana ürün hedefi",
-    colspan: 9,
+    descendingKeys: ["year", "term", "target", "status"],
+    numericKeys: ["year", "term", "target", "status"],
+    label: "hedef bağlamı",
+    colspan: 11,
     remote: async ({ state, filterValue, signal }) => {
       const params = new URLSearchParams({
         GroupId: filterValue("groupId"),
+        BranchId: filterValue("branchId"),
         ProductGamutId: filterValue("productGamutId"),
         PortfolioId: filterValue("portfolioId"),
         MainProductId: filterValue("mainProductId"),
@@ -863,8 +871,8 @@ if (parameterManagement) {
         Page: state.page.toString(),
         PageSize: targetRoot?.querySelector("[data-list-page-size]")?.value || "10"
       });
-      const response = await fetch(`${parameterManagement.dataset.mainTargetRowsUrl}?${params}`, { signal });
-      if (!response.ok) throw new Error("Ana ürün hedefleri yüklenemedi.");
+      const response = await fetch(`${targetManagement.dataset.rowsUrl}?${params}`, { signal });
+      if (!response.ok) throw new Error("Hedef listesi yüklenemedi.");
       return {
         html: await response.text(),
         totalCount: Number(response.headers.get("X-Total-Count") || 0),
@@ -873,74 +881,153 @@ if (parameterManagement) {
       };
     }
   });
-  const loadMainTargetEditor = async (button) => {
+
+  const filterValue = (name) => targetRoot?.querySelector(`[data-list-filter="${name}"]`)?.value || "";
+  const currentQuery = () => new URLSearchParams({
+    GroupId: filterValue("groupId"),
+    BranchId: filterValue("branchId"),
+    ProductGamutId: filterValue("productGamutId"),
+    PortfolioId: filterValue("portfolioId"),
+    MainProductId: filterValue("mainProductId"),
+    Year: filterValue("year"),
+    Term: filterValue("term"),
+    Search: filterValue("search"),
+    EntryMode: pageEntryMode?.value || "SixMonth"
+  });
+
+  const syncTargetDependencies = () => {
+    const group = filterValue("groupId");
+    const branch = filterValue("branchId");
+    const gamut = filterValue("productGamutId");
+    const syncSelect = (selector, isHidden) => {
+      const select = targetRoot?.querySelector(selector);
+      select?.querySelectorAll("option[value]").forEach((option) => {
+        if (!option.value) return;
+        option.hidden = isHidden(option);
+        option.disabled = option.hidden;
+      });
+      if (select?.selectedOptions[0]?.disabled) select.value = "";
+      return select?.value || "";
+    };
+    syncSelect("[data-target-branch]", (option) => Boolean(group) && option.dataset.groupId !== group);
+    const activeBranch = filterValue("branchId");
+    syncSelect("[data-target-gamut]", (option) => Boolean(group) && option.dataset.groupId !== group);
+    const activeGamut = filterValue("productGamutId");
+    syncSelect("[data-target-portfolio]", (option) =>
+      (Boolean(group) && option.dataset.groupId !== group)
+      || (Boolean(activeBranch) && option.dataset.branchId !== activeBranch)
+      || (Boolean(activeGamut) && option.dataset.gamutId !== activeGamut));
+  };
+
+  const loadTargetEditor = async (button) => {
     const detailId = button.closest("[data-detail-id]")?.dataset.detailId;
-    const detailRow = detailId ? targetRoot?.querySelector(`[data-detail-for="${CSS.escape(detailId)}"]`) : null;
-    const target = detailRow?.querySelector("[data-main-target-editor]");
-    if (!target) return;
-    if (target.dataset.loaded === "true") return;
-    target.classList.add("is-loading");
+    const detailRow = detailId
+      ? targetRoot?.querySelector(`[data-detail-for="${CSS.escape(detailId)}"]`)
+      : null;
+    const editor = detailRow?.querySelector("[data-target-editor]");
+    if (!editor || editor.dataset.loaded === "true") return;
+    editor.classList.add("is-loading");
     try {
       const params = new URLSearchParams({
         parameterId: button.dataset.parameterId,
         portfolioId: button.dataset.portfolioId
       });
-      const response = await fetch(`${parameterManagement.dataset.mainTargetEditorUrl}?${params}`);
-      if (!response.ok) throw new Error("Hedefler yüklenemedi.");
-      target.innerHTML = await response.text();
-      target.dataset.loaded = "true";
+      const response = await fetch(`${targetManagement.dataset.editorUrl}?${params}`);
+      if (!response.ok) throw new Error("Hedef editörü yüklenemedi.");
+      editor.innerHTML = await response.text();
+      editor.dataset.loaded = "true";
+      setupSegmentedControls(editor);
+      setSegmentedControlValue(
+        editor.querySelector("[data-target-editor-mode-input]")?.closest("[data-segmented-control]"),
+        pageEntryMode?.value || "SixMonth",
+        true
+      );
     } catch {
-      target.innerHTML = '<div class="inline-empty-state">Ana ürün hedefleri yüklenemedi.</div>';
-      target.dataset.loaded = "false";
+      editor.innerHTML = '<div class="inline-empty-state">Hedef editörü yüklenemedi. Lütfen yeniden deneyin.</div>';
+      editor.dataset.loaded = "false";
     } finally {
-      target.classList.remove("is-loading");
+      editor.classList.remove("is-loading");
     }
   };
 
-  const syncTargetDependencies = () => {
-    if (!targetRoot) return;
-    const group = targetRoot.querySelector("[data-target-group]")?.value || "";
-    const gamut = targetRoot.querySelector("[data-target-gamut]")?.value || "";
-    targetRoot.querySelectorAll("[data-target-gamut] option[data-group-id]").forEach((option) => {
-      option.hidden = Boolean(group) && option.dataset.groupId !== group;
-      option.disabled = option.hidden;
-    });
-    const gamutSelect = targetRoot.querySelector("[data-target-gamut]");
-    if (gamutSelect?.selectedOptions[0]?.disabled) gamutSelect.value = "";
-    targetRoot.querySelectorAll("[data-target-portfolio] option[data-group-id]").forEach((option) => {
-      option.hidden = (Boolean(group) && option.dataset.groupId !== group)
-        || (Boolean(gamut) && option.dataset.gamutId !== gamut);
-      option.disabled = option.hidden;
-    });
-    const portfolioSelect = targetRoot.querySelector("[data-target-portfolio]");
-    if (portfolioSelect?.selectedOptions[0]?.disabled) portfolioSelect.value = "";
-  };
-  parameterManagement.addEventListener("change", (event) => {
-    if (event.target.matches?.("[data-target-group], [data-target-gamut]")) syncTargetDependencies();
+  targetManagement.addEventListener("change", (event) => {
+    if (event.target.matches?.("[data-target-group], [data-target-branch], [data-target-gamut]")) {
+      syncTargetDependencies();
+    }
+    if (event.target.matches?.("[data-target-editor-mode-input]")) {
+      const form = event.target.closest("[data-period-target-form]");
+      form?.querySelectorAll("[data-target-entry-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.targetEntryPanel !== event.target.value;
+      });
+    }
+    if (event.target.matches?.("[data-target-entry-mode]")) {
+      window.sessionStorage.setItem("bankurun.target-entry-mode", event.target.value);
+      targetRoot?.querySelectorAll("[data-target-editor-mode-input]").forEach((input) => {
+        setSegmentedControlValue(
+          input.closest("[data-segmented-control]"),
+          event.target.value,
+          true
+        );
+      });
+    }
   });
-  parameterManagement.addEventListener("click", async (event) => {
-    const detailButton = event.target.closest?.("[data-main-target-detail]");
+
+  targetManagement.addEventListener("click", async (event) => {
+    const detailButton = event.target.closest?.("[data-target-detail]");
     if (detailButton) {
-      await loadMainTargetEditor(detailButton);
+      await loadTargetEditor(detailButton);
       return;
     }
-    const button = event.target.closest?.("[data-show-main-targets]");
-    if (!button || !targetRoot) return;
-    const setFilter = (name, value) => {
-      const input = targetRoot.querySelector(`[data-list-filter="${name}"]`);
-      if (input) input.value = value || "";
-    };
-    setFilter("groupId", button.dataset.groupId);
-    setFilter("year", button.dataset.year);
-    setFilter("term", button.dataset.term);
-    setFilter("mainProductId", button.dataset.mainProductId);
-    syncTargetDependencies();
-    setParameterMode("target");
-    targetList?.apply(true);
+    if (event.target.closest?.("[data-target-export]")) {
+      window.location.assign(`${targetManagement.dataset.exportUrl}?${currentQuery()}`);
+      return;
+    }
+    if (event.target.closest?.("[data-target-template]")) {
+      const params = new URLSearchParams({ EntryMode: pageEntryMode?.value || "SixMonth" });
+      window.location.assign(`${targetManagement.dataset.templateUrl}?${params}`);
+    }
   });
+
+  importForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    importPreview.innerHTML = '<div class="inline-loading-state">Excel doğrulanıyor…</div>';
+    const submit = importForm.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const response = await fetch(importForm.action, {
+        method: "POST",
+        body: new FormData(importForm)
+      });
+      if (!response.ok) throw new Error("Excel önizlemesi alınamadı.");
+      importPreview.innerHTML = await response.text();
+    } catch {
+      importPreview.innerHTML = '<div class="alert alert-danger mb-0">Excel önizlemesi alınamadı. Lütfen yeniden deneyin.</div>';
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
+  const storedEntryMode = window.sessionStorage.getItem("bankurun.target-entry-mode");
+  if (storedEntryMode && pageEntryMode) {
+    pageEntryMode.value = storedEntryMode;
+    setSegmentedControlValue(pageEntryMode.closest("[data-segmented-control]"), storedEntryMode);
+  }
+  const storedContext = window.sessionStorage.getItem("bankurun.target-context");
+  if (storedContext) {
+    try {
+      const context = JSON.parse(storedContext);
+      Object.entries(context).forEach(([name, value]) => {
+        const filter = targetRoot?.querySelector(`[data-list-filter="${name}"]`);
+        if (filter) filter.value = value || "";
+      });
+      window.sessionStorage.removeItem("bankurun.target-context");
+      syncTargetDependencies();
+      targetList?.apply(true);
+    } catch {
+      window.sessionStorage.removeItem("bankurun.target-context");
+    }
+  }
   syncTargetDependencies();
-  const storedMode = window.sessionStorage.getItem("bankurun.parameter-mode");
-  if (storedMode === "target") setParameterMode("target");
 }
 
 const dashboardRoot = document.querySelector("[data-dashboard]");

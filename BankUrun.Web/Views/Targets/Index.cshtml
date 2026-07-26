@@ -1,0 +1,91 @@
+@model BankUrun.Web.ViewModels.TargetIndexViewModel
+@{ ViewData["Title"] = "Hedef Girişi"; }
+
+<section class="page-title parameter-page-title">
+    <div>
+        <h1>Hedef Girişi</h1>
+        <p>Her grup, şube, portföy ve ana ürün bağlamının dönemsel hedeflerini yönetin.</p>
+    </div>
+</section>
+@if (TempData["Success"] is string success) { <div class="alert alert-success action-alert page-alert" role="alert">@success</div> }
+@if (TempData["Error"] is string error) { <div class="alert alert-danger action-alert page-alert" role="alert">@error</div> }
+
+<div class="target-entry-workspace"
+     data-target-management
+     data-rows-url="@Url.Action("Rows", "Targets")"
+     data-editor-url="@Url.Action("Editor", "Targets")"
+     data-export-url="@Url.Action("Export", "Targets")"
+     data-template-url="@Url.Action("Template", "Targets")">
+    <section class="surface-panel target-entry-actions">
+        <div class="panel-heading">
+            <div>
+                <h2>Giriş biçimi ve Excel</h2>
+                <p>Altı aylık, iki üç aylık blok veya ay bazında çalışabilirsiniz.</p>
+            </div>
+        </div>
+        <div class="target-action-grid">
+            <nav class="segmented-control segmented-control--compact target-entry-mode-picker"
+                 aria-label="Hedef giriş biçimi"
+                 data-segmented-control
+                 data-segmented-input="[data-target-entry-mode]">
+                <input type="hidden" value="SixMonth" data-target-entry-mode />
+                <button class="is-active" type="button" data-segmented-value="SixMonth" aria-pressed="true">6 aylık</button>
+                <button type="button" data-segmented-value="ThreeMonth" aria-pressed="false">3 aylık</button>
+                <button type="button" data-segmented-value="Monthly" aria-pressed="false">Aylık</button>
+            </nav>
+            <div class="target-export-actions">
+                <button class="btn btn-outline-primary" type="button" data-target-export>Filtreyi Excel'e aktar</button>
+                <button class="btn btn-outline-secondary" type="button" data-target-template>Boş şablon indir</button>
+            </div>
+            <form asp-action="ImportPreview" method="post" enctype="multipart/form-data" class="target-import-form" data-target-import-form>
+                @Html.AntiForgeryToken()
+                <label><span>Excel içe aktar</span><input class="form-control" type="file" name="file" accept=".xlsx" required /></label>
+                <button class="btn btn-primary" type="submit">Dosyayı önizle</button>
+            </form>
+        </div>
+        <div data-target-import-preview></div>
+    </section>
+
+    <section class="surface-panel table-panel compact-list-panel target-management-list"
+             data-list="targets"
+             data-list-page="@Model.Page.Page"
+             data-list-total-pages="@Model.Page.TotalPages"
+             data-list-total-count="@Model.Page.TotalCount">
+        <div class="panel-heading">
+            <div>
+                <h2>Portföy ana ürün hedefleri</h2>
+                <p>Aynı ürün farklı grup veya portföylerde bağımsız hedef satırları taşır.</p>
+            </div>
+        </div>
+        <div class="table-toolbar performance-list-toolbar target-entry-toolbar">
+            <label class="toolbar-search"><span>Hedeflerde ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Şube, portföy, gam veya ürün" /></label>
+            <label><span>Grup</span><select class="form-select" data-list-filter="groupId" data-target-group><option value="">Tümü</option>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.GroupNo</option> }</select></label>
+            <label><span>Şube</span><select class="form-select" data-list-filter="branchId" data-target-branch><option value="">Tümü</option>@foreach (var branch in Model.Portfolios.GroupBy(item => new { item.BranchId, item.BranchCode, item.GroupId }).Select(group => group.Key).OrderBy(item => item.BranchCode)) { <option value="@branch.BranchId" data-group-id="@branch.GroupId">@branch.BranchCode</option> }</select></label>
+            <label><span>Ürün gamı</span><select class="form-select" data-list-filter="productGamutId" data-target-gamut><option value="">Tümü</option>@foreach (var gamut in Model.ProductGamuts) { <option value="@gamut.Id" data-group-id="@gamut.GroupId">@gamut.GroupNo · @gamut.Code</option> }</select></label>
+            <label><span>Portföy</span><select class="form-select" data-list-filter="portfolioId" data-target-portfolio><option value="">Tümü</option>@foreach (var portfolio in Model.Portfolios) { <option value="@portfolio.Id" data-group-id="@portfolio.GroupId" data-branch-id="@portfolio.BranchId" data-gamut-id="@portfolio.ProductGamutId">@portfolio.BranchCode · @portfolio.Code</option> }</select></label>
+            <label><span>Ana ürün</span><select class="form-select" data-list-filter="mainProductId"><option value="">Tümü</option>@foreach (var product in Model.Products) { <option value="@product.Id">@product.Code · @product.Name</option> }</select></label>
+            <label><span>Yıl</span><select class="form-select" data-list-filter="year"><option value="">Tümü</option>@foreach (var year in Model.Years) { <option value="@year">@year</option> }</select></label>
+            <label><span>Dönem</span><select class="form-select" data-list-filter="term"><option value="">Tümü</option><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select></label>
+            <label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label>
+        </div>
+        <div class="table-responsive parameter-table-scroll">
+            <table class="table compact-table performance-parameter-table target-management-table">
+                <thead><tr>
+                    <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="branch">Şube <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="portfolio">Portföy <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="gamut">Ürün gamı <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="product">Ana ürün <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="calculation">Hesaplama <span></span></button></th>
+                    <th class="text-end"><button class="sort-button justify-content-end" type="button" data-list-sort="target">Dönem hedefi <span></span></button></th>
+                    <th><button class="sort-button" type="button" data-list-sort="status">Durum <span></span></button></th>
+                    <th class="text-end">İşlem</th>
+                </tr></thead>
+                <tbody data-remote-list-body>@await Html.PartialAsync("_TargetRows", Model.Page)</tbody>
+            </table>
+        </div>
+        @await Html.PartialAsync("_ListPager")
+    </section>
+</div>

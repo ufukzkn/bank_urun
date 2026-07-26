@@ -1,0 +1,53 @@
+@using System.Globalization
+@model BankUrun.Web.ViewModels.TargetEditorViewModel
+@functions {
+    private static string InputValue(decimal value) =>
+        value.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+<form asp-controller="Targets" asp-action="Update" method="post" class="monthly-target-form" data-period-target-form>
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ParameterId" value="@Model.ParameterId" />
+    <input type="hidden" name="PortfolioId" value="@Model.PortfolioId" />
+    <div class="sub-target-editor-heading">
+        <div><strong>@Model.PortfolioLabel</strong><span>@Model.Year / @Model.Term. Dönem · @Model.MainProductLabel</span></div>
+        <div class="target-editor-summary"><small>Portföydeki ürün hedefleri toplamı</small><strong>@Model.PortfolioPeriodTarget.ToString("N2")</strong></div>
+    </div>
+    <nav class="segmented-control segmented-control--compact target-editor-mode"
+         aria-label="Hedef düzenleme biçimi"
+         data-segmented-control
+         data-segmented-input="[data-target-editor-mode-input]">
+        <input type="hidden" name="EntryMode" value="SixMonth" data-target-editor-mode-input />
+        <button class="is-active" type="button" data-segmented-value="SixMonth" aria-pressed="true">6 aylık</button>
+        <button type="button" data-segmented-value="ThreeMonth" aria-pressed="false">3 aylık</button>
+        <button type="button" data-segmented-value="Monthly" aria-pressed="false">Aylık</button>
+    </nav>
+
+    <div class="target-entry-panel" data-target-entry-panel="SixMonth">
+        <div class="target-period-card">
+            <label><span>Dönem hedefi</span><input class="form-control numeric-input" type="number" name="SixMonthTarget" value="@InputValue(Model.SixMonthTarget)" min="0" step="0.01" /></label>
+            <small>@(Model.CalculationType == BankUrun.Web.Models.MainProductCalculationType.Average ? "Altı aya aynı ortalama değer uygulanır." : "Tutar altı aya eşit dağıtılır; toplam korunur.")</small>
+        </div>
+    </div>
+    <div class="target-entry-panel" data-target-entry-panel="ThreeMonth" hidden>
+        <div class="target-quarter-grid">
+            <div class="target-period-card"><label><span>İlk 3 ay</span><input class="form-control numeric-input" type="number" name="FirstThreeMonthTarget" value="@InputValue(Model.FirstThreeMonthTarget)" min="0" step="0.01" /></label></div>
+            <div class="target-period-card"><label><span>İkinci 3 ay</span><input class="form-control numeric-input" type="number" name="SecondThreeMonthTarget" value="@InputValue(Model.SecondThreeMonthTarget)" min="0" step="0.01" /></label></div>
+        </div>
+    </div>
+    <div class="target-entry-panel" data-target-entry-panel="Monthly" hidden>
+        <div class="monthly-metric-grid">
+        @for (var index = 0; index < Model.Months.Count; index++)
+        {
+            var month = Model.Months[index];
+            <div class="month-metric-card">
+                <div class="month-metric-heading"><strong>@month.MonthName</strong><span class="@(month.HasStoredTarget ? "" : "is-waiting")">@(month.HasStoredTarget ? "Hedef girildi" : "Yeni hedef")</span></div>
+                <input type="hidden" name="Months[@index].Month" value="@month.Month" />
+                <label><span>Ana ürün hedefi</span><input class="form-control form-control-sm numeric-input" type="number" name="Months[@index].TargetValue" value="@InputValue(month.TargetValue)" min="0" step="0.01" /></label>
+            </div>
+        }
+        </div>
+    </div>
+    <p class="inline-help-note">Bu hedef yalnız bu grup–şube–portföy–ana ürün bağlamına aittir. Aynı ürünün diğer portföylerdeki hedefleri değişmez.</p>
+    <div class="detail-command-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Bu bağlamın hedeflerini güncellemek istediğinize emin misiniz?">Hedefi kaydet</button></div>
+</form>

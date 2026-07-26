@@ -1,0 +1,25 @@
+@model BankUrun.Web.ViewModels.TargetImportPreviewViewModel
+
+<div class="target-import-preview @(Model.Errors.Count > 0 ? "has-errors" : "is-valid")">
+    <div class="target-import-preview-heading">
+        <div><strong>@(string.IsNullOrWhiteSpace(Model.FileName) ? "Excel önizlemesi" : Model.FileName)</strong><small>@Model.SourceRowCount kaynak satır · @Model.TargetContextCount hedef bağlamı · @Model.MonthlyValueCount aylık değer</small></div>
+    </div>
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="alert alert-danger mb-0"><strong>Dosya uygulanamadı.</strong><ul>@foreach (var error in Model.Errors.Take(30)) { <li>@error</li> }</ul></div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table compact-table"><thead><tr><th>Bağlam</th><th>Giriş</th><th class="text-end">Dönem hedefi</th></tr></thead>
+                <tbody>@foreach (var row in Model.Rows) { <tr><td>@row.Context</td><td>@row.EntryMode</td><td class="text-end">@row.PeriodTarget.ToString("N2")</td></tr> }</tbody>
+            </table>
+        </div>
+        @if (Model.TargetContextCount > Model.Rows.Count) { <p class="inline-help-note">İlk @Model.Rows.Count bağlam gösteriliyor; onay bütün dosyayı uygular.</p> }
+        <form asp-controller="Targets" asp-action="ImportConfirm" method="post" class="detail-command-row">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="token" value="@Model.Token" />
+            <button class="btn btn-primary" type="submit" data-confirm="Önizlenen Excel hedeflerinin tamamını kaydetmek istediğinize emin misiniz?">İçe aktarmayı onayla</button>
+        </form>
+    }
+</div>
