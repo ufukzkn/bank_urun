@@ -1928,14 +1928,21 @@ function setupOrganizationCreate() {
   const root = document.querySelector("[data-organization-create]");
   if (!root) return;
 
-  root.querySelectorAll("[data-organization-create-type]").forEach((button) => button.addEventListener("click", () => {
-    const type = button.dataset.organizationCreateType;
+  const setCreateType = (type) => {
     root.querySelectorAll("[data-organization-create-form]").forEach((form) => {
       const active = form.dataset.organizationCreateForm === type;
       form.classList.toggle("d-none", !active);
+      form.hidden = !active;
+      form.setAttribute("aria-hidden", (!active).toString());
       form.querySelectorAll("input, select").forEach((input) => input.disabled = !active);
     });
+  };
+
+  root.querySelectorAll("[data-organization-create-type]").forEach((button) => button.addEventListener("click", () => {
+    setCreateType(button.dataset.organizationCreateType);
   }));
+
+  setCreateType("group");
 
   const portfolioForm = root.querySelector("[data-portfolio-form]");
   const branch = portfolioForm?.querySelector("[data-portfolio-branch]");
