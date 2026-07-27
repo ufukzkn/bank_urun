@@ -29,7 +29,7 @@
     <div class="performance-chart-scroll">
         <svg class="performance-month-chart"
              viewBox="0 0 760 164"
-             role="img"
+             role="group"
              aria-label="@Model.Title">
             <title>@Model.Title</title>
             <desc>@Model.Description Kesin değerler aşağıdaki aylık kartlarda da sunulur.</desc>
@@ -37,7 +37,7 @@
             <line class="month-chart-grid" x1="64" y1="@Svg(chartTop + chartHeight / 2)" x2="742" y2="@Svg(chartTop + chartHeight / 2)" />
             <line class="month-chart-axis" x1="64" y1="@Svg(baseline)" x2="742" y2="@Svg(baseline)" />
             <text class="month-chart-axis-label" x="58" y="@Svg(chartTop + 4)" text-anchor="end">@maximum.ToString("N0")</text>
-            <text class="month-chart-axis-label" x="58" y="@Svg(chartTop + chartHeight / 2 + 4)" text-anchor="end">@(maximum / 2m).ToString("N0")</text>
+            <text class="month-chart-axis-label" x="58" y="@Svg(chartTop + chartHeight / 2 + 4)" text-anchor="end">@((maximum / 2m).ToString("N0"))</text>
             <text class="month-chart-axis-label" x="58" y="@Svg(baseline + 4)" text-anchor="end">0</text>
 
             @for (var index = 0; index < Model.Months.Count; index++)
@@ -50,7 +50,12 @@
                     ? Math.Max(2m, month.ActualValue.Value / maximum * chartHeight)
                     : 7m;
                 var actualY = month.ActualValue.HasValue ? baseline - actualHeight : baseline - 7m;
-                <g class="month-chart-group">
+                var monthAriaLabel = month.ActualValue.HasValue
+                    ? $"{month.MonthName}. Hedef {month.TargetValue:N2}, gerçekleşme {month.ActualValue.Value:N2}"
+                    : $"{month.MonthName}. Hedef {month.TargetValue:N2}, gerçekleşme batch bekliyor";
+                <g class="month-chart-group" tabindex="0" role="img" aria-label="@monthAriaLabel">
+                    <rect class="month-chart-hit-area"
+                          x="@Svg(groupX - 8m)" y="@Svg(chartTop - 8m)" width="78" height="132" rx="8"></rect>
                     <rect class="month-chart-bar is-target"
                           x="@Svg(groupX)" y="@Svg(targetY)" width="28" height="@Svg(targetHeight)" rx="5">
                         <title>@month.MonthName hedef: @month.TargetValue.ToString("N2")</title>

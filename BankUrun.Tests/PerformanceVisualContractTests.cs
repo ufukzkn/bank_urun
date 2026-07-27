@@ -41,6 +41,8 @@ public class PerformanceVisualContractTests
         Assert.Contains("@model ProductFlowViewModel", partial);
         Assert.DoesNotContain("DashboardMonthlyDetailViewModel", partial);
         Assert.Contains("product-flow-connector", partial);
+        Assert.Contains("product-flow-arrow", partial);
+        Assert.DoesNotContain("<span></span><b>→</b>", partial);
         Assert.Contains("_InteractiveDonut", partial);
         Assert.Contains("Ortak ·", partial);
         Assert.Contains("SharedRelationLabel", model);
@@ -100,6 +102,7 @@ public class PerformanceVisualContractTests
         Assert.Contains("focusin", client);
         Assert.Contains(".interactive-donut-segment.is-active", stylesheet);
         Assert.Contains(".interactive-donut-legend button.is-active", stylesheet);
+        Assert.Contains("transform: translate(-50%, -50%)", stylesheet);
         Assert.Contains("prefers-reduced-motion", stylesheet);
     }
 
@@ -111,9 +114,16 @@ public class PerformanceVisualContractTests
 
         Assert.Contains("const decimal chartHeight = 92m", chart);
         Assert.Contains("viewBox=\"0 0 760 164\"", chart);
+        Assert.Contains("@((maximum / 2m).ToString(\"N0\"))", chart);
+        Assert.DoesNotContain("@(maximum / 2m).ToString", chart);
+        Assert.Contains("class=\"month-chart-group\" tabindex=\"0\" role=\"img\"", chart);
+        Assert.Contains("month-chart-hit-area", chart);
+        Assert.Contains(".month-chart-group:focus-visible", stylesheet);
+        Assert.Contains("drop-shadow", stylesheet);
         Assert.Contains("max-width: 820px", stylesheet);
         Assert.Contains(".performance-detail-heading p", stylesheet);
         Assert.Contains("color: #43596b", stylesheet);
+        Assert.Contains(".performance-search-table .list-detail-row td .product-flow-center > small", stylesheet);
     }
 
     [Fact]

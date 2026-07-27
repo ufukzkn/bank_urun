@@ -106,8 +106,34 @@
     font-weight: 600;
 }
 
-.month-chart-bar { transition: opacity 160ms ease, transform 160ms ease; }
-.month-chart-group:hover .month-chart-bar { opacity: .78; }
+.month-chart-group { cursor: default; outline: none; }
+.month-chart-hit-area {
+    fill: transparent;
+    pointer-events: all;
+    stroke: transparent;
+    transition: fill 160ms ease, stroke 160ms ease;
+}
+.month-chart-bar {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    transition: filter 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+.month-chart-label { transition: fill 160ms ease, font-weight 160ms ease; }
+.month-chart-group:hover .month-chart-hit-area,
+.month-chart-group:focus-visible .month-chart-hit-area {
+    fill: #edf7fb;
+    stroke: #b9dce9;
+}
+.month-chart-group:hover .month-chart-bar,
+.month-chart-group:focus-visible .month-chart-bar {
+    filter: drop-shadow(0 3px 3px rgba(24, 57, 78, .22));
+    transform: translateY(-2px);
+}
+.month-chart-group:hover .month-chart-label,
+.month-chart-group:focus-visible .month-chart-label {
+    fill: #17384e;
+    font-weight: 800;
+}
 .month-chart-bar.is-target { fill: #d9eef8; stroke: #0872a5; stroke-width: 2; }
 .month-chart-bar.is-actual { fill: #d82f55; }
 .month-chart-bar.is-pending {
@@ -213,10 +239,28 @@
     align-items: center;
     color: #0a739e;
     display: flex;
+    min-width: 0;
+    padding-right: 4px;
 }
 
-.product-flow-connector span { background: #80b6cc; height: 2px; width: 100%; }
-.product-flow-connector b { font-size: 1.4rem; line-height: 1; }
+.product-flow-arrow {
+    background: #80b6cc;
+    display: block;
+    height: 2px;
+    position: relative;
+    width: 100%;
+}
+.product-flow-arrow::after {
+    border-right: 2px solid #0a739e;
+    border-top: 2px solid #0a739e;
+    content: "";
+    height: 8px;
+    position: absolute;
+    right: -1px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 8px;
+}
 
 .product-flow-center {
     background: linear-gradient(150deg, #075f92 0%, #087eaa 100%);
@@ -237,7 +281,12 @@
 }
 
 .product-flow-center > strong { font-size: .9rem; }
-.product-flow-center > small { color: #d8edf7; font-size: .72rem; }
+.product-flow-center > small {
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 600;
+}
+.performance-search-table .list-detail-row td .product-flow-center > small { color: #fff; }
 .product-flow-center > div {
     border-top: 1px solid rgba(255,255,255,.24);
     display: flex;
@@ -298,19 +347,25 @@
 
 .interactive-donut-center {
     display: grid;
-    inset: 0;
+    left: 50%;
     justify-items: center;
-    max-width: 84px;
+    max-width: none;
     place-content: center;
     pointer-events: none;
     position: absolute;
     text-align: center;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 84px;
 }
 .interactive-donut-center strong {
     color: #1e3648;
+    display: block;
     font-size: .78rem;
     font-variant-numeric: tabular-nums;
     line-height: 1.15;
+    text-align: center;
+    width: 100%;
 }
 .interactive-donut-center span {
     color: #536879;
@@ -319,6 +374,8 @@
     line-height: 1.2;
     margin-top: .18rem;
     overflow: hidden;
+    text-align: center;
+    width: 100%;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
 }
@@ -692,7 +749,7 @@
     .product-flow-map { grid-template-columns: 1fr; }
     .product-flow-feeders { grid-template-columns: 1fr; }
     .product-flow-connector { justify-content: center; transform: rotate(90deg); }
-    .product-flow-connector span { max-width: 36px; }
+    .product-flow-arrow { max-width: 36px; }
     .portfolio-target-composition .interactive-donut-composition { grid-template-columns: 1fr; justify-items: center; }
     .portfolio-target-composition .interactive-donut-legend { grid-template-columns: 1fr; }
     .branch-performance-visual { grid-template-columns: 1fr; justify-items: center; }
@@ -711,7 +768,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .month-chart-hit-area,
     .month-chart-bar,
+    .month-chart-label,
     .interactive-donut-segment,
     .interactive-donut-legend button,
     .branch-performance-gauge-value { transition: none; }
