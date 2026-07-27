@@ -53,7 +53,7 @@
     else
     {
         <div class="product-flow-layout @(Model.ShowDistribution ? "has-distribution" : null)">
-            <div class="product-flow-map">
+            <div class="product-flow-feeder-scroll">
                 <div class="product-flow-feeders" aria-label="@Model.Heading bağlantı listesi">
                     @for (var index = 0; index < Model.Items.Count; index++)
                     {
@@ -105,7 +105,9 @@
                         </article>
                     }
                 </div>
+            </div>
 
+            <div class="product-flow-summary-shell">
                 <div class="product-flow-connector" aria-hidden="true">
                     <span class="product-flow-arrow"></span>
                 </div>

@@ -52,7 +52,17 @@ public class PerformanceVisualContractTests
         Assert.DoesNotContain("\"Diğer\"", partial);
         Assert.Contains("data-product-flow-key", partial);
         Assert.Contains("item.Color", partial);
+        Assert.Contains("product-flow-summary-shell", partial);
+        Assert.Contains("product-flow-feeder-scroll", partial);
         Assert.Contains("_ProductFlowVisual", contributions);
+
+        var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
+        Assert.Contains("grid-template-areas:", stylesheet);
+        Assert.Contains("\"summary distribution\"", stylesheet);
+        Assert.Contains("transform: rotate(-90deg)", stylesheet);
+        Assert.Contains("height: 196px", stylesheet);
+        Assert.Contains("repeat(3, minmax(0, 1fr))", stylesheet);
+        Assert.Contains("max-height: min(680px, 62vh)", stylesheet);
     }
 
     [Fact]
