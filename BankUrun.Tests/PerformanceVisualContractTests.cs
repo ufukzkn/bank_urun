@@ -59,9 +59,12 @@ public class PerformanceVisualContractTests
         var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
         Assert.Contains("grid-template-areas:", stylesheet);
         Assert.Contains("\"summary distribution\"", stylesheet);
+        Assert.Contains("\"feeders distribution\"", stylesheet);
         Assert.Contains("transform: rotate(-90deg)", stylesheet);
         Assert.Contains("height: 196px", stylesheet);
-        Assert.Contains("repeat(3, minmax(0, 1fr))", stylesheet);
+        Assert.Contains("grid-template-columns: minmax(0, 1fr) minmax(280px, 360px)", stylesheet);
+        Assert.Contains(".product-flow-layout.has-distribution .product-flow-feeders", stylesheet);
+        Assert.Contains(".product-flow-distribution .interactive-donut-legend", stylesheet);
         Assert.Contains("max-height: min(680px, 62vh)", stylesheet);
     }
 

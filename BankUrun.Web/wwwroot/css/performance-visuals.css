@@ -183,8 +183,8 @@
     align-items: start;
     grid-template-areas:
         "summary distribution"
-        "feeders feeders";
-    grid-template-columns: minmax(220px, .68fr) minmax(0, 1.7fr);
+        "feeders distribution";
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
     grid-template-rows: auto auto;
 }
 
@@ -216,8 +216,11 @@
     grid-area: summary;
     grid-template-columns: 1fr;
     grid-template-rows: auto 44px;
+    justify-self: center;
+    max-width: 480px;
     position: sticky;
     top: .75rem;
+    width: 100%;
     z-index: 2;
 }
 
@@ -240,7 +243,7 @@
 }
 
 .product-flow-layout.has-distribution .product-flow-feeders {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .product-flow-item {
@@ -429,8 +432,8 @@
 }
 
 .product-flow-distribution .interactive-donut-composition {
-    grid-template-columns: 196px minmax(0, 1fr);
-    justify-items: stretch;
+    grid-template-columns: 1fr;
+    justify-items: center;
 }
 
 .product-flow-distribution .interactive-donut-chart {
@@ -452,7 +455,7 @@
 }
 
 .product-flow-distribution .interactive-donut-legend {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
 }
 
 .interactive-donut-svg {
@@ -931,7 +934,7 @@
         justify-items: center;
     }
     .product-flow-distribution .interactive-donut-legend {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
     .portfolio-target-composition .interactive-donut-composition { grid-template-columns: 1fr; justify-items: center; }
     .portfolio-target-composition .interactive-donut-legend { grid-template-columns: 1fr; }
