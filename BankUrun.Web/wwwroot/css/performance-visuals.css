@@ -470,6 +470,188 @@
     font-weight: 750;
 }
 
+.performance-table-scroll {
+    container-name: performance-table-scroll;
+    container-type: inline-size;
+}
+
+.branch-performance-visual {
+    align-items: center;
+    background: linear-gradient(145deg, #fff 0%, #f5f9fb 100%);
+    border: 1px solid #d8e4eb;
+    border-radius: 12px;
+    box-sizing: border-box;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 132px minmax(0, 1fr) minmax(132px, auto);
+    left: 0;
+    padding: 1rem;
+    position: sticky;
+    width: calc(100cqw - 1rem);
+}
+
+.branch-performance-gauge {
+    display: grid;
+    height: 122px;
+    place-items: center;
+    position: relative;
+    width: 122px;
+}
+.branch-performance-gauge svg {
+    height: 100%;
+    transform: rotate(-90deg);
+    width: 100%;
+}
+.branch-performance-gauge circle {
+    fill: none;
+    stroke-width: 11;
+}
+.branch-performance-gauge-track { stroke: #dfe8ed; }
+.branch-performance-gauge-value {
+    stroke: #8b9aa5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 220ms ease;
+}
+.performance-tone-excellent .branch-performance-gauge-value { stroke: #168459; }
+.performance-tone-good .branch-performance-gauge-value { stroke: #1680a0; }
+.performance-tone-watch .branch-performance-gauge-value { stroke: #d29b24; }
+.performance-tone-low .branch-performance-gauge-value { stroke: #c65060; }
+.performance-tone-pending .branch-performance-gauge-value { stroke: #9aa8b4; }
+.branch-performance-gauge > div {
+    display: grid;
+    inset: 0;
+    place-content: center;
+    pointer-events: none;
+    position: absolute;
+    text-align: center;
+}
+.branch-performance-gauge strong {
+    color: #17384e;
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+}
+.branch-performance-gauge span { color: #516777; font-size: .76rem; font-weight: 650; }
+
+.branch-performance-profile { display: grid; gap: .8rem; min-width: 0; }
+.branch-performance-profile-heading {
+    align-items: flex-start;
+    display: flex;
+    gap: .75rem;
+    justify-content: space-between;
+}
+.branch-performance-profile-heading > div { display: grid; gap: .18rem; min-width: 0; }
+.branch-performance-profile-heading > div > span {
+    color: #426073;
+    font-size: .76rem;
+    font-weight: 700;
+}
+.branch-performance-profile-heading > div > strong {
+    color: #17384e;
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.branch-data-status {
+    border: 1px solid;
+    border-radius: 999px;
+    flex: 0 0 auto;
+    font-size: .74rem;
+    font-weight: 750;
+    padding: .25rem .5rem;
+}
+.branch-data-status.is-complete { background: #e7f6ed; border-color: #b8dfc8; color: #176f4a; }
+.branch-data-status.is-pending { background: #fff4da; border-color: #ead49e; color: #805c12; }
+
+.branch-performance-metrics {
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.branch-performance-metrics > div {
+    background: #fff;
+    border: 1px solid #e0e8ed;
+    border-radius: 7px;
+    display: grid;
+    gap: .1rem;
+    padding: .48rem .58rem;
+}
+.branch-performance-metrics span { color: #536879; font-size: .74rem; }
+.branch-performance-metrics strong {
+    color: #1f3c50;
+    font-size: .9rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.branch-performance-signals {
+    display: grid;
+    gap: .85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.branch-performance-signals > div { min-width: 0; }
+.branch-signal-heading {
+    align-items: baseline;
+    display: flex;
+    gap: .5rem;
+    justify-content: space-between;
+}
+.branch-signal-heading span { color: #425b6d; font-size: .75rem; font-weight: 650; }
+.branch-signal-heading strong { color: #26475c; font-size: .78rem; font-variant-numeric: tabular-nums; }
+.branch-performance-signals small {
+    color: #5a6e7e;
+    display: block;
+    font-size: .72rem;
+    line-height: 1.35;
+    margin-top: .3rem;
+}
+
+.branch-product-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .28rem;
+    margin-top: .38rem;
+    min-height: 9px;
+}
+.branch-product-dots i {
+    background: #eef2f5;
+    border: 1px solid #c9d4dc;
+    border-radius: 50%;
+    height: 9px;
+    width: 9px;
+}
+.branch-product-dots i.is-complete { background: #1b8b62; border-color: #1b8b62; }
+
+.branch-rank-scale {
+    background: linear-gradient(90deg, #edf1f4 0%, #d9e9f1 65%, #c2e3d2 100%);
+    border-radius: 999px;
+    height: 9px;
+    margin-top: .38rem;
+    overflow: hidden;
+}
+.branch-rank-scale > span {
+    background: linear-gradient(90deg, #d55666, #0a7da6 72%, #15855a);
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
+
+.branch-performance-action {
+    align-items: stretch;
+    align-self: center;
+    display: grid;
+    gap: .35rem;
+    justify-items: stretch;
+}
+.branch-performance-action .btn { white-space: nowrap; }
+.branch-performance-action small {
+    color: #536a7b;
+    font-size: .72rem;
+    line-height: 1.35;
+    max-width: 150px;
+    text-align: center;
+}
+
 @media (max-width: 1050px) {
     .product-flow-layout.has-distribution { grid-template-columns: 1fr; }
     .product-flow-distribution {
@@ -482,6 +664,28 @@
     .product-flow-distribution > p { grid-column: auto; margin-left: 0; text-align: center; }
 }
 
+@media (max-width: 900px) {
+    .branch-performance-visual {
+        grid-template-columns: 122px minmax(0, 1fr);
+    }
+    .branch-performance-action {
+        grid-column: 1 / -1;
+        justify-self: end;
+    }
+    .branch-performance-action small { max-width: none; }
+}
+
+@container performance-table-scroll (max-width: 660px) {
+    .branch-performance-visual {
+        grid-template-columns: 122px minmax(0, 1fr);
+    }
+    .branch-performance-action {
+        grid-column: 1 / -1;
+        justify-self: end;
+    }
+    .branch-performance-action small { max-width: none; }
+}
+
 @media (max-width: 720px) {
     .performance-comparison-chart figcaption,
     .product-flow-copy { display: grid; }
@@ -491,12 +695,26 @@
     .product-flow-connector span { max-width: 36px; }
     .portfolio-target-composition .interactive-donut-composition { grid-template-columns: 1fr; justify-items: center; }
     .portfolio-target-composition .interactive-donut-legend { grid-template-columns: 1fr; }
+    .branch-performance-visual { grid-template-columns: 1fr; justify-items: center; }
+    .branch-performance-profile { width: 100%; }
+    .branch-performance-signals { grid-template-columns: 1fr; }
+    .branch-performance-action { grid-column: auto; justify-self: stretch; width: 100%; }
+    .branch-performance-action small { text-align: left; }
+}
+
+@container performance-table-scroll (max-width: 620px) {
+    .branch-performance-visual { grid-template-columns: 1fr; justify-items: center; }
+    .branch-performance-profile { width: 100%; }
+    .branch-performance-signals { grid-template-columns: 1fr; }
+    .branch-performance-action { grid-column: auto; justify-self: stretch; width: 100%; }
+    .branch-performance-action small { text-align: left; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .month-chart-bar,
     .interactive-donut-segment,
-    .interactive-donut-legend button { transition: none; }
+    .interactive-donut-legend button,
+    .branch-performance-gauge-value { transition: none; }
 }
 
 .performance-detail-heading p,

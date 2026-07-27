@@ -38,6 +38,9 @@
     @foreach (var row in branchRows)
     {
         var detailId = $"branch-performance-{row.Year}-{row.Term}-{row.BranchId}";
+        const decimal gaugeCircumference = 276.46m;
+        var gaugePercent = Math.Max(0, Math.Min(100, row.SuccessPercent ?? 0));
+        var gaugeOffset = gaugeCircumference * (1 - gaugePercent / 100);
         <tr class="list-row @Tone(row.SuccessPercent)" data-detail-id="@detailId">
             <td class="numeric-cell">@row.Year</td>
             <td class="numeric-cell">@row.Term</td>
@@ -64,21 +67,92 @@
         <tr class="list-detail-row" data-detail-for="@detailId">
             <td colspan="10">
                 <div class="collapse" id="@detailId">
-                    <div class="branch-inline-detail">
-                        <div>
-                            <strong>@row.CompleteProductCount / @row.ProductCount ana ürün tamamlandı</strong>
-                            <span>@(row.HasCompletePeriodData ? "Dönem batch'i tamamlandı." : "Eksik hedef veya alt ürün batch'i bulunuyor.")</span>
+                    <section class="branch-performance-visual @Tone(row.SuccessPercent)"
+                             aria-label="@row.BranchCode şube performans özeti">
+                        <div class="branch-performance-gauge"
+                             role="meter"
+                             aria-valuemin="0"
+                             aria-valuemax="100"
+                             aria-valuenow="@(row.SuccessPercent.HasValue ? gaugePercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : null)"
+                             aria-valuetext="@(row.SuccessPercent.HasValue ? $"Başarı oranı yüzde {row.SuccessPercent:N2}" : "Başarı oranı hesaplanamadı")">
+                            <svg viewBox="0 0 112 112" aria-hidden="true">
+                                <circle class="branch-performance-gauge-track" cx="56" cy="56" r="44"></circle>
+                                <circle class="branch-performance-gauge-value"
+                                        cx="56"
+                                        cy="56"
+                                        r="44"
+                                        stroke-dasharray="@gaugeCircumference.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                        stroke-dashoffset="@gaugeOffset.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"></circle>
+                            </svg>
+                            <div>
+                                <strong>@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N1}" : "—")</strong>
+                                <span>başarı</span>
+                            </div>
                         </div>
-                        <button class="btn btn-sm btn-primary" type="button"
-                                data-inspect-branch
-                                data-group-id="@row.GroupId"
-                                data-branch-id="@row.BranchId"
-                                data-year="@row.Year"
-                                data-term="@row.Term"
-                                data-branch-label="@($"{row.BranchCode} - {row.BranchName}")">
-                            Şubeyi incele
-                        </button>
-                    </div>
+                        <div class="branch-performance-profile">
+                            <div class="branch-performance-profile-heading">
+                                <div>
+                                    <span>@row.Year / @row.Term. Dönem · @row.GroupNo</span>
+                                    <strong>@row.BranchCode · @row.BranchName</strong>
+                                </div>
+                                <span class="branch-data-status @(row.HasCompletePeriodData ? "is-complete" : "is-pending")">
+                                    @(row.HasCompletePeriodData ? "Dönem verisi tamamlandı" : "Veri tamamlanıyor")
+                                </span>
+                            </div>
+                            <div class="branch-performance-metrics">
+                                <div><span>Kriter</span><strong>@row.CriterionScore.ToString("N2")</strong></div>
+                                <div><span>Kazanılan HGO</span><strong>@Text(row.HgoScore)</strong></div>
+                                <div><span>Grup sırası</span><strong>@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</strong></div>
+                            </div>
+                            <div class="branch-performance-signals">
+                                <div>
+                                    <div class="branch-signal-heading">
+                                        <span>Ana ürün veri kapsamı</span>
+                                        <strong>@row.CompleteProductCount / @row.ProductCount</strong>
+                                    </div>
+                                    <div class="branch-product-dots"
+                                         role="meter"
+                                         aria-valuemin="0"
+                                         aria-valuemax="@row.ProductCount"
+                                         aria-valuenow="@row.CompleteProductCount"
+                                         aria-valuetext="@row.ProductCount ana ürünün @row.CompleteProductCount tanesi tamamlandı">
+                                        @for (var productIndex = 0; productIndex < row.ProductCount; productIndex++)
+                                        {
+                                            <i class="@(productIndex < row.CompleteProductCount ? "is-complete" : null)" aria-hidden="true"></i>
+                                        }
+                                    </div>
+                                    <small>@(row.HasCompletePeriodData
+                                        ? "Hedef ve batch kapsamı bütün ürünlerde hazır."
+                                        : "Eksik hedef veya alt ürün batch'i bulunan ürünler açık renkle gösterilir.")</small>
+                                </div>
+                                <div>
+                                    <div class="branch-signal-heading">
+                                        <span>Grup içindeki konum</span>
+                                        <strong>@(row.Rank.HasValue ? $"{row.Rank}. sıra" : "Sıra bekleniyor")</strong>
+                                    </div>
+                                    <div class="branch-rank-scale" role="img"
+                                         aria-label="@(row.Rank.HasValue ? $"{row.RankCandidateCount} şube arasında {row.Rank}. sıra" : "Sıralama için veri bekleniyor")">
+                                        <span style="width:@(row.Rank.HasValue ? RankWidth(row.Rank.Value, row.RankCandidateCount) : "0")%"></span>
+                                    </div>
+                                    <small>@(row.Rank.HasValue
+                                        ? $"Toplam puana göre {row.RankCandidateCount} şube ile karşılaştırıldı."
+                                        : "Dönem tamamlandığında resmî sıra oluşur.")</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="branch-performance-action">
+                            <button class="btn btn-sm btn-primary" type="button"
+                                    data-inspect-branch
+                                    data-group-id="@row.GroupId"
+                                    data-branch-id="@row.BranchId"
+                                    data-year="@row.Year"
+                                    data-term="@row.Term"
+                                    data-branch-label="@($"{row.BranchCode} - {row.BranchName}")">
+                                Şubeyi incele
+                            </button>
+                            <small>Şubenin ana ürün kırılımına geçer.</small>
+                        </div>
+                    </section>
                 </div>
             </td>
         </tr>

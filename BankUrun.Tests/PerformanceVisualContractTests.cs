@@ -133,6 +133,28 @@ public class PerformanceVisualContractTests
     }
 
     [Fact]
+    public void BranchDetail_ShowsAccessiblePerformanceProfileWithoutAnotherDataRequest()
+    {
+        var rows = ReadWebFile("Views", "Performance", "_PerformanceRows.cshtml");
+        var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
+
+        Assert.Contains("branch-performance-visual", rows);
+        Assert.Contains("branch-performance-gauge", rows);
+        Assert.Contains("branch-product-dots", rows);
+        Assert.Contains("branch-rank-scale", rows);
+        Assert.Contains("role=\"meter\"", rows);
+        Assert.Contains("Ana ürün veri kapsamı", rows);
+        Assert.Contains("Grup içindeki konum", rows);
+        Assert.Contains("Şubeyi incele", rows);
+        Assert.DoesNotContain(
+            "data-detail-section-load",
+            rows[..rows.IndexOf("else if (Model.Mode == PerformanceMode.BranchProduct)", StringComparison.Ordinal)]);
+        Assert.Contains(".branch-performance-visual", stylesheet);
+        Assert.Contains(".branch-performance-gauge-value", stylesheet);
+        Assert.Contains("prefers-reduced-motion", stylesheet);
+    }
+
+    [Fact]
     public void EveryPerformanceRank_HasTextAndAccessiblePositionTrack()
     {
         var rows = ReadWebFile("Views", "Performance", "_PerformanceRows.cshtml");
