@@ -2,9 +2,9 @@
 @using BankUrun.Web.ViewModels
 @model MonthlyComparisonChartViewModel
 @{
-    const decimal chartHeight = 138m;
-    const decimal baseline = 172m;
-    const decimal chartTop = 34m;
+    const decimal chartHeight = 92m;
+    const decimal baseline = 122m;
+    const decimal chartTop = 30m;
     var values = Model.Months
         .SelectMany(month => new[] { month.TargetValue, month.ActualValue.GetValueOrDefault() })
         .ToList();
@@ -28,7 +28,7 @@
     </figcaption>
     <div class="performance-chart-scroll">
         <svg class="performance-month-chart"
-             viewBox="0 0 760 220"
+             viewBox="0 0 760 164"
              role="img"
              aria-label="@Model.Title">
             <title>@Model.Title</title>
@@ -61,7 +61,7 @@
                             ? $"{month.MonthName} gerçekleşme: {month.ActualValue.Value:N2}"
                             : $"{month.MonthName}: Batch bekleniyor")</title>
                     </rect>
-                    <text class="month-chart-label" x="@Svg(groupX + 31m)" y="198" text-anchor="middle">@month.MonthName</text>
+                    <text class="month-chart-label" x="@Svg(groupX + 31m)" y="150" text-anchor="middle">@month.MonthName</text>
                 </g>
             }
         </svg>

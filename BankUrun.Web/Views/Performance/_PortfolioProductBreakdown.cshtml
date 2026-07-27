@@ -29,21 +29,6 @@
             targetProducts.Skip(visibleProductCount).Sum(product => product.TargetValue),
             5));
     }
-    var gradientParts = new List<string>();
-    decimal cursor = 0;
-    for (var index = 0; index < targetDistributionItems.Count; index++)
-    {
-        var item = targetDistributionItems[index];
-        var share = portfolioTarget > 0 ? item.Value / portfolioTarget * 100 : 0;
-        var next = cursor + share;
-        gradientParts.Add(
-            $"{colors[item.ColorIndex % colors.Length]} {cursor.ToString("0.####", CultureInfo.InvariantCulture)}% " +
-            $"{next.ToString("0.####", CultureInfo.InvariantCulture)}%");
-        cursor = next;
-    }
-    var targetDistribution = gradientParts.Count > 0
-        ? $"conic-gradient({string.Join(", ", gradientParts)})"
-        : "conic-gradient(#dbe4eb 0 100%)";
 }
 @functions {
     private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
@@ -66,24 +51,20 @@
             </div>
         </div>
         <div class="portfolio-target-composition-layout">
-            <div class="portfolio-target-donut"
-                 style="--flow-distribution:@targetDistribution"
-                 role="img"
-                 aria-label="@Model.Products.Count ana ürünün toplam @portfolioTarget.ToString("N2") dönem hedefindeki payları">
-                <div><strong>@portfolioTarget.ToString("N2")</strong><span>toplam hedef</span></div>
-            </div>
-            <div class="portfolio-target-composition-list">
-                @for (var index = 0; index < targetDistributionItems.Count; index++)
+            @await Html.PartialAsync("_InteractiveDonut",
+                new BankUrun.Web.ViewModels.InteractiveDonutChartViewModel
                 {
-                    var item = targetDistributionItems[index];
-                    var share = portfolioTarget > 0 ? item.Value / portfolioTarget * 100 : 0;
-                    <div>
-                        <i class="flow-color-bg-@(item.ColorIndex % colors.Length)" aria-hidden="true"></i>
-                        <span>@item.Code · @item.Name</span>
-                        <strong>%@share.ToString("N1")</strong>
-                    </div>
-                }
-            </div>
+                    AriaLabel = $"{Model.Products.Count} ana ürünün toplam {portfolioTarget:N2} dönem hedefindeki payları",
+                    TotalLabel = "toplam hedef",
+                    ValueLabel = "Hedef",
+                    Segments = targetDistributionItems.Select(item =>
+                        new BankUrun.Web.ViewModels.InteractiveDonutSegmentViewModel
+                        {
+                            Label = $"{item.Code} · {item.Name}",
+                            Value = item.Value,
+                            Color = colors[item.ColorIndex % colors.Length]
+                        }).ToList()
+                })
         </div>
     </section>
     <div class="portfolio-product-breakdown-grid">

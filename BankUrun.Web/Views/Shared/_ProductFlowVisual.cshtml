@@ -45,21 +45,6 @@
             colors.Length - 1));
     }
 
-    var gradientParts = new List<string>();
-    decimal cursor = 0;
-    foreach (var item in distributionItems)
-    {
-        var share = total > 0 ? item.Value / total * 100 : 0;
-        var next = cursor + share;
-        gradientParts.Add(
-            $"{colors[item.ColorIndex]} {cursor.ToString("0.####", CultureInfo.InvariantCulture)}% " +
-            $"{next.ToString("0.####", CultureInfo.InvariantCulture)}%");
-        cursor = next;
-    }
-
-    var distribution = gradientParts.Count > 0
-        ? $"conic-gradient({string.Join(", ", gradientParts)})"
-        : "conic-gradient(#dbe4eb 0 100%)";
 }
 
 <section class="product-flow-visual" aria-label="@Model.Heading">
@@ -147,24 +132,21 @@
             @if (Model.ShowDistribution)
             {
                 <aside class="product-flow-distribution" aria-label="@Model.ValueLabel dağılımı">
-                    <div class="product-flow-donut"
-                         style="--flow-distribution:@distribution"
-                         role="img"
-                         aria-label="Toplam @total.ToString("N2") @Model.ValueLabel değerinin ürünlere göre dağılımı">
-                        <div><strong>@total.ToString("N2")</strong><span>@effectiveTotalLabel.ToLowerInvariant()</span></div>
-                    </div>
-                    <div class="product-flow-legend">
-                        @foreach (var item in distributionItems)
+                    @await Html.PartialAsync("_InteractiveDonut",
+                        new InteractiveDonutChartViewModel
                         {
-                            var share = total > 0 ? item.Value / total * 100 : 0;
-                            <span>
-                                <i class="flow-color-bg-@item.ColorIndex" aria-hidden="true"></i>
-                                <b>@item.Code</b>
-                                <small>%@share.ToString("N1")</small>
-                            </span>
-                        }
-                    </div>
-                    <p>Renklerin yanında ürün kodu ve oran da gösterilir.</p>
+                            AriaLabel = $"Toplam {total:N2} {Model.ValueLabel} değerinin ürünlere göre dağılımı",
+                            TotalLabel = effectiveTotalLabel.ToLowerInvariant(),
+                            ValueLabel = Model.ValueLabel,
+                            Segments = distributionItems.Select(item =>
+                                new InteractiveDonutSegmentViewModel
+                                {
+                                    Label = $"{item.Code} · {item.Name}",
+                                    Value = item.Value,
+                                    Color = colors[item.ColorIndex]
+                                }).ToList()
+                        })
+                    <p>Dilim veya açıklama satırı üzerinde seçili ürünün değeri ve oranı gösterilir.</p>
                 </aside>
             }
         </div>

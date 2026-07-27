@@ -197,6 +197,7 @@ public class PerformanceControllerContractTests
             55,
             2025,
             2,
+            null,
             section,
             CancellationToken.None);
 
@@ -204,6 +205,24 @@ public class PerformanceControllerContractTests
         Assert.Equal(expectedPartial, partial.ViewName);
         Assert.Equal([expectedCall], service.Calls);
         Assert.DoesNotContain("portfolio-full", service.Calls);
+    }
+
+    [Fact]
+    public async Task PortfolioContributionSection_ForwardsSelectedMainProduct()
+    {
+        var service = new RecordingDashboardService();
+        var controller = CreateController(service);
+
+        var result = await controller.PortfolioDetail(
+            55,
+            2025,
+            2,
+            918,
+            "contributions",
+            CancellationToken.None);
+
+        Assert.IsType<PartialViewResult>(result);
+        Assert.Equal(918, service.LastPortfolioContributionProductId);
     }
 
     private static PerformanceController CreateController(RecordingDashboardService service)
@@ -250,6 +269,7 @@ public class PerformanceControllerContractTests
 
         public DashboardSnapshotViewModel SnapshotResult { get; set; } = new();
         public PerformanceQuery? LastQuery { get; private set; }
+        public int? LastPortfolioContributionProductId { get; private set; }
         public List<string> Calls { get; } = [];
 
         public Task<DashboardIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default)
@@ -340,8 +360,12 @@ public class PerformanceControllerContractTests
             int portfolioId,
             int year,
             int term,
-            CancellationToken cancellationToken = default) =>
-            Portfolio("portfolio-contributions");
+            int? mainProductInstanceId,
+            CancellationToken cancellationToken = default)
+        {
+            LastPortfolioContributionProductId = mainProductInstanceId;
+            return Portfolio("portfolio-contributions");
+        }
 
         public Task<DashboardPortfolioDetailViewModel?> GetPortfolioDetailAsync(
             int portfolioId,

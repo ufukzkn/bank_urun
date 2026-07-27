@@ -291,7 +291,16 @@ public class DashboardPortfolioDetailViewModel
     public int Term { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Subtitle { get; set; } = string.Empty;
+    public int? SelectedContributionMainProductInstanceId { get; set; }
+    public IReadOnlyList<DashboardPortfolioProductOptionViewModel> ContributionProductOptions { get; set; } = [];
     public IReadOnlyList<DashboardPortfolioProductDetailViewModel> Products { get; set; } = [];
+}
+
+public class DashboardPortfolioProductOptionViewModel
+{
+    public int MainProductInstanceId { get; set; }
+    public string ProductCode { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
 }
 
 public class DashboardPortfolioProductDetailViewModel

@@ -1,0 +1,74 @@
+@using System.Globalization
+@using BankUrun.Web.ViewModels
+@model InteractiveDonutChartViewModel
+@{
+    const decimal radius = 44m;
+    var circumference = (decimal)(2 * Math.PI * (double)radius);
+    var segments = Model.Segments.Where(segment => segment.Value > 0).ToList();
+    var total = segments.Sum(segment => segment.Value);
+    decimal offset = 0;
+
+    static string Svg(decimal value) =>
+        value.ToString("0.####", CultureInfo.InvariantCulture);
+}
+
+<div class="interactive-donut-composition"
+     data-interactive-donut
+     data-donut-total-value="@total.ToString("N2")"
+     data-donut-total-label="@Model.TotalLabel">
+    <div class="interactive-donut-chart">
+        <svg class="interactive-donut-svg"
+             viewBox="0 0 112 112"
+             role="img"
+             aria-label="@Model.AriaLabel">
+            <circle class="interactive-donut-track" cx="56" cy="56" r="@Svg(radius)" />
+            @for (var index = 0; index < segments.Count; index++)
+            {
+                var segment = segments[index];
+                var share = total > 0 ? segment.Value / total * 100 : 0;
+                var length = total > 0 ? segment.Value / total * circumference : 0;
+                var remaining = Math.Max(0, circumference - length);
+                <circle class="interactive-donut-segment"
+                        cx="56"
+                        cy="56"
+                        r="@Svg(radius)"
+                        stroke="@segment.Color"
+                        stroke-dasharray="@Svg(length) @Svg(remaining)"
+                        stroke-dashoffset="@Svg(-offset)"
+                        tabindex="0"
+                        data-donut-key="@index"
+                        data-donut-label="@segment.Label"
+                        data-donut-value="@segment.Value.ToString("N2")"
+                        data-donut-share="%@share.ToString("N1")"
+                        aria-label="@segment.Label: %@share.ToString("N1"), @Model.ValueLabel @segment.Value.ToString("N2")">
+                    <title>@segment.Label · %@share.ToString("N1") · @segment.Value.ToString("N2")</title>
+                </circle>
+                offset += length;
+            }
+        </svg>
+        <div class="interactive-donut-center" aria-live="polite">
+            <strong data-donut-center-value>@total.ToString("N2")</strong>
+            <span data-donut-center-label>@Model.TotalLabel</span>
+        </div>
+        <div class="interactive-donut-tooltip" data-donut-tooltip role="tooltip" hidden>
+            <strong data-donut-tooltip-label></strong>
+            <span data-donut-tooltip-share></span>
+        </div>
+    </div>
+    <div class="interactive-donut-legend" aria-label="@Model.AriaLabel açıklaması">
+        @for (var index = 0; index < segments.Count; index++)
+        {
+            var segment = segments[index];
+            var share = total > 0 ? segment.Value / total * 100 : 0;
+            <button type="button"
+                    data-donut-key="@index"
+                    data-donut-label="@segment.Label"
+                    data-donut-value="@segment.Value.ToString("N2")"
+                    data-donut-share="%@share.ToString("N1")">
+                <i style="background-color:@segment.Color" aria-hidden="true"></i>
+                <span>@segment.Label</span>
+                <strong>%@share.ToString("N1")</strong>
+            </button>
+        }
+    </div>
+</div>

@@ -23,6 +23,21 @@ public sealed class ProductFlowItemViewModel
     public int SharedRelationCount { get; set; }
 }
 
+public sealed class InteractiveDonutChartViewModel
+{
+    public string AriaLabel { get; set; } = "Dağılım grafiği";
+    public string TotalLabel { get; set; } = "Toplam";
+    public string ValueLabel { get; set; } = "Değer";
+    public IReadOnlyList<InteractiveDonutSegmentViewModel> Segments { get; set; } = [];
+}
+
+public sealed class InteractiveDonutSegmentViewModel
+{
+    public string Label { get; set; } = string.Empty;
+    public decimal Value { get; set; }
+    public string Color { get; set; } = "#0076a8";
+}
+
 public sealed class MonthlyComparisonChartViewModel
 {
     public string Title { get; set; } = "Altı aylık hedef ve gerçekleşme karşılaştırması";

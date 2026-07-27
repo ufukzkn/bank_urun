@@ -83,6 +83,88 @@ function parseLocalizedDecimal(value) {
   return Number((value || "0").toString().replace(",", "."));
 }
 
+function setInteractiveDonutState(root, source, pointerEvent = null) {
+  if (!root || !source) return;
+  const key = source.dataset.donutKey;
+  const centerValue = root.querySelector("[data-donut-center-value]");
+  const centerLabel = root.querySelector("[data-donut-center-label]");
+  if (centerValue) centerValue.textContent = source.dataset.donutValue || root.dataset.donutTotalValue || "0";
+  if (centerLabel) centerLabel.textContent = source.dataset.donutLabel || root.dataset.donutTotalLabel || "Toplam";
+
+  root.querySelectorAll("[data-donut-key]").forEach((item) => {
+    const isActive = item.dataset.donutKey === key;
+    item.classList.toggle("is-active", isActive);
+    item.classList.toggle("is-muted", !isActive);
+  });
+
+  const tooltip = root.querySelector("[data-donut-tooltip]");
+  if (!tooltip) return;
+  const isChartSegment = source.classList.contains("interactive-donut-segment");
+  if (!isChartSegment || !pointerEvent) {
+    tooltip.hidden = true;
+    return;
+  }
+  const chart = root.querySelector(".interactive-donut-chart");
+  const bounds = chart?.getBoundingClientRect();
+  if (!bounds) return;
+  tooltip.querySelector("[data-donut-tooltip-label]").textContent = source.dataset.donutLabel || "";
+  tooltip.querySelector("[data-donut-tooltip-share]").textContent = source.dataset.donutShare || "";
+  tooltip.style.left = `${pointerEvent.clientX - bounds.left}px`;
+  tooltip.style.top = `${pointerEvent.clientY - bounds.top}px`;
+  tooltip.hidden = false;
+}
+
+function clearInteractiveDonutState(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-donut-key]").forEach((item) => {
+    item.classList.remove("is-active", "is-muted");
+  });
+  const centerValue = root.querySelector("[data-donut-center-value]");
+  const centerLabel = root.querySelector("[data-donut-center-label]");
+  if (centerValue) centerValue.textContent = root.dataset.donutTotalValue || "0";
+  if (centerLabel) centerLabel.textContent = root.dataset.donutTotalLabel || "Toplam";
+  const tooltip = root.querySelector("[data-donut-tooltip]");
+  if (tooltip) tooltip.hidden = true;
+}
+
+document.addEventListener("pointerover", (event) => {
+  const source = event.target.closest?.("[data-interactive-donut] [data-donut-key]");
+  if (!source) return;
+  setInteractiveDonutState(source.closest("[data-interactive-donut]"), source, event);
+});
+
+document.addEventListener("pointermove", (event) => {
+  const source = event.target.closest?.(".interactive-donut-segment[data-donut-key]");
+  if (!source) return;
+  setInteractiveDonutState(source.closest("[data-interactive-donut]"), source, event);
+});
+
+document.addEventListener("pointerout", (event) => {
+  const source = event.target.closest?.("[data-interactive-donut] [data-donut-key]");
+  if (!source) return;
+  const root = source.closest("[data-interactive-donut]");
+  const relatedSource = event.relatedTarget?.closest?.("[data-interactive-donut] [data-donut-key]");
+  if (relatedSource?.closest("[data-interactive-donut]") === root) return;
+  clearInteractiveDonutState(root);
+});
+
+document.addEventListener("focusin", (event) => {
+  const source = event.target.closest?.("[data-interactive-donut] [data-donut-key]");
+  if (!source) return;
+  setInteractiveDonutState(source.closest("[data-interactive-donut]"), source);
+});
+
+document.addEventListener("focusout", (event) => {
+  const root = event.target.closest?.("[data-interactive-donut]");
+  if (!root) return;
+  window.setTimeout(() => {
+    const focused = document.activeElement?.closest?.("[data-interactive-donut] [data-donut-key]");
+    if (focused?.closest("[data-interactive-donut]") !== root) {
+      clearInteractiveDonutState(root);
+    }
+  }, 0);
+});
+
 function normalizeDecimalInputs(form) {
   form.querySelectorAll(".decimal-input").forEach((input) => {
     input.value = input.value.trim().replace(".", ",");
@@ -1777,6 +1859,54 @@ if (dashboardRoot) {
       syncModeUi();
       refreshDashboard();
       return;
+    }
+  });
+  snapshot?.addEventListener("change", async (event) => {
+    const selector = event.target.closest("[data-portfolio-contribution-product]");
+    if (!selector) return;
+    const browser = selector.closest("[data-portfolio-contribution-browser]");
+    const sectionRoot = browser?.closest(".performance-detail-section");
+    const content = browser?.querySelector("[data-portfolio-contribution-content]");
+    const baseUrl = browser?.dataset.portfolioContributionUrl;
+    if (!browser || !sectionRoot || !content || !baseUrl) return;
+
+    if (!selector.value) {
+      content.innerHTML = '<div class="inline-empty-state">Katkılarını görmek için bir ana ürün seçin.</div>';
+      return;
+    }
+
+    const url = new URL(baseUrl, window.location.origin);
+    url.searchParams.set("mainProductInstanceId", selector.value);
+    const requestUrl = `${url.pathname}${url.search}`;
+    const cachedHtml = takeCache(detailCache, requestUrl);
+    if (cachedHtml !== null) {
+      sectionRoot.outerHTML = cachedHtml;
+      return;
+    }
+
+    browser.setAttribute("aria-busy", "true");
+    selector.disabled = true;
+    content.innerHTML = '<div class="inline-loading-state">Alt ürün katkıları yükleniyor…</div>';
+    const requestGeneration = detailCacheGeneration;
+    const detailController = new AbortController();
+    detailRequestControllers.add(detailController);
+    try {
+      const response = await fetch(requestUrl, { signal: detailController.signal });
+      if (!response.ok) throw new Error("Alt ürün katkıları yüklenemedi.");
+      const html = await response.text();
+      if (requestGeneration !== detailCacheGeneration) {
+        throw new DOMException("Geçersiz katkı cevabı.", "AbortError");
+      }
+      putCache(detailCache, requestUrl, html, maxDetailCacheEntries);
+      sectionRoot.outerHTML = html;
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        content.innerHTML = '<div class="inline-empty-state">Alt ürün katkıları yüklenemedi. Lütfen yeniden deneyin.</div>';
+        selector.disabled = false;
+        browser.setAttribute("aria-busy", "false");
+      }
+    } finally {
+      detailRequestControllers.delete(detailController);
     }
   });
   syncTermContext();

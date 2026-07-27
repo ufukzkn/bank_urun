@@ -6,28 +6,55 @@
         type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
 }
 <div class="performance-detail-section">
-    <div class="detail-section-heading"><h3>Alt ürün katkıları</h3><p>Alt ürünler yalnız gerçekleşmeyi besler; ortak ürün her bağlı ana ürüne tam katkı sağlar.</p></div>
-    @foreach (var product in Model.Products)
-    {
-        <section class="portfolio-detail-product-section">
-            @await Html.PartialAsync("_ProductFlowVisual",
-                new ProductFlowViewModel
+    <div class="detail-section-heading">
+        <h3>Alt ürün katkıları</h3>
+        <p>İncelemek istediğiniz ana ürünü seçin; yalnız o ürünün portföy içindeki katkıları yüklenir.</p>
+    </div>
+    <div class="portfolio-contribution-browser"
+         data-portfolio-contribution-browser
+         data-portfolio-contribution-url="@ViewData["ContributionSelectionUrl"]">
+        <label class="portfolio-contribution-picker">
+            <span>Ana ürün</span>
+            <select class="form-select" data-portfolio-contribution-product>
+                <option value="">Ana ürün seçin</option>
+                @foreach (var option in Model.ContributionProductOptions)
                 {
-                    CenterTitle = $"{product.ProductCode} · {product.ProductName}",
-                    CenterSubtitle = $"{Calculation(product.CalculationType)} ana ürün",
-                    CenterLabel = "Ana ürün",
-                    Heading = "Besleyen alt ürünler",
-                    Description = "Bu dağılım yalnız seçili ana ürünün portföy içindeki katkılarını gösterir.",
-                    ValueLabel = "Gerçekleşme",
-                    ShowDistribution = true,
-                    Items = product.Contributions.Select(item => new ProductFlowItemViewModel
-                    {
-                        Code = item.Code,
-                        Name = item.Name,
-                        Value = item.ActualValue,
-                        SharedRelationCount = item.SharedRelationCount
-                    }).ToList()
-                })
-        </section>
-    }
+                    <option value="@option.MainProductInstanceId"
+                            selected="@(option.MainProductInstanceId == Model.SelectedContributionMainProductInstanceId ? "selected" : null)">
+                        @option.ProductCode · @option.ProductName
+                    </option>
+                }
+            </select>
+        </label>
+        <div data-portfolio-contribution-content aria-live="polite">
+            @if (Model.Products.Count == 0)
+            {
+                <div class="inline-empty-state">Katkılarını görmek için bir ana ürün seçin.</div>
+            }
+            else
+            {
+                var product = Model.Products[0];
+                <section class="portfolio-detail-product-section">
+                    @await Html.PartialAsync("_ProductFlowVisual",
+                        new ProductFlowViewModel
+                        {
+                            CenterTitle = $"{product.ProductCode} · {product.ProductName}",
+                            CenterSubtitle = $"{Calculation(product.CalculationType)} ana ürün",
+                            CenterLabel = "Ana ürün",
+                            Heading = "Besleyen alt ürünler",
+                            Description = "Bu dağılım yalnız seçili ana ürünün portföy içindeki katkılarını gösterir.",
+                            ValueLabel = "Gerçekleşme",
+                            ShowDistribution = true,
+                            Items = product.Contributions.Select(item => new ProductFlowItemViewModel
+                            {
+                                Code = item.Code,
+                                Name = item.Name,
+                                Value = item.ActualValue,
+                                SharedRelationCount = item.SharedRelationCount
+                            }).ToList()
+                        })
+                </section>
+            }
+        </div>
+    </div>
 </div>

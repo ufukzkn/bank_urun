@@ -41,7 +41,7 @@ public class PerformanceVisualContractTests
         Assert.Contains("@model ProductFlowViewModel", partial);
         Assert.DoesNotContain("DashboardMonthlyDetailViewModel", partial);
         Assert.Contains("product-flow-connector", partial);
-        Assert.Contains("product-flow-donut", partial);
+        Assert.Contains("_InteractiveDonut", partial);
         Assert.Contains("Ortak ·", partial);
         Assert.Contains("SharedRelationLabel", model);
         Assert.Contains("positiveItems.Count > colors.Length", partial);
@@ -78,10 +78,58 @@ public class PerformanceVisualContractTests
         var source = ReadWebFile("Views", "Performance", "_PortfolioProductBreakdown.cshtml");
 
         Assert.Contains("Portföyün bağımsız hedefi yoktur", source);
-        Assert.Contains("portfolio-target-donut", source);
+        Assert.Contains("_InteractiveDonut", source);
         Assert.Contains("Portföy hedefindeki pay", source);
         Assert.Contains("H/G bekleniyor", source);
-        Assert.Contains("role=\"img\"", source);
+        Assert.Contains("InteractiveDonutChartViewModel", source);
+    }
+
+    [Fact]
+    public void Donuts_ShareHoverFocusAndDynamicExplanationBehavior()
+    {
+        var partial = ReadWebFile("Views", "Shared", "_InteractiveDonut.cshtml");
+        var client = ReadWebFile("wwwroot", "js", "site.js");
+        var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
+
+        Assert.Contains("data-interactive-donut", partial);
+        Assert.Contains("data-donut-center-value", partial);
+        Assert.Contains("data-donut-tooltip", partial);
+        Assert.Contains("tabindex=\"0\"", partial);
+        Assert.Contains("setInteractiveDonutState", client);
+        Assert.Contains("pointerover", client);
+        Assert.Contains("focusin", client);
+        Assert.Contains(".interactive-donut-segment.is-active", stylesheet);
+        Assert.Contains(".interactive-donut-legend button.is-active", stylesheet);
+        Assert.Contains("prefers-reduced-motion", stylesheet);
+    }
+
+    [Fact]
+    public void MonthlyCharts_AreCompactAndSummaryTextHasReadableContrast()
+    {
+        var chart = ReadWebFile("Views", "Shared", "_MonthlyComparisonChart.cshtml");
+        var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
+
+        Assert.Contains("const decimal chartHeight = 92m", chart);
+        Assert.Contains("viewBox=\"0 0 760 164\"", chart);
+        Assert.Contains("max-width: 820px", stylesheet);
+        Assert.Contains(".performance-detail-heading p", stylesheet);
+        Assert.Contains("color: #43596b", stylesheet);
+    }
+
+    [Fact]
+    public void PortfolioContributions_LoadOnlyTheSelectedMainProduct()
+    {
+        var partial = ReadWebFile("Views", "Performance", "_PortfolioContributions.cshtml");
+        var client = ReadWebFile("wwwroot", "js", "site.js");
+        var service = ReadWebFile("Services", "DashboardService.cs");
+
+        Assert.Contains("data-portfolio-contribution-product", partial);
+        Assert.Contains("Ana ürün seçin", partial);
+        Assert.Contains("Model.Products[0]", partial);
+        Assert.Contains("mainProductInstanceId", client);
+        Assert.Contains("Alt ürün katkıları yükleniyor", client);
+        Assert.Contains("contributionMainProductInstanceId.HasValue", service);
+        Assert.Contains(".Take(1)", service);
     }
 
     [Fact]

@@ -409,9 +409,15 @@ public class DashboardService(
         int portfolioId,
         int year,
         int term,
+        int? mainProductInstanceId,
         CancellationToken cancellationToken = default) =>
         GetPortfolioDetailSectionAsync(
-            portfolioId, year, term, DetailSection.Contributions, cancellationToken);
+            portfolioId,
+            year,
+            term,
+            DetailSection.Contributions,
+            cancellationToken,
+            mainProductInstanceId);
 
     public Task<DashboardPortfolioDetailViewModel?> GetPortfolioDetailAsync(
         int portfolioId,
@@ -522,7 +528,8 @@ public class DashboardService(
         int year,
         int term,
         DetailSection section,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? contributionMainProductInstanceId = null)
     {
         if (term is not (1 or 2))
         {
@@ -561,6 +568,22 @@ public class DashboardService(
         }
 
         var first = records[0];
+        var contributionOptions = section == DetailSection.Contributions
+            ? records.Select(record => new DashboardPortfolioProductOptionViewModel
+                {
+                    MainProductInstanceId = record.Instance.Id,
+                    ProductCode = record.Instance.ProductCode,
+                    ProductName = record.Instance.ProductName
+                })
+                .ToList()
+            : [];
+        var detailRecords = section == DetailSection.Contributions
+            ? records.Where(record =>
+                    contributionMainProductInstanceId.HasValue
+                    && record.Instance.Id == contributionMainProductInstanceId.Value)
+                .Take(1)
+                .ToList()
+            : records;
         return new DashboardPortfolioDetailViewModel
         {
             PortfolioId = portfolioId,
@@ -569,9 +592,12 @@ public class DashboardService(
             Title = $"{first.Portfolio.Code} · {first.Portfolio.Name}",
             Subtitle = $"{first.Branch.BranchCode} · {first.Branch.BranchName} · " +
                 $"{first.Gamut.Code} ürün gamı",
+            SelectedContributionMainProductInstanceId =
+                detailRecords.FirstOrDefault()?.Instance.Id,
+            ContributionProductOptions = contributionOptions,
             Products = section == DetailSection.Header
                 ? []
-                : records.Select(record => new DashboardPortfolioProductDetailViewModel
+                : detailRecords.Select(record => new DashboardPortfolioProductDetailViewModel
                 {
                     MainProductInstanceId = record.Instance.Id,
                     ProductCode = record.Instance.ProductCode,

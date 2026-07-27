@@ -60,6 +60,7 @@ public interface IDashboardService
         int portfolioId,
         int year,
         int term,
+        int? mainProductInstanceId,
         CancellationToken cancellationToken = default);
     Task<DashboardPortfolioDetailViewModel?> GetPortfolioDetailAsync(
         int portfolioId,

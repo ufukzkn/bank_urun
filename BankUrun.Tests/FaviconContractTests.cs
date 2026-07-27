@@ -32,10 +32,10 @@ public class FaviconContractTests
         var svg = Assert.IsType<XElement>(document.Root);
 
         Assert.Equal("-11 0 112 112", svg.Attribute("viewBox")?.Value);
-        Assert.Empty(svg.Descendants().Where(element =>
-            element.Name.LocalName is "rect" or "image"));
-        var path = Assert.Single(svg.Descendants().Where(element =>
-            element.Name.LocalName == "path"));
+        Assert.DoesNotContain(svg.Descendants(), element =>
+            element.Name.LocalName is "rect" or "image");
+        var path = Assert.Single(svg.Descendants(), element =>
+            element.Name.LocalName == "path");
         Assert.Equal("#005696", path.Attribute("fill")?.Value);
     }
 

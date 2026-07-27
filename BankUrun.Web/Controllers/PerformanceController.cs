@@ -134,6 +134,7 @@ public class PerformanceController(IDashboardService dashboardService) : Control
         int portfolioId,
         int year,
         int term,
+        int? mainProductInstanceId,
         string? section,
         CancellationToken cancellationToken)
     {
@@ -144,7 +145,7 @@ public class PerformanceController(IDashboardService dashboardService) : Control
             "months" => await dashboardService.GetPortfolioMonthsAsync(
                 portfolioId, year, term, cancellationToken),
             "contributions" => await dashboardService.GetPortfolioContributionsAsync(
-                portfolioId, year, term, cancellationToken),
+                portfolioId, year, term, mainProductInstanceId, cancellationToken),
             _ => await dashboardService.GetPortfolioDetailHeaderAsync(
                 portfolioId, year, term, cancellationToken)
         };
@@ -165,6 +166,13 @@ public class PerformanceController(IDashboardService dashboardService) : Control
 
         if (section == "contributions")
         {
+            ViewData["ContributionSelectionUrl"] = Url.Action(nameof(PortfolioDetail), new
+            {
+                portfolioId,
+                year,
+                term,
+                section = "contributions"
+            });
             return PartialView("_PortfolioContributions", model);
         }
 
