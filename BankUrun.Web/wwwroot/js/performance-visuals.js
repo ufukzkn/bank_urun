@@ -1,6 +1,7 @@
 (() => {
   const valueSelector = "[data-month-chart-value]";
   const summarySelector = "[data-month-chart-summary]";
+  const productFlowSourceSelector = ".product-flow-visual [data-interactive-donut] [data-donut-key]";
   let tooltip = null;
   let activeSource = null;
 
@@ -99,4 +100,49 @@
 
   window.addEventListener("scroll", () => hideTooltip(), true);
   window.addEventListener("resize", () => hideTooltip());
+
+  function setProductFlowCardState(source) {
+    const visual = source.closest(".product-flow-visual");
+    if (!visual) return;
+    const key = source.dataset.donutKey;
+    visual.querySelectorAll("[data-product-flow-key]").forEach((card) => {
+      card.classList.toggle("is-chart-active", card.dataset.productFlowKey === key);
+    });
+  }
+
+  function clearProductFlowCardState(visual) {
+    visual?.querySelectorAll(".product-flow-item.is-chart-active").forEach((card) => {
+      card.classList.remove("is-chart-active");
+    });
+  }
+
+  document.addEventListener("pointerover", (event) => {
+    const source = event.target.closest?.(productFlowSourceSelector);
+    if (source) setProductFlowCardState(source);
+  });
+
+  document.addEventListener("pointerout", (event) => {
+    const source = event.target.closest?.(productFlowSourceSelector);
+    if (!source) return;
+    const visual = source.closest(".product-flow-visual");
+    const relatedSource = event.relatedTarget?.closest?.(productFlowSourceSelector);
+    if (relatedSource?.closest(".product-flow-visual") === visual) return;
+    clearProductFlowCardState(visual);
+  });
+
+  document.addEventListener("focusin", (event) => {
+    const source = event.target.closest?.(productFlowSourceSelector);
+    if (source) setProductFlowCardState(source);
+  });
+
+  document.addEventListener("focusout", (event) => {
+    const visual = event.target.closest?.(".product-flow-visual");
+    if (!visual) return;
+    window.setTimeout(() => {
+      const focusedSource = document.activeElement?.closest?.(productFlowSourceSelector);
+      if (focusedSource?.closest(".product-flow-visual") !== visual) {
+        clearProductFlowCardState(visual);
+      }
+    }, 0);
+  });
 })();

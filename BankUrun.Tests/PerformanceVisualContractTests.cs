@@ -47,8 +47,11 @@ public class PerformanceVisualContractTests
         Assert.Contains("_InteractiveDonut", partial);
         Assert.Contains("Ortak ·", partial);
         Assert.Contains("SharedRelationLabel", model);
-        Assert.Contains("positiveItems.Count > colors.Length", partial);
-        Assert.Contains("\"Diğer\"", partial);
+        Assert.Contains("positiveItems.Count; index++", partial);
+        Assert.DoesNotContain("visibleSliceCount", partial);
+        Assert.DoesNotContain("\"Diğer\"", partial);
+        Assert.Contains("data-product-flow-key", partial);
+        Assert.Contains("item.Color", partial);
         Assert.Contains("_ProductFlowVisual", contributions);
     }
 
@@ -101,8 +104,10 @@ public class PerformanceVisualContractTests
         Assert.Contains("setInteractiveDonutState", client);
         Assert.Contains("pointerover", client);
         Assert.Contains("focusin", client);
+        Assert.Contains("setProductFlowCardState", ReadWebFile("wwwroot", "js", "performance-visuals.js"));
         Assert.Contains(".interactive-donut-segment.is-active", stylesheet);
         Assert.Contains(".interactive-donut-legend button.is-active", stylesheet);
+        Assert.Contains(".product-flow-item.is-chart-active", stylesheet);
         Assert.Contains("transform: translate(-50%, -50%)", stylesheet);
         Assert.Contains("prefers-reduced-motion", stylesheet);
     }

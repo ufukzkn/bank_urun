@@ -2,7 +2,13 @@
 @using BankUrun.Web.ViewModels
 @model ProductFlowViewModel
 @{
-    var colors = new[] { "#0076a8", "#d82f55", "#2a9d78", "#f0a128", "#7357b8", "#4a7d97" };
+    var colors = new[]
+    {
+        "#0076a8", "#d82f55", "#2a9d78", "#f0a128",
+        "#7357b8", "#4a7d97", "#c05a97", "#5d8c3a",
+        "#d46a3a", "#3e63b6", "#8b6f47", "#008f88",
+        "#a8552c", "#6b7280", "#9c4dcc", "#2f7d54"
+    };
     var positiveItems = Model.Items
         .Select((item, originalIndex) => (Item: item, OriginalIndex: originalIndex))
         .Where(entry => entry.Item.Value.GetValueOrDefault() > 0)
@@ -13,38 +19,22 @@
         && Model.Items.Any(item => !item.Value.HasValue);
     var effectiveTotalLabel = hasPendingValues ? "Kısmi toplam" : Model.TotalLabel;
     var total = positiveItems.Sum(entry => entry.Item.Value.GetValueOrDefault());
-    var visibleSliceCount = positiveItems.Count > colors.Length ? colors.Length - 1 : positiveItems.Count;
-    var distributionItems = new List<(string Code, string Name, decimal Value, int ColorIndex)>();
-    var itemColorIndexes = new Dictionary<ProductFlowItemViewModel, int>();
+    var distributionItems = new List<(string Code, string Name, decimal Value, string Color)>();
+    var itemDistributionKeys = new Dictionary<ProductFlowItemViewModel, int>();
+    var itemColors = new Dictionary<ProductFlowItemViewModel, string>();
 
-    for (var index = 0; index < visibleSliceCount; index++)
+    for (var index = 0; index < positiveItems.Count; index++)
     {
         var entry = positiveItems[index];
-        itemColorIndexes[entry.Item] = index;
+        var color = colors[index % colors.Length];
+        itemDistributionKeys[entry.Item] = index;
+        itemColors[entry.Item] = color;
         distributionItems.Add((
             entry.Item.Code,
             entry.Item.Name,
             entry.Item.Value.GetValueOrDefault(),
-            index));
+            color));
     }
-
-    if (positiveItems.Count > colors.Length)
-    {
-        var otherValue = positiveItems
-            .Skip(visibleSliceCount)
-            .Sum(entry => entry.Item.Value.GetValueOrDefault());
-        foreach (var entry in positiveItems.Skip(visibleSliceCount))
-        {
-            itemColorIndexes[entry.Item] = colors.Length - 1;
-        }
-
-        distributionItems.Add((
-            "Diğer",
-            $"{positiveItems.Count - visibleSliceCount} ürün",
-            otherValue,
-            colors.Length - 1));
-    }
-
 }
 
 <section class="product-flow-visual" aria-label="@Model.Heading">
@@ -68,16 +58,21 @@
                     @for (var index = 0; index < Model.Items.Count; index++)
                     {
                         var item = Model.Items[index];
-                        var colorIndex = itemColorIndexes.TryGetValue(item, out var distributionColorIndex)
-                            ? distributionColorIndex
-                            : index % colors.Length;
+                        var itemColor = itemColors.TryGetValue(item, out var distributionColor)
+                            ? distributionColor
+                            : colors[index % colors.Length];
+                        var distributionKey = itemDistributionKeys.TryGetValue(item, out var itemDistributionKey)
+                            ? itemDistributionKey
+                            : (int?)null;
                         var share = total > 0 && item.Value.HasValue
                             ? Math.Max(0, item.Value.Value) / total * 100
                             : 0;
                         var shareText = share.ToString("0.##", CultureInfo.InvariantCulture);
-                        <article class="product-flow-item">
+                        <article class="product-flow-item"
+                                 data-product-flow-key="@distributionKey"
+                                 style="--product-flow-color:@itemColor">
                             <div class="product-flow-item-heading">
-                                <span class="product-flow-swatch flow-color-@colorIndex" aria-hidden="true"></span>
+                                <span class="product-flow-swatch" aria-hidden="true"></span>
                                 <div><strong>@item.Code</strong><span>@item.Name</span></div>
                                 @if (item.SharedRelationCount > 1)
                                 {
@@ -99,7 +94,7 @@
                                 @if (Model.ShowDistribution)
                                 {
                                     <div class="product-flow-bar" aria-hidden="true">
-                                        <span class="flow-color-bg-@colorIndex" style="width:@shareText%"></span>
+                                        <span style="width:@shareText%"></span>
                                     </div>
                                 }
                             }
@@ -143,7 +138,7 @@
                                 {
                                     Label = $"{item.Code} · {item.Name}",
                                     Value = item.Value,
-                                    Color = colors[item.ColorIndex]
+                                    Color = item.Color
                                 }).ToList()
                         })
                     <p>Dilim veya açıklama satırı üzerinde seçili ürünün değeri ve oranı gösterilir.</p>

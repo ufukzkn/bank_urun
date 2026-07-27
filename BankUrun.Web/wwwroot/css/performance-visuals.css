@@ -200,6 +200,16 @@
     border-radius: 9px;
     min-width: 0;
     padding: .7rem;
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.product-flow-item.is-chart-active {
+    background: #f8fcfe;
+    border-color: #8fc3d6;
+    border-color: color-mix(in srgb, var(--product-flow-color) 58%, #c9dfe9);
+    box-shadow: 0 8px 20px rgba(7, 118, 168, .16);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--product-flow-color) 18%, transparent);
+    transform: translateY(-2px);
 }
 
 .product-flow-item-heading {
@@ -220,6 +230,7 @@
 }
 
 .product-flow-swatch {
+    background: var(--product-flow-color);
     border-radius: 999px;
     height: 100%;
     min-height: 27px;
@@ -262,7 +273,13 @@
     overflow: hidden;
 }
 
-.product-flow-bar span { border-radius: inherit; display: block; height: 100%; min-width: 2px; }
+.product-flow-bar span {
+    background: var(--product-flow-color);
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+    min-width: 2px;
+}
 .product-flow-pending { color: #7b8995; display: block; font-size: .7rem; margin-top: .55rem; }
 
 .product-flow-connector {
@@ -802,6 +819,7 @@
     .month-chart-bar,
     .month-chart-label,
     .month-chart-tooltip,
+    .product-flow-item,
     .interactive-donut-segment,
     .interactive-donut-legend button,
     .branch-performance-gauge-value { transition: none; }
