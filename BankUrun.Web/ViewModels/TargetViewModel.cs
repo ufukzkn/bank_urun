@@ -10,6 +10,12 @@ public enum TargetEntryMode
     Monthly
 }
 
+public enum TargetCompletionFilter
+{
+    Complete,
+    Missing
+}
+
 public class TargetIndexViewModel
 {
     public IReadOnlyList<TargetGroupOptionViewModel> Groups { get; set; } = [];
@@ -63,6 +69,7 @@ public class TargetQuery
     public int? MainProductId { get; set; }
     public int? Year { get; set; }
     public int? Term { get; set; }
+    public TargetCompletionFilter? CompletionStatus { get; set; }
     public string Search { get; set; } = string.Empty;
     public string SortKey { get; set; } = "year";
     public string SortDirection { get; set; } = "desc";

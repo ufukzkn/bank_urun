@@ -151,6 +151,20 @@ public class TargetsController(
             workbook.FileName);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> MissingTemplate(
+        [FromQuery] TargetQuery query,
+        TargetEntryMode entryMode = TargetEntryMode.SixMonth,
+        CancellationToken cancellationToken = default)
+    {
+        var workbook = await targetService.ExportMissingTemplateAsync(
+            query, entryMode, cancellationToken);
+        return File(
+            workbook.Content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            workbook.FileName);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportPreview(

@@ -1087,6 +1087,7 @@ if (targetManagement) {
         MainProductId: filterValue("mainProductId"),
         Year: filterValue("year"),
         Term: filterValue("term"),
+        CompletionStatus: filterValue("completionStatus"),
         Search: filterValue("search"),
         SortKey: state.sort.key,
         SortDirection: state.sort.direction,
@@ -1113,6 +1114,7 @@ if (targetManagement) {
     MainProductId: filterValue("mainProductId"),
     Year: filterValue("year"),
     Term: filterValue("term"),
+    CompletionStatus: filterValue("completionStatus"),
     Search: filterValue("search"),
     EntryMode: pageEntryMode?.value || "SixMonth"
   });
@@ -1247,6 +1249,10 @@ if (targetManagement) {
     }
     if (event.target.closest?.("[data-target-export-selected]")) {
       submitSelectedTargetExport();
+      return;
+    }
+    if (event.target.closest?.("[data-target-missing-template]")) {
+      window.location.assign(`${targetManagement.dataset.missingTemplateUrl}?${currentQuery()}`);
       return;
     }
     if (event.target.closest?.("[data-target-template]")) {

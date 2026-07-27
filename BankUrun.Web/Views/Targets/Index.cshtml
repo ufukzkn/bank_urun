@@ -19,6 +19,7 @@
      data-editor-url="@Url.Action("Editor", "Targets")"
      data-export-url="@Url.Action("Export", "Targets")"
      data-export-selected-url="@Url.Action("ExportSelected", "Targets")"
+     data-missing-template-url="@Url.Action("MissingTemplate", "Targets")"
      data-target-selection-limit="@BankUrun.Web.ViewModels.TargetSelectedExportInput.MaximumContextCount"
      data-template-url="@Url.Action("Template", "Targets")">
     <section class="surface-panel target-entry-actions">
@@ -45,6 +46,12 @@
                         data-target-selection-toggle
                         aria-pressed="false">
                     Satır seçerek aktar
+                </button>
+                <button class="btn btn-outline-secondary"
+                        type="button"
+                        data-target-missing-template
+                        title="Mevcut filtrelerde hedefi eksik ürün bağlamlarını, kimlik bilgileri dolu ve hedef tutarları boş olarak indirir">
+                    Eksik hedef şablonu
                 </button>
                 <button class="btn btn-outline-secondary" type="button" data-target-template>Boş şablon indir</button>
             </div>
@@ -92,6 +99,7 @@
             <label><span>Ana ürün</span><select class="form-select" data-list-filter="mainProductId"><option value="">Tümü</option>@foreach (var product in Model.Products) { <option value="@product.Id">@product.Code · @product.Name</option> }</select></label>
             <label><span>Yıl</span><select class="form-select" data-list-filter="year"><option value="">Tümü</option>@foreach (var year in Model.Years) { <option value="@year">@year</option> }</select></label>
             <label><span>Dönem</span><select class="form-select" data-list-filter="term"><option value="">Tümü</option><option value="1">1. Dönem</option><option value="2">2. Dönem</option></select></label>
+            <label><span>Hedef durumu</span><select class="form-select" data-list-filter="completionStatus"><option value="">Tümü</option><option value="Missing">Eksik</option><option value="Complete">Hazır</option></select></label>
             <label><span>Sayfa</span><select class="form-select" data-list-page-size><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option></select></label>
         </div>
         <div class="table-responsive parameter-table-scroll">

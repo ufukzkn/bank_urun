@@ -264,14 +264,40 @@ public class TargetManagementService(
             cancellationToken);
     }
 
+    public async Task<TargetWorkbookResult> ExportMissingTemplateAsync(
+        TargetQuery query,
+        TargetEntryMode entryMode,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Enum.IsDefined(entryMode))
+        {
+            throw new InvalidOperationException(
+                "Eksik hedef şablonu giriş biçimi geçersiz.");
+        }
+
+        query.CompletionStatus = TargetCompletionFilter.Missing;
+        var rows = (await BuildRowsAsync(query, cancellationToken))
+            .Where(row => !row.HasCompleteTarget)
+            .ToList();
+        return await BuildWorkbookAsync(
+            rows,
+            entryMode,
+            $"eksik-{DateTime.UtcNow:yyyyMMdd-HHmm}",
+            cancellationToken,
+            blankTargetValues: true);
+    }
+
     private async Task<TargetWorkbookResult> BuildWorkbookAsync(
         IReadOnlyList<TargetRowViewModel> rows,
         TargetEntryMode entryMode,
         string fileSuffix,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool blankTargetValues = false)
     {
         var keys = rows.Select(row => (row.PortfolioId, row.ParameterId)).ToHashSet();
-        var targets = await LoadWorkbookTargetsAsync(keys, cancellationToken);
+        var targets = blankTargetValues
+            ? []
+            : await LoadWorkbookTargetsAsync(keys, cancellationToken);
         var targetLookup = targets
             .Where(item => keys.Contains((item.PortfolioId, item.MainProductParameterId)))
             .GroupBy(item => (item.PortfolioId, item.MainProductParameterId))
@@ -284,7 +310,8 @@ public class TargetManagementService(
         var headers = new[]
         {
             "Yıl", "Dönem", "Grup Kodu", "Şube Kodu", "Portföy Kodu",
-            "Ana Ürün Kodu", "Giriş Tipi", "Aralık", "Hedef Tutarı"
+            "Ana Ürün Kodu", "Giriş Tipi", "Aralık", "Hedef Tutarı",
+            "Grup Adı", "Şube Adı", "Portföy Adı", "Ürün Gamı", "Ana Ürün Adı"
         };
         for (var column = 0; column < headers.Length; column++)
         {
@@ -310,6 +337,12 @@ public class TargetManagementService(
                 {
                     sheet.Cell(excelRow, 9).Value = value.Value;
                 }
+                sheet.Cell(excelRow, 10).Value = row.GroupName;
+                sheet.Cell(excelRow, 11).Value = row.BranchName;
+                sheet.Cell(excelRow, 12).Value = row.PortfolioName;
+                sheet.Cell(excelRow, 13).Value =
+                    $"{row.ProductGamutCode} - {row.ProductGamutName}";
+                sheet.Cell(excelRow, 14).Value = row.MainProductName;
                 excelRow++;
             }
         }
@@ -327,6 +360,14 @@ public class TargetManagementService(
             "Aynı ürün farklı grup veya portföylerde ayrı hedef bağlamıdır.";
         explanation.Cell("A7").Value =
             "Kümülatif 6/3 aylık tutarlar aylara bölünür; ortalamalı tutarlar aylara aynen uygulanır.";
+        if (blankTargetValues)
+        {
+            explanation.Cell("A9").Value =
+                "Bu dosya yalnız seçili filtre kapsamındaki eksik hedef bağlamlarını içerir.";
+            explanation.Cell("A10").Value = rows.Count == 0
+                ? "Seçili filtre kapsamında eksik hedef bulunamadı."
+                : "Hedef Tutarı hücreleri özellikle boş bırakılmıştır; bütün satırları doldurup dosyayı Hedef Girişi ekranından içe aktarın.";
+        }
 
         var headerRange = sheet.Range(1, 1, 1, headers.Length);
         headerRange.Style.Font.Bold = true;
@@ -746,6 +787,10 @@ public class TargetManagementService(
             rows = rows.Where(row => row.Year == query.Year.Value).ToList();
         if (query.Term is 1 or 2)
             rows = rows.Where(row => row.Term == query.Term.Value).ToList();
+        if (query.CompletionStatus == TargetCompletionFilter.Complete)
+            rows = rows.Where(row => row.HasCompleteTarget).ToList();
+        else if (query.CompletionStatus == TargetCompletionFilter.Missing)
+            rows = rows.Where(row => !row.HasCompleteTarget).ToList();
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var search = query.Search.Trim();

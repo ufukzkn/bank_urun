@@ -123,6 +123,29 @@ public class TargetSelectedExportControllerTests
             .SingleOrDefault());
     }
 
+    [Fact]
+    public async Task MissingTemplate_ForwardsFiltersAndEntryMode()
+    {
+        var service = new RecordingTargetManagementService();
+        var controller = CreateController(service);
+        var query = new TargetQuery
+        {
+            GroupId = 7,
+            Year = 2025,
+            Term = 2,
+            Search = "vadeli"
+        };
+
+        var result = await controller.MissingTemplate(
+            query, TargetEntryMode.Monthly);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal([4, 5, 6], file.FileContents);
+        Assert.Equal("missing.xlsx", file.FileDownloadName);
+        Assert.Same(query, service.MissingTemplateQuery);
+        Assert.Equal(TargetEntryMode.Monthly, service.MissingTemplateEntryMode);
+    }
+
     private static TargetsController CreateController(
         RecordingTargetManagementService service)
     {
@@ -148,6 +171,8 @@ public class TargetSelectedExportControllerTests
     {
         public IReadOnlyCollection<TargetContextKey>? SelectedContextKeys { get; private set; }
         public TargetEntryMode? SelectedEntryMode { get; private set; }
+        public TargetQuery? MissingTemplateQuery { get; private set; }
+        public TargetEntryMode? MissingTemplateEntryMode { get; private set; }
         public InvalidOperationException? SelectedExportError { get; init; }
 
         public Task<TargetWorkbookResult> ExportSelectedAsync(
@@ -193,6 +218,17 @@ public class TargetSelectedExportControllerTests
             bool templateOnly,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<TargetWorkbookResult> ExportMissingTemplateAsync(
+            TargetQuery query,
+            TargetEntryMode entryMode,
+            CancellationToken cancellationToken = default)
+        {
+            MissingTemplateQuery = query;
+            MissingTemplateEntryMode = entryMode;
+            return Task.FromResult(
+                new TargetWorkbookResult([4, 5, 6], "missing.xlsx"));
+        }
 
         public Task<TargetImportPreviewViewModel> PreviewImportAsync(
             Stream stream,

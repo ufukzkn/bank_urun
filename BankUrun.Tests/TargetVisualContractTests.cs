@@ -74,6 +74,27 @@ public class TargetVisualContractTests
         Assert.Contains("new TargetAggregateFact(", service);
     }
 
+    [Fact]
+    public void MissingTargetTemplate_UsesActiveFiltersAndLeavesAmountsBlank()
+    {
+        var index = ReadWebFile("Views", "Targets", "Index.cshtml");
+        var controller = ReadWebFile("Controllers", "TargetsController.cs");
+        var service = ReadWebFile("Services", "TargetManagementService.cs");
+        var client = ReadWebFile("wwwroot", "js", "site.js");
+
+        Assert.Contains("data-target-missing-template", index);
+        Assert.Contains("data-missing-template-url", index);
+        Assert.Contains("data-list-filter=\"completionStatus\"", index);
+        Assert.Contains("MissingTemplate", controller);
+        Assert.Contains("query.CompletionStatus = TargetCompletionFilter.Missing", service);
+        Assert.Contains(".Where(row => !row.HasCompleteTarget)", service);
+        Assert.Contains("blankTargetValues: true", service);
+        Assert.Contains("\"Ana Ürün Adı\"", service);
+        Assert.Contains("targetManagement.dataset.missingTemplateUrl", client);
+        Assert.Contains("CompletionStatus: filterValue(\"completionStatus\")", client);
+        Assert.Contains("currentQuery()", client);
+    }
+
     private static int Count(string source, string value)
     {
         var count = 0;
