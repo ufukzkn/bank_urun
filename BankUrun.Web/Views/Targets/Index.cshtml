@@ -1,6 +1,9 @@
 @model BankUrun.Web.ViewModels.TargetIndexViewModel
 @{ ViewData["Title"] = "Hedef Girişi"; }
 
+<link rel="stylesheet" href="~/css/target-visuals.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/performance-visuals.css" asp-append-version="true" />
+
 <section class="page-title parameter-page-title">
     <div>
         <h1>Hedef Girişi</h1>
@@ -15,6 +18,8 @@
      data-rows-url="@Url.Action("Rows", "Targets")"
      data-editor-url="@Url.Action("Editor", "Targets")"
      data-export-url="@Url.Action("Export", "Targets")"
+     data-export-selected-url="@Url.Action("ExportSelected", "Targets")"
+     data-target-selection-limit="@BankUrun.Web.ViewModels.TargetSelectedExportInput.MaximumContextCount"
      data-template-url="@Url.Action("Template", "Targets")">
     <section class="surface-panel target-entry-actions">
         <div class="panel-heading">
@@ -35,6 +40,12 @@
             </nav>
             <div class="target-export-actions">
                 <button class="btn btn-outline-primary" type="button" data-target-export>Filtreyi Excel'e aktar</button>
+                <button class="btn btn-outline-primary target-selection-toggle"
+                        type="button"
+                        data-target-selection-toggle
+                        aria-pressed="false">
+                    Satır seçerek aktar
+                </button>
                 <button class="btn btn-outline-secondary" type="button" data-target-template>Boş şablon indir</button>
             </div>
             <form asp-action="ImportPreview" method="post" enctype="multipart/form-data" class="target-import-form" data-target-import-form>
@@ -57,6 +68,21 @@
                 <p>Aynı ürün farklı grup veya portföylerde bağımsız hedef satırları taşır.</p>
             </div>
         </div>
+        <div class="target-selection-toolbar" data-target-selection-toolbar hidden>
+            <div class="target-selection-summary" aria-live="polite">
+                <span class="target-selection-icon" aria-hidden="true">✓</span>
+                <div>
+                    <strong data-target-selection-count>0 satır seçildi</strong>
+                    <small data-target-selection-feedback>
+                        Filtre veya sayfa değiştirseniz de seçimleriniz korunur; en fazla @BankUrun.Web.ViewModels.TargetSelectedExportInput.MaximumContextCount satır aktarılır.
+                    </small>
+                </div>
+            </div>
+            <div class="target-selection-actions">
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-target-selection-clear disabled>Seçimi temizle</button>
+                <button class="btn btn-sm btn-primary" type="button" data-target-export-selected disabled>Seçilenleri Excel'e aktar</button>
+            </div>
+        </div>
         <div class="table-toolbar performance-list-toolbar target-entry-toolbar">
             <label class="toolbar-search"><span>Hedeflerde ara</span><input class="form-control" type="search" data-list-filter="search" placeholder="Şube, portföy, gam veya ürün" /></label>
             <label><span>Grup</span><select class="form-select" data-list-filter="groupId" data-target-group><option value="">Tümü</option>@foreach (var group in Model.Groups) { <option value="@group.Id">@group.GroupNo</option> }</select></label>
@@ -71,6 +97,13 @@
         <div class="table-responsive parameter-table-scroll">
             <table class="table compact-table performance-parameter-table target-management-table">
                 <thead><tr>
+                    <th class="target-selection-cell target-selection-heading">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               data-target-select-page
+                               aria-label="Bu sayfadaki bütün hedef satırlarını seç"
+                               title="Bu sayfadaki bütün satırları seç" />
+                    </th>
                     <th><button class="sort-button" type="button" data-list-sort="year">Yıl <span></span></button></th>
                     <th><button class="sort-button" type="button" data-list-sort="term">Dönem <span></span></button></th>
                     <th><button class="sort-button" type="button" data-list-sort="group">Grup <span></span></button></th>

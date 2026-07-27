@@ -2,12 +2,20 @@
 
 @if (Model.Rows.Count == 0)
 {
-    <tr class="empty-row"><td colspan="11" class="empty-cell">Filtreye uygun hedef bağlamı bulunamadı.</td></tr>
+    <tr class="empty-row"><td colspan="12" class="empty-cell">Filtreye uygun hedef bağlamı bulunamadı.</td></tr>
 }
 @foreach (var row in Model.Rows)
 {
     var detailId = $"target-{row.PortfolioId}-{row.ParameterId}";
+    var contextKey = $"{row.PortfolioId}:{row.ParameterId}";
     <tr class="list-row" data-detail-id="@detailId">
+        <td class="target-selection-cell">
+            <input class="form-check-input"
+                   type="checkbox"
+                   value="@contextKey"
+                   data-target-select-row
+                   aria-label="@row.PortfolioCode – @row.MainProductCode hedef satırını seç" />
+        </td>
         <td>@row.Year</td>
         <td>@row.Term. Dönem</td>
         <td><strong>@row.GroupNo</strong><small>@row.GroupName</small></td>
@@ -21,7 +29,7 @@
         <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" data-target-detail data-parameter-id="@row.ParameterId" data-portfolio-id="@row.PortfolioId">Detay</button></td>
     </tr>
     <tr class="list-detail-row" data-detail-for="@detailId">
-        <td colspan="11">
+        <td colspan="12">
             <div class="collapse" id="@detailId">
                 <div class="main-product-target-detail" data-target-editor>
                     <div class="inline-empty-state">Hedef editörü Detay açıldığında yüklenir.</div>

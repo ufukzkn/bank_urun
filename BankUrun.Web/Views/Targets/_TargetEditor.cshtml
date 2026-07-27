@@ -5,14 +5,48 @@
         value.ToString("0.##", CultureInfo.InvariantCulture);
 }
 
-<form asp-controller="Targets" asp-action="Update" method="post" class="monthly-target-form" data-period-target-form>
+<form asp-controller="Targets"
+      asp-action="Update"
+      method="post"
+      class="monthly-target-form"
+      data-period-target-form
+      data-target-calculation-type="@Model.CalculationType">
     @Html.AntiForgeryToken()
     <input type="hidden" name="ParameterId" value="@Model.ParameterId" />
     <input type="hidden" name="PortfolioId" value="@Model.PortfolioId" />
+    <nav class="target-context-path" aria-label="Hedef bağlamı">
+        <span><small>Grup</small><strong>@Model.GroupLabel</strong></span>
+        <i aria-hidden="true">→</i>
+        <span><small>Şube</small><strong>@Model.BranchLabel</strong></span>
+        <i aria-hidden="true">→</i>
+        <span><small>Portföy</small><strong>@Model.PortfolioLabel</strong></span>
+        <i aria-hidden="true">→</i>
+        <span><small>Ürün gamı</small><strong>@Model.ProductGamutLabel</strong></span>
+        <i aria-hidden="true">→</i>
+        <span class="is-current"><small>Ana ürün</small><strong>@Model.MainProductLabel</strong></span>
+    </nav>
     <div class="sub-target-editor-heading">
         <div><strong>@Model.PortfolioLabel</strong><span>@Model.Year / @Model.Term. Dönem · @Model.MainProductLabel</span></div>
-        <div class="target-editor-summary"><small>Portföydeki ürün hedefleri toplamı</small><strong>@Model.PortfolioPeriodTarget.ToString("N2")</strong></div>
+        <div class="target-editor-summary">
+            <small>Portföydeki ürün hedefleri toplamı</small>
+            <strong>@(Model.PortfolioPeriodTarget.HasValue ? Model.PortfolioPeriodTarget.Value.ToString("N2") : "Veri bekleniyor")</strong>
+        </div>
     </div>
+    @await Html.PartialAsync("_ProductFlowVisual", new BankUrun.Web.ViewModels.ProductFlowViewModel
+    {
+        CenterTitle = Model.PortfolioLabel,
+        CenterSubtitle = Model.PortfolioPeriodTarget.HasValue
+            ? $"{Model.Year} / {Model.Term}. Dönem · Toplam {Model.PortfolioPeriodTarget.Value:N2}"
+            : $"{Model.Year} / {Model.Term}. Dönem · Eksik hedef bulunuyor",
+        CenterLabel = "Portföy",
+        Heading = "Portföy hedef bileşimi",
+        Description = "Portföyün dönem hedefi, kapsamındaki ana ürün hedeflerinden oluşur.",
+        ValueLabel = "Dönem hedefi",
+        TotalLabel = "Toplam hedef",
+        EmptyMessage = "Bu portföyde hedef kapsamına giren ana ürün bulunamadı.",
+        ShowDistribution = true,
+        Items = Model.PortfolioTargetProducts
+    })
     <nav class="segmented-control segmented-control--compact target-editor-mode"
          aria-label="Hedef düzenleme biçimi"
          data-segmented-control
@@ -48,6 +82,36 @@
         }
         </div>
     </div>
+    <section class="target-allocation-preview" data-target-allocation-preview>
+        <div class="target-allocation-heading">
+            <div>
+                <span class="target-visual-kicker">Canlı önizleme</span>
+                <h4>Aylara yansıyacak hedef</h4>
+            </div>
+            <div class="target-allocation-total">
+                <small>Dönem hedefi</small>
+                <strong data-target-allocation-total>0,00</strong>
+            </div>
+        </div>
+        <p data-target-allocation-explanation>
+            Giriş biçimini veya hedef tutarını değiştirdiğinizde aylık dağılım burada güncellenir.
+        </p>
+        <div class="target-allocation-chart"
+             data-target-allocation-chart
+             role="img"
+             aria-label="Altı aylık hedef dağılımı">
+            @foreach (var month in Model.Months)
+            {
+                <div class="target-allocation-month" data-target-allocation-month="@month.Month">
+                    <div class="target-allocation-value" data-target-allocation-value>0,00</div>
+                    <div class="target-allocation-track" aria-hidden="true">
+                        <span class="target-allocation-bar" data-target-allocation-bar></span>
+                    </div>
+                    <span class="target-allocation-label">@month.MonthName</span>
+                </div>
+            }
+        </div>
+    </section>
     <p class="inline-help-note">Bu hedef yalnız bu grup–şube–portföy–ana ürün bağlamına aittir. Aynı ürünün diğer portföylerdeki hedefleri değişmez.</p>
     <div class="detail-command-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Bu bağlamın hedeflerini güncellemek istediğinize emin misiniz?">Hedefi kaydet</button></div>
 </form>

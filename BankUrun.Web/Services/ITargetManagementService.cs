@@ -9,6 +9,10 @@ public interface ITargetManagementService
     Task<TargetEditorViewModel> GetEditorAsync(int parameterId, int portfolioId, CancellationToken cancellationToken = default);
     Task UpdateTargetsAsync(TargetPeriodInput input, string actor, CancellationToken cancellationToken = default);
     Task<TargetWorkbookResult> ExportAsync(TargetQuery query, TargetEntryMode entryMode, bool templateOnly, CancellationToken cancellationToken = default);
+    Task<TargetWorkbookResult> ExportSelectedAsync(
+        IReadOnlyCollection<TargetContextKey> contextKeys,
+        TargetEntryMode entryMode,
+        CancellationToken cancellationToken = default);
     Task<TargetImportPreviewViewModel> PreviewImportAsync(Stream stream, string fileName, CancellationToken cancellationToken = default);
     Task ConfirmImportAsync(string token, string actor, CancellationToken cancellationToken = default);
 }

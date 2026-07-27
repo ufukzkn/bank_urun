@@ -30,7 +30,7 @@ public class TargetEntryContractTests
         Assert.Contains("data-target-detail", rows);
         Assert.Contains("setupList(targetRoot", client);
         Assert.Contains("BranchId: filterValue(\"branchId\")", client);
-        Assert.Contains("colspan: 11", client);
+        Assert.Contains("colspan: 12", client);
     }
 
     [Fact]

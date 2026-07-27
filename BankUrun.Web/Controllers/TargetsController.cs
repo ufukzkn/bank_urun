@@ -85,6 +85,59 @@ public class TargetsController(
             workbook.FileName);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExportSelected(
+        [FromForm] TargetSelectedExportInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest("Seçili dışa aktarma bilgileri geçersiz.");
+        }
+        if (input.ContextKeys is not { Count: > 0 })
+        {
+            return BadRequest("Dışa aktarılacak en az bir hedef satırı seçin.");
+        }
+        if (input.ContextKeys.Count > TargetSelectedExportInput.MaximumContextCount)
+        {
+            return BadRequest(
+                $"Tek işlemde en fazla {TargetSelectedExportInput.MaximumContextCount} hedef satırı dışa aktarılabilir.");
+        }
+
+        var contextKeys = new HashSet<TargetContextKey>();
+        foreach (var value in input.ContextKeys)
+        {
+            var parts = value?.Split(
+                ':',
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts is not { Length: 2 }
+                || !int.TryParse(parts[0], out var portfolioId)
+                || !int.TryParse(parts[1], out var parameterId)
+                || portfolioId <= 0
+                || parameterId <= 0)
+            {
+                return BadRequest("Seçili hedef satırlarından biri geçersiz.");
+            }
+
+            contextKeys.Add(new TargetContextKey(portfolioId, parameterId));
+        }
+
+        try
+        {
+            var workbook = await targetService.ExportSelectedAsync(
+                contextKeys, input.EntryMode, cancellationToken);
+            return File(
+                workbook.Content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbook.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> Template(
         TargetEntryMode entryMode = TargetEntryMode.SixMonth,

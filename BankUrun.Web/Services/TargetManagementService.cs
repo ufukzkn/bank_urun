@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Text;
 using BankUrun.Web.Data;
 using BankUrun.Web.Models;
@@ -11,7 +12,8 @@ namespace BankUrun.Web.Services;
 public class TargetManagementService(
     AppDbContext db,
     TimeProvider timeProvider,
-    TargetImportPreviewStore importStore) : ITargetManagementService
+    TargetImportPreviewStore importStore,
+    IPerformanceFactCache performanceFactCache) : ITargetManagementService
 {
     private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
     private static readonly CompareInfo TurkishCompare = TurkishCulture.CompareInfo;
@@ -127,7 +129,11 @@ public class TargetManagementService(
                 PageSize = 50
             },
             cancellationToken);
-        var portfolioPeriodTarget = eligiblePortfolioRows.Sum(item => item.PeriodTarget);
+        var hasCompletePortfolioTarget = eligiblePortfolioRows.Count > 0
+            && eligiblePortfolioRows.All(item => item.HasCompleteTarget);
+        var portfolioPeriodTarget = hasCompletePortfolioTarget
+            ? Round(eligiblePortfolioRows.Sum(item => item.PeriodTarget))
+            : (decimal?)null;
 
         return new TargetEditorViewModel
         {
@@ -136,7 +142,13 @@ public class TargetManagementService(
             Year = context.Parameter.MainProductInstance.Year,
             Term = context.Parameter.MainProductInstance.Term,
             CalculationType = context.Parameter.CalculationType,
+            GroupLabel =
+                $"{context.Parameter.Group.GroupNo} - {context.Parameter.Group.Name}",
+            BranchLabel =
+                $"{context.Portfolio.Branch.BranchCode} - {context.Portfolio.Branch.Name}",
             PortfolioLabel = $"{context.Portfolio.Code} - {context.Portfolio.Name}",
+            ProductGamutLabel =
+                $"{context.Portfolio.ProductGamut.Code} - {context.Portfolio.ProductGamut.Name}",
             MainProductLabel =
                 $"{context.Parameter.MainProductInstance.MainProduct.Code} - {context.Parameter.MainProductInstance.MainProduct.Name}",
             SixMonthTarget = TargetPeriodValueConverter.Aggregate(
@@ -145,7 +157,18 @@ public class TargetManagementService(
                 values.Take(3), context.Parameter.CalculationType),
             SecondThreeMonthTarget = TargetPeriodValueConverter.Aggregate(
                 values.Skip(3), context.Parameter.CalculationType),
-            PortfolioPeriodTarget = Round(portfolioPeriodTarget),
+            PortfolioPeriodTarget = portfolioPeriodTarget,
+            PortfolioTargetProducts = eligiblePortfolioRows
+                .OrderByDescending(item => item.PeriodTarget)
+                .ThenBy(item => item.MainProductCode, StringComparer.Create(
+                    TurkishCulture, ignoreCase: true))
+                .Select(item => new ProductFlowItemViewModel
+                {
+                    Code = item.MainProductCode,
+                    Name = item.MainProductName,
+                    Value = item.HasCompleteTarget ? item.PeriodTarget : null
+                })
+                .ToList(),
             Months = termMonths.Select(month => new TargetMonthViewModel
             {
                 Month = month,
@@ -190,13 +213,65 @@ public class TargetManagementService(
         var rows = templateOnly
             ? []
             : await BuildRowsAsync(query, cancellationToken);
+        return await BuildWorkbookAsync(
+            rows,
+            entryMode,
+            templateOnly ? "sablon" : DateTime.UtcNow.ToString("yyyyMMdd-HHmm"),
+            cancellationToken);
+    }
+
+    public async Task<TargetWorkbookResult> ExportSelectedAsync(
+        IReadOnlyCollection<TargetContextKey> contextKeys,
+        TargetEntryMode entryMode,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(contextKeys);
+        if (contextKeys.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Dışa aktarılacak en az bir hedef satırı seçin.");
+        }
+        if (contextKeys.Count > TargetSelectedExportInput.MaximumContextCount)
+        {
+            throw new InvalidOperationException(
+                $"Tek işlemde en fazla {TargetSelectedExportInput.MaximumContextCount} hedef satırı dışa aktarılabilir.");
+        }
+        if (!Enum.IsDefined(entryMode)
+            || contextKeys.Any(key => key.PortfolioId <= 0 || key.ParameterId <= 0))
+        {
+            throw new InvalidOperationException(
+                "Seçili dışa aktarma bilgileri geçersiz.");
+        }
+
+        var distinctKeys = contextKeys.ToHashSet();
+        var rows = await BuildRowsAsync(
+            new TargetQuery(),
+            cancellationToken,
+            distinctKeys);
+        var resolvedKeys = rows
+            .Select(row => new TargetContextKey(row.PortfolioId, row.ParameterId))
+            .ToHashSet();
+        if (!resolvedKeys.SetEquals(distinctKeys))
+        {
+            throw new InvalidOperationException(
+                "Seçilen hedeflerden biri artık aktif veya geçerli değil. Listeyi yenileyip tekrar deneyin.");
+        }
+
+        return await BuildWorkbookAsync(
+            rows,
+            entryMode,
+            $"secili-{DateTime.UtcNow:yyyyMMdd-HHmm}",
+            cancellationToken);
+    }
+
+    private async Task<TargetWorkbookResult> BuildWorkbookAsync(
+        IReadOnlyList<TargetRowViewModel> rows,
+        TargetEntryMode entryMode,
+        string fileSuffix,
+        CancellationToken cancellationToken)
+    {
         var keys = rows.Select(row => (row.PortfolioId, row.ParameterId)).ToHashSet();
-        var targets = keys.Count == 0
-            ? []
-            : await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
-                .Where(item => rows.Select(row => row.PortfolioId).Contains(item.PortfolioId)
-                    && rows.Select(row => row.ParameterId).Contains(item.MainProductParameterId))
-                .ToListAsync(cancellationToken);
+        var targets = await LoadWorkbookTargetsAsync(keys, cancellationToken);
         var targetLookup = targets
             .Where(item => keys.Contains((item.PortfolioId, item.MainProductParameterId)))
             .GroupBy(item => (item.PortfolioId, item.MainProductParameterId))
@@ -256,16 +331,69 @@ public class TargetManagementService(
         var headerRange = sheet.Range(1, 1, 1, headers.Length);
         headerRange.Style.Font.Bold = true;
         headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#DCECF5");
+        sheet.Range(1, 1, Math.Max(1, excelRow - 1), headers.Length).SetAutoFilter();
+        sheet.Column(9).Style.NumberFormat.Format = "#,##0.00";
         sheet.SheetView.FreezeRows(1);
         sheet.Columns().AdjustToContents();
         explanation.Columns().AdjustToContents();
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
-        var suffix = templateOnly ? "sablon" : DateTime.UtcNow.ToString("yyyyMMdd-HHmm");
         return new TargetWorkbookResult(
             stream.ToArray(),
-            $"hedef-girisi-{suffix}.xlsx");
+            $"hedef-girisi-{fileSuffix}.xlsx");
+    }
+
+    private async Task<List<PortfolioMainProductMonthlyTarget>> LoadWorkbookTargetsAsync(
+        IReadOnlySet<(int PortfolioId, int ParameterId)> keys,
+        CancellationToken cancellationToken)
+    {
+        if (keys.Count == 0)
+            return [];
+
+        if (keys.Count > TargetSelectedExportInput.MaximumContextCount)
+        {
+            var portfolioIds = keys.Select(key => key.PortfolioId).Distinct().ToArray();
+            var parameterIds = keys.Select(key => key.ParameterId).Distinct().ToArray();
+            return await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
+                .Where(item => portfolioIds.Contains(item.PortfolioId)
+                    && parameterIds.Contains(item.MainProductParameterId))
+                .ToListAsync(cancellationToken);
+        }
+
+        var result = new List<PortfolioMainProductMonthlyTarget>();
+        foreach (var batch in keys.Chunk(100))
+        {
+            var item = Expression.Parameter(
+                typeof(PortfolioMainProductMonthlyTarget),
+                "item");
+            Expression body = Expression.Constant(false);
+            foreach (var key in batch)
+            {
+                var portfolioMatch = Expression.Equal(
+                    Expression.Property(
+                        item,
+                        nameof(PortfolioMainProductMonthlyTarget.PortfolioId)),
+                    Expression.Constant(key.PortfolioId));
+                var parameterMatch = Expression.Equal(
+                    Expression.Property(
+                        item,
+                        nameof(PortfolioMainProductMonthlyTarget.MainProductParameterId)),
+                    Expression.Constant(key.ParameterId));
+                body = Expression.OrElse(
+                    body,
+                    Expression.AndAlso(portfolioMatch, parameterMatch));
+            }
+
+            var predicate = Expression.Lambda<Func<PortfolioMainProductMonthlyTarget, bool>>(
+                body,
+                item);
+            result.AddRange(await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
+                .Where(predicate)
+                .ToListAsync(cancellationToken));
+        }
+
+        return result;
     }
 
     public async Task<TargetImportPreviewViewModel> PreviewImportAsync(
@@ -400,33 +528,134 @@ public class TargetManagementService(
 
     private async Task<List<TargetRowViewModel>> BuildRowsAsync(
         TargetQuery query,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<TargetContextKey>? selectedKeys = null)
     {
-        var parameters = await db.MainProductParameters.AsNoTracking()
+        if (selectedKeys is null)
+        {
+            var cached = await performanceFactCache.GetOrCreateAsync(
+                "target-context-rows",
+                false,
+                token => BuildRowsUncachedAsync(new TargetQuery(), token),
+                cancellationToken);
+            return SortRows(
+                ApplyFilters(cached.Value.ToList(), query),
+                query.SortKey,
+                query.SortDirection);
+        }
+
+        return await BuildRowsUncachedAsync(
+            query,
+            cancellationToken,
+            selectedKeys);
+    }
+
+    private async Task<List<TargetRowViewModel>> BuildRowsUncachedAsync(
+        TargetQuery query,
+        CancellationToken cancellationToken,
+        IReadOnlySet<TargetContextKey>? selectedKeys = null)
+    {
+        IQueryable<MainProductParameter> parameterQuery =
+            db.MainProductParameters.AsNoTracking()
             .Include(item => item.Group)
             .Include(item => item.MainProductInstance).ThenInclude(item => item.MainProduct)
-            .Where(item => item.IsActive)
-            .ToListAsync(cancellationToken);
-        var portfolios = await db.Portfolios.AsNoTracking()
+            .Where(item => item.IsActive);
+        IQueryable<Portfolio> portfolioQuery = db.Portfolios.AsNoTracking()
             .Include(item => item.Branch)
             .Include(item => item.ProductGamut)
-            .Where(item => item.IsActive)
-            .ToListAsync(cancellationToken);
+            .Where(item => item.IsActive);
+        if (query.GroupId.HasValue)
+        {
+            parameterQuery = parameterQuery.Where(item => item.GroupId == query.GroupId.Value);
+            portfolioQuery = portfolioQuery.Where(item => item.GroupId == query.GroupId.Value);
+        }
+        if (query.BranchId.HasValue)
+            portfolioQuery = portfolioQuery.Where(item => item.BranchId == query.BranchId.Value);
+        if (query.ProductGamutId.HasValue)
+            portfolioQuery = portfolioQuery.Where(
+                item => item.ProductGamutId == query.ProductGamutId.Value);
+        if (query.PortfolioId.HasValue)
+            portfolioQuery = portfolioQuery.Where(item => item.Id == query.PortfolioId.Value);
+        if (query.MainProductId.HasValue)
+            parameterQuery = parameterQuery.Where(item =>
+                item.MainProductInstance.MainProductId == query.MainProductId.Value);
+        if (query.Year.HasValue)
+            parameterQuery = parameterQuery.Where(
+                item => item.MainProductInstance.Year == query.Year.Value);
+        if (query.Term is 1 or 2)
+            parameterQuery = parameterQuery.Where(
+                item => item.MainProductInstance.Term == query.Term.Value);
+        if (selectedKeys is not null)
+        {
+            var selectedParameterIds = selectedKeys
+                .Select(key => key.ParameterId)
+                .Distinct()
+                .ToArray();
+            var selectedPortfolioIds = selectedKeys
+                .Select(key => key.PortfolioId)
+                .Distinct()
+                .ToArray();
+            parameterQuery = parameterQuery.Where(
+                item => selectedParameterIds.Contains(item.Id));
+            portfolioQuery = portfolioQuery.Where(
+                item => selectedPortfolioIds.Contains(item.Id));
+        }
+
+        var parameters = await parameterQuery.ToListAsync(cancellationToken);
+        var portfolios = await portfolioQuery.ToListAsync(cancellationToken);
+        var productIds = parameters
+            .Select(item => item.MainProductInstance.MainProductId)
+            .Distinct()
+            .ToArray();
+        var productGamutIds = portfolios
+            .Select(item => item.ProductGamutId)
+            .Distinct()
+            .ToArray();
+        var branchIds = portfolios
+            .Select(item => item.BranchId)
+            .Distinct()
+            .ToArray();
         var assignments = await db.ProductGamutMainProductAssignments.AsNoTracking()
+            .Where(item => productGamutIds.Contains(item.ProductGamutId)
+                && productIds.Contains(item.MainProductId))
             .ToListAsync(cancellationToken);
         var exclusions = await db.BranchMainProductExclusions.AsNoTracking()
+            .Where(item => branchIds.Contains(item.BranchId)
+                && productIds.Contains(item.MainProductId))
             .ToListAsync(cancellationToken);
-        var targets = await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
-            .ToListAsync(cancellationToken);
-        var targetMap = targets
-            .GroupBy(item => (item.PortfolioId, item.MainProductParameterId))
-            .ToDictionary(
-                group => group.Key,
-                group => new
+        var portfolioIds = portfolios.Select(item => item.Id).ToArray();
+        var parameterIds = parameters.Select(item => item.Id).ToArray();
+        var targetSummaries = selectedKeys is null
+            ? await db.PortfolioMainProductMonthlyTargets.AsNoTracking()
+                .Where(item => portfolioIds.Contains(item.PortfolioId)
+                    && parameterIds.Contains(item.MainProductParameterId))
+                .GroupBy(item => new
                 {
-                    Values = group.Select(item => item.TargetValue).ToList(),
-                    Count = group.Select(item => item.Month).Distinct().Count()
-                });
+                    item.PortfolioId,
+                    item.MainProductParameterId
+                })
+                .Select(group => new TargetAggregateFact(
+                    group.Key.PortfolioId,
+                    group.Key.MainProductParameterId,
+                    group.Sum(item => item.TargetValue),
+                    group.Average(item => item.TargetValue),
+                    group.Select(item => item.Month).Distinct().Count()))
+                .ToListAsync(cancellationToken)
+            : (await LoadWorkbookTargetsAsync(
+                    selectedKeys
+                        .Select(key => (key.PortfolioId, key.ParameterId))
+                        .ToHashSet(),
+                    cancellationToken))
+                .GroupBy(item => (item.PortfolioId, item.MainProductParameterId))
+                .Select(group => new TargetAggregateFact(
+                    group.Key.PortfolioId,
+                    group.Key.MainProductParameterId,
+                    group.Sum(item => item.TargetValue),
+                    group.Average(item => item.TargetValue),
+                    group.Select(item => item.Month).Distinct().Count()))
+                .ToList();
+        var targetMap = targetSummaries.ToDictionary(
+            item => (item.PortfolioId, item.MainProductParameterId));
 
         var rows = new List<TargetRowViewModel>();
         foreach (var portfolio in portfolios)
@@ -434,6 +663,13 @@ public class TargetManagementService(
             foreach (var parameter in parameters.Where(
                          item => item.GroupId == portfolio.GroupId))
             {
+                if (selectedKeys is not null
+                    && !selectedKeys.Contains(
+                        new TargetContextKey(portfolio.Id, parameter.Id)))
+                {
+                    continue;
+                }
+
                 var instance = parameter.MainProductInstance;
                 if (!assignments.Any(item =>
                         item.ProductGamutId == portfolio.ProductGamutId
@@ -479,9 +715,11 @@ public class TargetManagementService(
                     CalculationType = parameter.CalculationType,
                     PeriodTarget = target is null
                         ? 0
-                        : TargetPeriodValueConverter.Aggregate(
-                            target.Values, parameter.CalculationType),
-                    EnteredMonthCount = target?.Count ?? 0
+                        : Round(parameter.CalculationType
+                            == MainProductCalculationType.Average
+                                ? target.Average
+                                : target.Total),
+                    EnteredMonthCount = target?.MonthCount ?? 0
                 });
             }
         }
@@ -562,6 +800,7 @@ public class TargetManagementService(
         CancellationToken cancellationToken)
     {
         var parameter = await db.MainProductParameters.AsNoTracking()
+            .Include(item => item.Group)
             .Include(item => item.MainProductInstance).ThenInclude(item => item.MainProduct)
             .FirstOrDefaultAsync(item => item.Id == parameterId && item.IsActive,
                 cancellationToken)
@@ -1085,6 +1324,13 @@ public class TargetManagementService(
     {
         public bool HasValue => Value.HasValue;
     }
+
+    private sealed record TargetAggregateFact(
+        int PortfolioId,
+        int MainProductParameterId,
+        decimal Total,
+        decimal Average,
+        int MonthCount);
 
     private sealed record RawImportRow(
         int RowNumber,

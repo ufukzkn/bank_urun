@@ -112,13 +112,17 @@ public class TargetEditorViewModel
     public int Year { get; set; }
     public int Term { get; set; }
     public MainProductCalculationType CalculationType { get; set; }
+    public string GroupLabel { get; set; } = string.Empty;
+    public string BranchLabel { get; set; } = string.Empty;
     public string PortfolioLabel { get; set; } = string.Empty;
+    public string ProductGamutLabel { get; set; } = string.Empty;
     public string MainProductLabel { get; set; } = string.Empty;
     public decimal SixMonthTarget { get; set; }
     public decimal FirstThreeMonthTarget { get; set; }
     public decimal SecondThreeMonthTarget { get; set; }
-    public decimal PortfolioPeriodTarget { get; set; }
+    public decimal? PortfolioPeriodTarget { get; set; }
     public IReadOnlyList<TargetMonthViewModel> Months { get; set; } = [];
+    public IReadOnlyList<ProductFlowItemViewModel> PortfolioTargetProducts { get; set; } = [];
 }
 
 public class TargetMonthViewModel
@@ -150,6 +154,18 @@ public class TargetPeriodInput
     public decimal? SecondThreeMonthTarget { get; set; }
 
     public List<TargetMonthInput> Months { get; set; } = [];
+}
+
+public sealed record TargetContextKey(int PortfolioId, int ParameterId);
+
+public class TargetSelectedExportInput
+{
+    public const int MaximumContextCount = 500;
+
+    [EnumDataType(typeof(TargetEntryMode))]
+    public TargetEntryMode EntryMode { get; set; } = TargetEntryMode.SixMonth;
+
+    public List<string> ContextKeys { get; set; } = [];
 }
 
 public class TargetMonthInput
