@@ -207,16 +207,41 @@ function syncConfirmAvailability() {
   });
 }
 
+function impactCountTone(label, result) {
+  const normalized = String(label || "").toLocaleLowerCase("tr-TR");
+  if (normalized.includes("korunacak") || normalized.includes("korunan")) return "is-preserved";
+  if (result?.allowed === false) return "is-warning";
+  const destructiveOperation = /(sil|kaldır|çıkar|pasifleştir)/i.test(result?.operation || "");
+  const destructiveLabel = /(silinecek|hedef|gerçekleşme|atama|istisna|bağlantı|parametre|dönem kaydı)/i.test(normalized);
+  return destructiveOperation || destructiveLabel ? "is-removed" : "is-neutral";
+}
+
 function renderConfirmImpact(result) {
   if (!confirmImpact) return;
   const counts = Array.isArray(result?.counts) ? result.counts : [];
   const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
   const blockers = Array.isArray(result?.blockers) ? result.blockers : [];
-  const rows = counts.filter((item) => Number(item.count) > 0)
+  const visibleCounts = counts.filter((item) => Number(item.count) > 0);
+  const rows = visibleCounts
     .map((item) => `<li><span>${escapeHtml(item.label)}</span><strong>${Number(item.count).toLocaleString("tr-TR")}</strong></li>`).join("");
+  const impactNodes = visibleCounts.map((item) => {
+    const tone = impactCountTone(item.label, result);
+    return `<div class="impact-map-node ${tone}"><span>${escapeHtml(item.label)}</span><strong>${Number(item.count).toLocaleString("tr-TR")}</strong></div>`;
+  }).join("");
+  const relationshipMap = impactNodes
+    ? `<div class="impact-relationship-map">
+        <div class="impact-map-caption"><span>Mevcut bağlam</span><span>İşlem etkisi</span></div>
+        <div class="impact-map-stage">
+          <div class="impact-map-subject"><strong>${escapeHtml(result?.subject || "Seçili kayıt")}</strong><small>${escapeHtml(result?.operation || "Yönetim işlemi")}</small></div>
+          <span class="impact-map-arrow" aria-hidden="true">→</span>
+          <div class="impact-map-outcomes">${impactNodes}</div>
+        </div>
+        <div class="impact-map-legend" aria-label="Etki renkleri"><span class="is-removed">Silinen veya değişen</span><span class="is-preserved">Korunan</span><span class="is-neutral">Bağlı kayıt</span></div>
+      </div>`
+    : "";
   const notices = [...warnings.map((item) => `<p class="impact-warning">${escapeHtml(item)}</p>`),
     ...blockers.map((item) => `<p class="impact-blocker">${escapeHtml(item)}</p>`)].join("");
-  confirmImpact.innerHTML = `<strong>${escapeHtml(result?.subject || "Etki özeti")}</strong><p>${escapeHtml(result?.summary || "")}</p>${rows ? `<ul>${rows}</ul>` : ""}${notices}`;
+  confirmImpact.innerHTML = `<strong>${escapeHtml(result?.subject || "Etki özeti")}</strong><p>${escapeHtml(result?.summary || "")}</p>${relationshipMap}${rows ? `<ul class="impact-count-list">${rows}</ul>` : ""}${notices}`;
   confirmImpact.classList.remove("d-none");
   pendingImpactAllowed = result?.allowed !== false;
   syncConfirmAvailability();
@@ -730,6 +755,7 @@ if (productManagement) {
   const picker = productManagement.querySelector(":scope > [data-segmented-control]");
   const buttons = Array.from(productManagement.querySelectorAll("[data-product-mode]"));
   const panels = Array.from(productManagement.querySelectorAll("[data-product-mode-panel]"));
+  const productFlowCache = new Map();
   const setMode = (mode) => {
     setSegmentedControlValue(picker, mode);
     panels.forEach((panel) => panel.classList.toggle("d-none", panel.dataset.productModePanel !== mode));
@@ -757,6 +783,49 @@ if (productManagement) {
   };
   removalScope?.addEventListener("change", syncRemovalScope);
   syncRemovalScope();
+
+  productManagement.addEventListener("click", async (event) => {
+    const button = event.target.closest?.("[data-product-flow-load]");
+    if (!button) return;
+    const shell = button.closest("[data-product-flow-shell]");
+    const target = shell?.querySelector("[data-product-flow-target]");
+    const url = button.dataset.productFlowUrl;
+    if (!target || !url) return;
+
+    if (target.dataset.loaded === "true") {
+      const willOpen = target.hidden;
+      target.hidden = !willOpen;
+      button.setAttribute("aria-expanded", willOpen.toString());
+      button.textContent = willOpen
+        ? "Besleyen ürünleri gizle"
+        : "Besleyen ürünleri göster";
+      return;
+    }
+
+    button.disabled = true;
+    target.hidden = false;
+    target.setAttribute("aria-busy", "true");
+    target.innerHTML = '<div class="inline-empty-state">Besleyen ürünler yükleniyor…</div>';
+    try {
+      let html = productFlowCache.get(url);
+      if (!html) {
+        const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        if (!response.ok) throw new Error("Product flow could not be loaded.");
+        html = await response.text();
+        productFlowCache.set(url, html);
+      }
+      target.innerHTML = html;
+      target.dataset.loaded = "true";
+      button.setAttribute("aria-expanded", "true");
+      button.textContent = "Besleyen ürünleri gizle";
+    } catch {
+      target.innerHTML = '<div class="inline-empty-state">Besleyen ürünler yüklenemedi. Lütfen yeniden deneyin.</div>';
+      target.hidden = false;
+    } finally {
+      target.removeAttribute("aria-busy");
+      button.disabled = false;
+    }
+  });
 }
 
 setupList(document.querySelector('[data-list="groups"]'), {
@@ -849,13 +918,166 @@ if (targetManagement) {
   const pageEntryMode = targetManagement.querySelector("[data-target-entry-mode]");
   const importForm = targetManagement.querySelector("[data-target-import-form]");
   const importPreview = targetManagement.querySelector("[data-target-import-preview]");
+  const selectionToggle = targetManagement.querySelector("[data-target-selection-toggle]");
+  const selectionToolbar = targetManagement.querySelector("[data-target-selection-toolbar]");
+  const filteredTargetExport = targetManagement.querySelector("[data-target-export]");
+  const targetSelectionLimit = Number(targetManagement.dataset.targetSelectionLimit || 500);
+  const selectedTargetContexts = new Set();
+  let targetSelectionMode = false;
+
+  const moneyFormatter = new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const targetInputValue = (input) => {
+    const value = Number.parseFloat((input?.value || "0").replace(",", "."));
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  };
+  const roundTargetValue = (value) =>
+    Math.round((value + Number.EPSILON) * 100) / 100;
+  const allocateTargetBlock = (value, count, isAverage) => {
+    const roundedValue = roundTargetValue(value);
+    if (isAverage) return Array(count).fill(roundedValue);
+    const perMonth = roundTargetValue(roundedValue / count);
+    return [
+      ...Array(Math.max(0, count - 1)).fill(perMonth),
+      roundTargetValue(roundedValue - (perMonth * Math.max(0, count - 1)))
+    ];
+  };
+  const updateTargetAllocationPreview = (form) => {
+    if (!form) return;
+    const preview = form.querySelector("[data-target-allocation-preview]");
+    if (!preview) return;
+    const mode = form.querySelector("[data-target-editor-mode-input]")?.value || "SixMonth";
+    const isAverage = form.dataset.targetCalculationType === "Average";
+    let monthlyValues = [];
+    if (mode === "SixMonth") {
+      monthlyValues = allocateTargetBlock(
+        targetInputValue(form.querySelector('[name="SixMonthTarget"]')),
+        6,
+        isAverage
+      );
+    } else if (mode === "ThreeMonth") {
+      monthlyValues = [
+        ...allocateTargetBlock(
+          targetInputValue(form.querySelector('[name="FirstThreeMonthTarget"]')),
+          3,
+          isAverage
+        ),
+        ...allocateTargetBlock(
+          targetInputValue(form.querySelector('[name="SecondThreeMonthTarget"]')),
+          3,
+          isAverage
+        )
+      ];
+    } else {
+      monthlyValues = Array.from(form.querySelectorAll('[name$=".TargetValue"]'))
+        .map(targetInputValue);
+    }
+    while (monthlyValues.length < 6) monthlyValues.push(0);
+    monthlyValues = monthlyValues.slice(0, 6);
+
+    const maximum = Math.max(...monthlyValues, 0);
+    const periodTarget = roundTargetValue(isAverage
+      ? monthlyValues.reduce((sum, value) => sum + value, 0) / monthlyValues.length
+      : monthlyValues.reduce((sum, value) => sum + value, 0));
+    const valueElements = preview.querySelectorAll("[data-target-allocation-value]");
+    const barElements = preview.querySelectorAll("[data-target-allocation-bar]");
+    monthlyValues.forEach((value, index) => {
+      const formatted = moneyFormatter.format(value);
+      if (valueElements[index]) {
+        valueElements[index].textContent = formatted;
+        valueElements[index].title = formatted;
+      }
+      if (barElements[index]) {
+        const height = maximum > 0 ? Math.max(4, (value / maximum) * 100) : 0;
+        barElements[index].style.setProperty("--target-bar-height", `${height}%`);
+      }
+    });
+    const total = preview.querySelector("[data-target-allocation-total]");
+    if (total) total.textContent = moneyFormatter.format(periodTarget);
+    const explanation = preview.querySelector("[data-target-allocation-explanation]");
+    if (explanation) {
+      explanation.textContent = mode === "Monthly"
+        ? `Aylık değerler aynen kaydedilir; dönem hedefi ${isAverage ? "altı ayın ortalamasıdır" : "altı ayın toplamıdır"}.`
+        : isAverage
+          ? `${mode === "ThreeMonth" ? "Her üç aylık bloktaki" : "Girilen"} ortalama hedef ilgili aylara aynen uygulanır.`
+          : `${mode === "ThreeMonth" ? "Her üç aylık blok" : "Dönem tutarı"} aylara eşit bölünür; kuruş farkı bloğun son ayına eklenir.`;
+    }
+    preview.querySelector("[data-target-allocation-chart]")?.setAttribute(
+      "aria-label",
+      `Altı aylık hedef dağılımı. Dönem hedefi ${moneyFormatter.format(periodTarget)}.`
+    );
+  };
+
+  const currentPageTargetCheckboxes = () =>
+    Array.from(targetRoot?.querySelectorAll("[data-target-select-row]") || []);
+  const updateTargetSelectionUi = () => {
+    targetRoot?.classList.toggle("is-target-selection-mode", targetSelectionMode);
+    if (selectionToolbar) selectionToolbar.hidden = !targetSelectionMode;
+    if (filteredTargetExport) filteredTargetExport.hidden = targetSelectionMode;
+    if (selectionToggle) {
+      selectionToggle.classList.toggle("is-active", targetSelectionMode);
+      selectionToggle.setAttribute("aria-pressed", targetSelectionMode.toString());
+      selectionToggle.textContent = targetSelectionMode
+        ? "Seçimli aktarımı kapat"
+        : "Satır seçerek aktar";
+    }
+
+    const pageCheckboxes = currentPageTargetCheckboxes();
+    pageCheckboxes.forEach((checkbox) => {
+      checkbox.checked = selectedTargetContexts.has(checkbox.value);
+    });
+    const selectedOnPage = pageCheckboxes.filter((checkbox) => checkbox.checked).length;
+    const selectPage = targetRoot?.querySelector("[data-target-select-page]");
+    if (selectPage) {
+      selectPage.checked = pageCheckboxes.length > 0 && selectedOnPage === pageCheckboxes.length;
+      selectPage.indeterminate = selectedOnPage > 0 && selectedOnPage < pageCheckboxes.length;
+      selectPage.disabled = pageCheckboxes.length === 0;
+    }
+
+    const count = targetManagement.querySelector("[data-target-selection-count]");
+    if (count) count.textContent = `${selectedTargetContexts.size} satır seçildi`;
+    const feedback = targetManagement.querySelector("[data-target-selection-feedback]");
+    if (feedback) {
+      const limitReached = selectedTargetContexts.size >= targetSelectionLimit;
+      feedback.textContent = limitReached
+        ? `${targetSelectionLimit} satırlık seçim sınırına ulaştınız. Yeni bir satır seçmek için mevcut seçimlerden birini kaldırın.`
+        : `Filtre veya sayfa değiştirseniz de seçimleriniz korunur; en fazla ${targetSelectionLimit} satır aktarılır.`;
+      feedback.classList.toggle("is-limit", limitReached);
+    }
+    targetManagement.querySelectorAll("[data-target-export-selected], [data-target-selection-clear]")
+      .forEach((button) => { button.disabled = selectedTargetContexts.size === 0; });
+  };
+  const submitSelectedTargetExport = () => {
+    if (!selectedTargetContexts.size || !targetManagement.dataset.exportSelectedUrl) return;
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = targetManagement.dataset.exportSelectedUrl;
+    form.hidden = true;
+    const addValue = (name, value) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.append(input);
+    };
+    const token = targetManagement.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    if (token) addValue("__RequestVerificationToken", token);
+    addValue("EntryMode", pageEntryMode?.value || "SixMonth");
+    selectedTargetContexts.forEach((contextKey) => addValue("ContextKeys", contextKey));
+    document.body.append(form);
+    form.submit();
+    window.setTimeout(() => form.remove(), 0);
+  };
 
   const targetList = setupList(targetRoot, {
     defaultSort: { key: "year", direction: "desc" },
     descendingKeys: ["year", "term", "target", "status"],
     numericKeys: ["year", "term", "target", "status"],
     label: "hedef bağlamı",
-    colspan: 11,
+    colspan: 12,
+    afterLoad: () => updateTargetSelectionUi(),
     remote: async ({ state, filterValue, signal }) => {
       const params = new URLSearchParams({
         GroupId: filterValue("groupId"),
@@ -942,6 +1164,7 @@ if (targetManagement) {
         pageEntryMode?.value || "SixMonth",
         true
       );
+      updateTargetAllocationPreview(editor.querySelector("[data-period-target-form]"));
     } catch {
       editor.innerHTML = '<div class="inline-empty-state">Hedef editörü yüklenemedi. Lütfen yeniden deneyin.</div>';
       editor.dataset.loaded = "false";
@@ -959,6 +1182,7 @@ if (targetManagement) {
       form?.querySelectorAll("[data-target-entry-panel]").forEach((panel) => {
         panel.hidden = panel.dataset.targetEntryPanel !== event.target.value;
       });
+      updateTargetAllocationPreview(form);
     }
     if (event.target.matches?.("[data-target-entry-mode]")) {
       window.sessionStorage.setItem("bankurun.target-entry-mode", event.target.value);
@@ -970,6 +1194,35 @@ if (targetManagement) {
         );
       });
     }
+    if (event.target.matches?.("[data-target-select-row]")) {
+      if (event.target.checked
+        && !selectedTargetContexts.has(event.target.value)
+        && selectedTargetContexts.size >= targetSelectionLimit) {
+        event.target.checked = false;
+      } else if (event.target.checked) selectedTargetContexts.add(event.target.value);
+      else selectedTargetContexts.delete(event.target.value);
+      updateTargetSelectionUi();
+    }
+    if (event.target.matches?.("[data-target-select-page]")) {
+      currentPageTargetCheckboxes().forEach((checkbox) => {
+        if (event.target.checked) {
+          if (selectedTargetContexts.has(checkbox.value)
+            || selectedTargetContexts.size < targetSelectionLimit) {
+            selectedTargetContexts.add(checkbox.value);
+          }
+        } else {
+          selectedTargetContexts.delete(checkbox.value);
+        }
+      });
+      updateTargetSelectionUi();
+    }
+  });
+
+  targetManagement.addEventListener("input", (event) => {
+    const form = event.target.closest?.("[data-period-target-form]");
+    if (form && event.target.matches('input[type="number"]')) {
+      updateTargetAllocationPreview(form);
+    }
   });
 
   targetManagement.addEventListener("click", async (event) => {
@@ -980,6 +1233,20 @@ if (targetManagement) {
     }
     if (event.target.closest?.("[data-target-export]")) {
       window.location.assign(`${targetManagement.dataset.exportUrl}?${currentQuery()}`);
+      return;
+    }
+    if (event.target.closest?.("[data-target-selection-toggle]")) {
+      targetSelectionMode = !targetSelectionMode;
+      updateTargetSelectionUi();
+      return;
+    }
+    if (event.target.closest?.("[data-target-selection-clear]")) {
+      selectedTargetContexts.clear();
+      updateTargetSelectionUi();
+      return;
+    }
+    if (event.target.closest?.("[data-target-export-selected]")) {
+      submitSelectedTargetExport();
       return;
     }
     if (event.target.closest?.("[data-target-template]")) {
@@ -1028,6 +1295,7 @@ if (targetManagement) {
     }
   }
   syncTargetDependencies();
+  updateTargetSelectionUi();
 }
 
 const dashboardRoot = document.querySelector("[data-dashboard]");
