@@ -1,26 +1,26 @@
-@model BankUrun.Web.ViewModels.DashboardMonthlyDetailViewModel
-@functions {
-    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
-}
+@using BankUrun.Web.ViewModels
+@model DashboardMonthlyDetailViewModel
 <div class="sub-product-contribution-section">
     <div class="detail-section-heading">
         <h3>Alt ürün katkıları</h3>
         <p>Alt ürünlerin hedefi yoktur; ortak alt ürün her bağlı ana ürüne tam gerçekleşme katkısı sağlar.</p>
     </div>
-    @if (Model.Contributions.Count == 0)
-    {
-        <div class="inline-empty-state">Alt ürün bağlantısı yok.</div>
-    }
-    else
-    {
-        <div class="sub-product-contribution-grid">
-            @foreach (var item in Model.Contributions)
+    @await Html.PartialAsync("_ProductFlowVisual",
+        new ProductFlowViewModel
+        {
+            CenterTitle = Model.Title,
+            CenterSubtitle = Model.Subtitle,
+            CenterLabel = "Ana ürün",
+            Heading = "Besleyen alt ürünler",
+            Description = "Oklar katkının alt üründen seçili ana ürüne aktığını gösterir.",
+            ValueLabel = "Gerçekleşme",
+            ShowDistribution = true,
+            Items = Model.Contributions.Select(item => new ProductFlowItemViewModel
             {
-                <article>
-                    <div><strong>@item.Code</strong><span>@item.Name</span></div>
-                    <dl><dt>Gerçekleşme</dt><dd>@Text(item.ActualValue)</dd></dl>
-                </article>
-            }
-        </div>
-    }
+                Code = item.Code,
+                Name = item.Name,
+                Value = item.ActualValue,
+                SharedRelationCount = item.SharedRelationCount
+            }).ToList()
+        })
 </div>

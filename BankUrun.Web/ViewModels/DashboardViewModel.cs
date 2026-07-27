@@ -281,6 +281,7 @@ public class DashboardSubProductContributionViewModel
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public decimal? ActualValue { get; set; }
+    public int SharedRelationCount { get; set; }
 }
 
 public class DashboardPortfolioDetailViewModel

@@ -1,9 +1,12 @@
 @using BankUrun.Web.Models
+@using BankUrun.Web.ViewModels
 @model BankUrun.Web.ViewModels.ProductIndexViewModel
 @{
     ViewData["Title"] = "Ürün Kataloğu";
     var activeMainProducts = Model.MainProducts.Where(product => product.IsActive).ToList();
 }
+
+<link rel="stylesheet" href="~/css/performance-visuals.css" asp-append-version="true" />
 
 <section class="page-title"><div><h1>Ürün Kataloğu</h1><p>Ana ürün, alt ürün ve grup bazlı ürün gamlarını yönetin.</p></div></section>
 @if (TempData["Success"] is string success) { <div class="alert alert-success action-alert page-alert" role="alert">@success</div> }
@@ -40,7 +43,18 @@
                 var row = Model.Rows[index];
                 var detailId = $"product-detail-{row.MainProductInstanceId}-{row.SubProductInstanceId ?? 0}-{index}";
                 <tr class="list-row product-row" data-detail-id="@detailId" data-year="@row.Year" data-term="@row.Term" data-main-code="@row.MainProductCode" data-sub-code="@(row.SubProductCode ?? "")" data-sub-name="@(row.SubProductName ?? "")" data-has-sub="@(row.SubProductId.HasValue ? "true" : "false")" data-active="@((row.MainProductActive && (!row.SubProductId.HasValue || row.SubProductActive == true)) ? "true" : "false")" data-search="@($"{row.Year} {row.Term} {row.MainProductCode} {row.MainProductName} {row.SubProductCode} {row.SubProductName}".ToUpperInvariant())"><td>@row.Year</td><td>@row.Term</td><td><strong>@row.MainProductCode</strong><small>@row.MainProductName</small></td><td>@(row.SubProductCode ?? "—")</td><td>@(row.SubProductName ?? "Alt ürün yok")</td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td></tr>
-                <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="6"><div class="collapse" id="@detailId"><div class="actions-panel"><div class="status-line"><span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>@if (row.SubProductId.HasValue) { <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span> }</div><div class="actions-cell">
+                <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="6"><div class="collapse" id="@detailId"><div class="actions-panel">
+                    <div class="product-flow-lazy-shell" data-product-flow-shell>
+                        <button class="btn btn-sm btn-outline-primary"
+                                type="button"
+                                data-product-flow-load
+                                data-product-flow-url="@Url.Action("ProductFlow", "Products", new { mainProductInstanceId = row.MainProductInstanceId })"
+                                aria-expanded="false">
+                            Besleyen ürünleri göster
+                        </button>
+                        <div data-product-flow-target hidden></div>
+                    </div>
+                    <div class="status-line"><span class="status-pill @(row.MainProductActive ? "active" : "passive")">Ana @(row.MainProductActive ? "Aktif" : "Pasif")</span>@if (row.SubProductId.HasValue) { <span class="status-pill @(row.SubProductActive == true ? "active" : "passive")">Alt @(row.SubProductActive == true ? "Aktif" : "Pasif")</span> }</div><div class="actions-cell">
                     <span class="action-group-title">Ana ürün</span>
                     <form asp-action="RenameProduct" method="post" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><input class="form-control form-control-sm code-edit-input" name="Code" value="@row.MainProductCode" maxlength="2" /><input class="form-control form-control-sm" name="Name" value="@row.MainProductName" maxlength="180" /><button class="btn btn-sm btn-outline-primary" type="submit" data-confirm="Ana ürün kodu ve adı bütün dönemlerde güncellenecek. Emin misiniz?">Güncelle</button></form>
                     <form asp-action="DeactivateProduct" method="post" class="button-form">@Html.AntiForgeryToken()<input type="hidden" name="Type" value="@ProductType.Main" /><input type="hidden" name="ProductId" value="@row.MainProductId" /><button class="btn btn-sm btn-outline-warning" type="submit" data-confirm="Ana ürün bütün dönemlerde pasifleştirilecek ve yeni performans hesaplarından çıkarılacak; bağlı alt ürünler ile geçmiş hedef/gerçekleşmeler korunacak. Emin misiniz?">Pasifleştir</button></form>
@@ -96,8 +110,32 @@
             {
                 var detailId = $"product-gamut-{gamut.Id}";
                 var search = $"{gamut.GroupNo} {gamut.GroupName} {gamut.Code} {gamut.Name} {string.Join(' ', gamut.Assignments.Select(item => item.MainProductCode + ' ' + item.MainProductName))}".ToUpperInvariant();
+                var distinctAssignments = gamut.Assignments
+                    .GroupBy(item => item.MainProductId)
+                    .Select(group => group.OrderByDescending(item => item.EffectiveFromYear).ThenByDescending(item => item.EffectiveFromTerm).First())
+                    .OrderBy(item => item.MainProductCode)
+                    .ToList();
+                var gamutFlow = new ProductFlowViewModel
+                {
+                    CenterTitle = $"{gamut.Code} · {gamut.Name}",
+                    CenterSubtitle = $"{gamut.GroupNo} · {gamut.GroupName}",
+                    CenterLabel = "Ürün gamı",
+                    Heading = "Gamın ana ürün kapsamı",
+                    Description = "Dönemsel ataması bulunan ana ürünlerin bu ürün gamını nasıl oluşturduğunu gösterir.",
+                    EmptyMessage = "Bu ürün gamına atanmış ana ürün bulunmuyor.",
+                    SharedRelationLabel = "ürün gamı",
+                    ShowDistribution = false,
+                    Items = distinctAssignments.Select(assignment => new ProductFlowItemViewModel
+                    {
+                        Code = assignment.MainProductCode,
+                        Name = $"{assignment.MainProductName} · {assignment.EffectivePeriodLabel}",
+                        SharedRelationCount = Model.ProductGamuts
+                            .Count(candidate => candidate.Assignments.Any(item => item.MainProductId == assignment.MainProductId))
+                    }).ToArray()
+                };
                 <tr class="list-row" data-detail-id="@detailId" data-search="@search" data-group="@($"{gamut.GroupNo} {gamut.GroupName}")" data-gamut="@($"{gamut.Code} {gamut.Name}")" data-portfolio-count="@gamut.PortfolioCount" data-active="@(gamut.IsActive ? 1 : 0)"><td><strong>@gamut.GroupNo</strong><small>@gamut.GroupName</small></td><td><strong>@gamut.Code</strong><small>@gamut.Name</small></td><td>@await Html.PartialAsync("_RelationBadges", gamut.Assignments.Select(assignment => new BankUrun.Web.ViewModels.RelationBadgeViewModel { Label = $"{assignment.MainProductCode} · {assignment.MainProductName}", Title = assignment.EffectivePeriodLabel }).ToArray())</td><td class="text-end numeric-cell">@gamut.PortfolioCount</td><td><span class="status-pill @(gamut.IsActive ? "active" : "passive")">@(gamut.IsActive ? "Aktif" : "Pasif")</span></td><td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId">Detay</button></td></tr>
                 <tr class="list-detail-row" data-detail-for="@detailId"><td colspan="6"><div class="collapse" id="@detailId"><div class="compact-detail-panel gamut-detail-panel">
+                    @await Html.PartialAsync("_ProductFlowVisual", gamutFlow)
                     <form asp-action="SaveProductGamut" method="post" class="compact-edit-form">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@gamut.Id" /><input type="hidden" name="GroupId" value="@gamut.GroupId" /><div class="compact-form-grid"><label><span>Kod</span><input class="form-control form-control-sm code-input" name="Code" value="@gamut.Code" maxlength="2" required /></label><label class="compact-name-field"><span>Ad</span><input class="form-control form-control-sm" name="Name" value="@gamut.Name" maxlength="120" required /></label><label class="check-line"><input class="form-check-input" type="checkbox" name="IsActive" value="true" checked="@gamut.IsActive" /><input type="hidden" name="IsActive" value="false" /><span>Aktif</span></label></div><div class="detail-command-row"><button class="btn btn-sm btn-primary" type="submit" data-confirm="Ürün gamı bütün dönemlerde güncellenecek. Kod değişirse bağlı portföy kodları da değişir; pasifleştirilirse gamı kullanan portföyler performans hesaplarından çıkar. Hedef ve gerçekleşmeler korunur. Emin misiniz?">Gamı güncelle</button><button class="btn btn-sm btn-outline-danger" type="submit" form="delete-gamut-@gamut.Id" data-confirm="Ürün gamı ve bütün ana ürün atamaları kalıcı olarak silinecek." data-impact-url="@Url.Action("ProductGamutDeleteImpact", "Products", new { id = gamut.Id })">Gamı sil</button></div></form><form id="delete-gamut-@gamut.Id" asp-action="DeleteProductGamut" method="post">@Html.AntiForgeryToken()<input type="hidden" name="Id" value="@gamut.Id" /></form>
                     <div class="relation-management-block"><div class="detail-section-heading"><h3>Ana ürün atamaları</h3><p>Bitiş dönemi girerek atamayı kapatabilir ve geçmişi koruyabilirsiniz.</p></div><form asp-action="SaveProductGamutAssignment" method="post" class="inline-relation-form">@Html.AntiForgeryToken()<input type="hidden" name="ProductGamutId" value="@gamut.Id" /><select class="form-select form-select-sm" name="MainProductId" required>@foreach (var product in Model.MainProductDefinitions.Where(item => item.IsActive)) { <option value="@product.Id">@product.Label</option> }</select><input class="form-control form-control-sm" type="number" name="EffectiveFromYear" value="2026" min="2000" max="2100" aria-label="Başlangıç yılı" required /><select class="form-select form-select-sm" name="EffectiveFromTerm"><option value="1">1</option><option value="2" selected>2</option></select><button class="btn btn-sm btn-outline-primary" type="submit">Ana ürün ekle</button></form>
                     @foreach (var assignment in gamut.Assignments)

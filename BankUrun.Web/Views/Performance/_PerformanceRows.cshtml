@@ -22,6 +22,15 @@
         not null => "performance-tone-low",
         _ => "performance-tone-pending"
     };
+
+    private static string RankWidth(int rank, int candidateCount)
+    {
+        var width = candidateCount <= 1
+            ? 100m
+            : (candidateCount - rank) * 100m / (candidateCount - 1);
+        return Math.Max(0, Math.Min(100, width))
+            .ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
 }
 
 @if (Model.Mode == PerformanceMode.Branch)
@@ -38,7 +47,18 @@
             <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
             <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
             <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N2}" : "—")</span></td>
-            <td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td>
+            <td class="text-end numeric-cell">
+                @if (row.Rank.HasValue)
+                {
+                    <div class="performance-rank-position">
+                        <span>@row.Rank / @row.RankCandidateCount</span>
+                        <span class="performance-rank-track" role="img" aria-label="@row.RankCandidateCount şube arasında @(row.Rank). sıra">
+                            <span style="width:@RankWidth(row.Rank.Value, row.RankCandidateCount)%"></span>
+                        </span>
+                    </div>
+                }
+                else { <span>—</span> }
+            </td>
             <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
         </tr>
         <tr class="list-detail-row" data-detail-for="@detailId">
@@ -94,7 +114,18 @@ else if (Model.Mode == PerformanceMode.BranchProduct)
             <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td>
             <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
             <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
-            <td class="text-end numeric-cell">@(row.SegmentRank.HasValue ? $"{row.SegmentRank} / {row.SegmentRankCandidateCount}" : "—")</td>
+            <td class="text-end numeric-cell">
+                @if (row.SegmentRank.HasValue)
+                {
+                    <div class="performance-rank-position">
+                        <span>@row.SegmentRank / @row.SegmentRankCandidateCount</span>
+                        <span class="performance-rank-track" role="img" aria-label="@row.SegmentRankCandidateCount şube arasında @(row.SegmentRank). ürün içi sıra">
+                            <span style="width:@RankWidth(row.SegmentRank.Value, row.SegmentRankCandidateCount)%"></span>
+                        </span>
+                    </div>
+                }
+                else { <span>—</span> }
+            </td>
             <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
         </tr>
         <tr class="list-detail-row" data-detail-for="@detailId">
@@ -145,7 +176,18 @@ else if (Model.Mode == PerformanceMode.MainProduct)
             <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.HgRatioPercent.HasValue ? $"%{row.HgRatioPercent:N2}" : "—")</span></td>
             <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
             <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
-            <td class="text-end numeric-cell">@(row.Rank.HasValue ? $"{row.Rank} / {row.RankCandidateCount}" : "—")</td>
+            <td class="text-end numeric-cell">
+                @if (row.Rank.HasValue)
+                {
+                    <div class="performance-rank-position">
+                        <span>@row.Rank / @row.RankCandidateCount</span>
+                        <span class="performance-rank-track" role="img" aria-label="@row.RankCandidateCount ana ürün arasında @(row.Rank). sıra">
+                            <span style="width:@RankWidth(row.Rank.Value, row.RankCandidateCount)%"></span>
+                        </span>
+                    </div>
+                }
+                else { <span>—</span> }
+            </td>
             <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
         </tr>
         <tr class="list-detail-row" data-detail-for="@detailId">
@@ -191,8 +233,30 @@ else
             <td class="text-end numeric-cell">@Text(row.HgoScore)</td>
             <td class="text-end numeric-cell"><strong>@Text(row.TotalScore)</strong></td>
             <td class="text-end numeric-cell"><span class="performance-ratio-chip">@(row.SuccessPercent.HasValue ? $"%{row.SuccessPercent:N2}" : "—")</span></td>
-            <td class="text-end numeric-cell">@(row.OfficialRank.HasValue ? $"{row.OfficialRank} / {row.OfficialRankCandidateCount}" : "—")</td>
-            <td class="text-end numeric-cell">@(row.BranchRank.HasValue ? $"{row.BranchRank} / {row.BranchRankCandidateCount}" : "—")</td>
+            <td class="text-end numeric-cell">
+                @if (row.OfficialRank.HasValue)
+                {
+                    <div class="performance-rank-position">
+                        <span>@row.OfficialRank / @row.OfficialRankCandidateCount</span>
+                        <span class="performance-rank-track" role="img" aria-label="@row.OfficialRankCandidateCount portföy arasında @(row.OfficialRank). grup gam sırası">
+                            <span style="width:@RankWidth(row.OfficialRank.Value, row.OfficialRankCandidateCount)%"></span>
+                        </span>
+                    </div>
+                }
+                else { <span>—</span> }
+            </td>
+            <td class="text-end numeric-cell">
+                @if (row.BranchRank.HasValue)
+                {
+                    <div class="performance-rank-position">
+                        <span>@row.BranchRank / @row.BranchRankCandidateCount</span>
+                        <span class="performance-rank-track" role="img" aria-label="@row.BranchRankCandidateCount portföy arasında @(row.BranchRank). şube içi sıra">
+                            <span style="width:@RankWidth(row.BranchRank.Value, row.BranchRankCandidateCount)%"></span>
+                        </span>
+                    </div>
+                }
+                else { <span>—</span> }
+            </td>
             <td class="text-end"><button class="btn btn-sm btn-outline-primary detail-button" type="button" data-bs-toggle="collapse" data-bs-target="#@detailId" aria-expanded="false">Detay</button></td>
         </tr>
         <tr class="list-detail-row" data-detail-for="@detailId">

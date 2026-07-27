@@ -755,7 +755,15 @@ public class DashboardService(
                     link.MainProductInstanceId,
                     link.SubProductId,
                     link.SubProduct.Code,
-                    link.SubProduct.Name))
+                    link.SubProduct.Name,
+                    db.SubProductInstances.Count(candidate =>
+                        candidate.SubProductId == link.SubProductId
+                        && candidate.SubProduct.IsActive
+                        && candidate.MainProductInstance.MainProduct.IsActive
+                        && candidate.MainProductInstance.Year
+                            == link.MainProductInstance.Year
+                        && candidate.MainProductInstance.Term
+                            == link.MainProductInstance.Term)))
                 .ToListAsync(cancellationToken);
         }
 
@@ -1207,6 +1215,7 @@ public class DashboardService(
                 SubProductId = product.SubProductId,
                 Code = product.Code,
                 Name = product.Name,
+                SharedRelationCount = product.SharedRelationCount,
                 ActualValue = complete
                     ? Round(Aggregate(
                         metrics.Select(metric => metric!.ActualValue!.Value),
@@ -1225,6 +1234,7 @@ public class DashboardService(
                 SubProductId = group.Key.SubProductId,
                 Code = group.Key.Code,
                 Name = group.Key.Name,
+                SharedRelationCount = group.Max(item => item.SharedRelationCount),
                 ActualValue = group.All(item => item.ActualValue.HasValue)
                     ? Round(group.Sum(item => item.ActualValue!.Value))
                     : null
@@ -1240,6 +1250,7 @@ public class DashboardService(
                 SubProductId = group.Key.SubProductId,
                 Code = group.Key.Code,
                 Name = group.Key.Name,
+                SharedRelationCount = group.Max(item => item.SharedRelationCount),
                 ActualValue = group.All(item => item.ActualValue.HasValue)
                     ? Round(group.Sum(item => item.ActualValue!.Value))
                     : null
@@ -1649,7 +1660,8 @@ public class DashboardService(
         int MainProductInstanceId,
         int SubProductId,
         string Code,
-        string Name);
+        string Name,
+        int SharedRelationCount);
     private sealed record ParameterFact(
         int Id,
         int GroupId,

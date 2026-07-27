@@ -8,6 +8,13 @@
     {
         <section class="portfolio-detail-product-section">
             <h4>@product.ProductCode · @product.ProductName</h4>
+            @await Html.PartialAsync("_MonthlyComparisonChart",
+                new BankUrun.Web.ViewModels.MonthlyComparisonChartViewModel
+                {
+                    Title = $"{product.ProductCode} · hedef ve gerçekleşme",
+                    Description = $"{product.ProductName}. Kesin değerler aşağıdaki aylık kartlarda yer alır.",
+                    Months = product.Months
+                })
             <div class="performance-month-detail-grid">
                 @foreach (var month in product.Months)
                 {

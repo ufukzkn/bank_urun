@@ -1,26 +1,33 @@
-@model BankUrun.Web.ViewModels.DashboardPortfolioDetailViewModel
+@using BankUrun.Web.Models
+@using BankUrun.Web.ViewModels
+@model DashboardPortfolioDetailViewModel
 @functions {
-    private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
+    private static string Calculation(MainProductCalculationType type) =>
+        type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
 }
 <div class="performance-detail-section">
     <div class="detail-section-heading"><h3>Alt ürün katkıları</h3><p>Alt ürünler yalnız gerçekleşmeyi besler; ortak ürün her bağlı ana ürüne tam katkı sağlar.</p></div>
     @foreach (var product in Model.Products)
     {
         <section class="portfolio-detail-product-section">
-            <h4>@product.ProductCode · @product.ProductName</h4>
-            @if (product.Contributions.Count == 0)
-            {
-                <div class="inline-empty-state">Alt ürün bağlantısı yok.</div>
-            }
-            else
-            {
-                <div class="sub-product-contribution-grid">
-                    @foreach (var item in product.Contributions)
+            @await Html.PartialAsync("_ProductFlowVisual",
+                new ProductFlowViewModel
+                {
+                    CenterTitle = $"{product.ProductCode} · {product.ProductName}",
+                    CenterSubtitle = $"{Calculation(product.CalculationType)} ana ürün",
+                    CenterLabel = "Ana ürün",
+                    Heading = "Besleyen alt ürünler",
+                    Description = "Bu dağılım yalnız seçili ana ürünün portföy içindeki katkılarını gösterir.",
+                    ValueLabel = "Gerçekleşme",
+                    ShowDistribution = true,
+                    Items = product.Contributions.Select(item => new ProductFlowItemViewModel
                     {
-                        <article><div><strong>@item.Code</strong><span>@item.Name</span></div><dl><dt>Gerçekleşme</dt><dd>@Text(item.ActualValue)</dd></dl></article>
-                    }
-                </div>
-            }
+                        Code = item.Code,
+                        Name = item.Name,
+                        Value = item.ActualValue,
+                        SharedRelationCount = item.SharedRelationCount
+                    }).ToList()
+                })
         </section>
     }
 </div>

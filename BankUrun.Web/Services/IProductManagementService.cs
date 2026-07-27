@@ -5,6 +5,9 @@ namespace BankUrun.Web.Services;
 public interface IProductManagementService
 {
     Task<ProductIndexViewModel> GetIndexAsync(CancellationToken cancellationToken = default);
+    Task<ProductFlowViewModel> GetProductFlowAsync(
+        int mainProductInstanceId,
+        CancellationToken cancellationToken = default);
     Task CreateProductAsync(CreateProductInput input, string actor, CancellationToken cancellationToken = default);
     Task RenameProductAsync(RenameProductInput input, string actor, CancellationToken cancellationToken = default);
     Task DeactivateProductAsync(ProductIdInput input, string actor, CancellationToken cancellationToken = default);

@@ -7,6 +7,8 @@
     var terms = Model.Periods.Select(period => period.Term).Distinct().OrderBy(term => term).ToList();
 }
 
+<link rel="stylesheet" href="~/css/performance-visuals.css" asp-append-version="true" />
+
 <section class="page-title dashboard-page-title">
     <div><h1>Dönemsel performans</h1><p>Şube, şube–ürün, ana ürün ve portföy sonuçlarını aynı dönem yapısıyla karşılaştırın.</p></div>
     <span class="batch-date">Batch tarihi <strong>@Model.BatchDate.ToString("dd.MM.yyyy")</strong></span>

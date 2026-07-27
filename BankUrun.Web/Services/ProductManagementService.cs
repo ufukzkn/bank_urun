@@ -127,6 +127,52 @@ public class ProductManagementService(AppDbContext db, IProductCodeService codeS
         };
     }
 
+    public async Task<ProductFlowViewModel> GetProductFlowAsync(
+        int mainProductInstanceId,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await db.MainProductInstances.AsNoTracking()
+            .Where(item => item.Id == mainProductInstanceId)
+            .Select(item => new
+            {
+                item.Year,
+                item.Term,
+                Code = item.MainProduct.Code,
+                Name = item.MainProduct.Name
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Ana ürün dönem kaydı bulunamadı.");
+
+        var items = await db.SubProductInstances.AsNoTracking()
+            .Where(link => link.MainProductInstanceId == mainProductInstanceId
+                && link.SubProduct.IsActive)
+            .OrderBy(link => link.SubProduct.Code)
+            .Select(link => new ProductFlowItemViewModel
+            {
+                Code = link.SubProduct.Code,
+                Name = link.SubProduct.Name,
+                SharedRelationCount = db.SubProductInstances.Count(candidate =>
+                    candidate.SubProductId == link.SubProductId
+                    && candidate.SubProduct.IsActive
+                    && candidate.MainProductInstance.MainProduct.IsActive
+                    && candidate.MainProductInstance.Year == instance.Year
+                    && candidate.MainProductInstance.Term == instance.Term)
+            })
+            .ToListAsync(cancellationToken);
+
+        return new ProductFlowViewModel
+        {
+            CenterTitle = $"{instance.Code} · {instance.Name}",
+            CenterSubtitle = $"{instance.Year}/{instance.Term}. Dönem",
+            CenterLabel = "Ana ürün",
+            Heading = "Besleyen alt ürünler",
+            Description = "Bu dönemde seçili ana ürünü besleyen aktif alt ürün bağlantıları.",
+            EmptyMessage = "Bu ana ürüne bağlı aktif alt ürün bulunmuyor.",
+            ShowDistribution = false,
+            Items = items
+        };
+    }
+
     public async Task CreateProductAsync(CreateProductInput input, string actor, CancellationToken cancellationToken = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

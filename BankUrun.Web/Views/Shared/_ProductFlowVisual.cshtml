@@ -1,0 +1,172 @@
+@using System.Globalization
+@using BankUrun.Web.ViewModels
+@model ProductFlowViewModel
+@{
+    var colors = new[] { "#0076a8", "#d82f55", "#2a9d78", "#f0a128", "#7357b8", "#4a7d97" };
+    var positiveItems = Model.Items
+        .Select((item, originalIndex) => (Item: item, OriginalIndex: originalIndex))
+        .Where(entry => entry.Item.Value.GetValueOrDefault() > 0)
+        .OrderByDescending(entry => entry.Item.Value.GetValueOrDefault())
+        .ThenBy(entry => entry.OriginalIndex)
+        .ToList();
+    var hasPendingValues = Model.ShowDistribution
+        && Model.Items.Any(item => !item.Value.HasValue);
+    var effectiveTotalLabel = hasPendingValues ? "Kısmi toplam" : Model.TotalLabel;
+    var total = positiveItems.Sum(entry => entry.Item.Value.GetValueOrDefault());
+    var visibleSliceCount = positiveItems.Count > colors.Length ? colors.Length - 1 : positiveItems.Count;
+    var distributionItems = new List<(string Code, string Name, decimal Value, int ColorIndex)>();
+    var itemColorIndexes = new Dictionary<ProductFlowItemViewModel, int>();
+
+    for (var index = 0; index < visibleSliceCount; index++)
+    {
+        var entry = positiveItems[index];
+        itemColorIndexes[entry.Item] = index;
+        distributionItems.Add((
+            entry.Item.Code,
+            entry.Item.Name,
+            entry.Item.Value.GetValueOrDefault(),
+            index));
+    }
+
+    if (positiveItems.Count > colors.Length)
+    {
+        var otherValue = positiveItems
+            .Skip(visibleSliceCount)
+            .Sum(entry => entry.Item.Value.GetValueOrDefault());
+        foreach (var entry in positiveItems.Skip(visibleSliceCount))
+        {
+            itemColorIndexes[entry.Item] = colors.Length - 1;
+        }
+
+        distributionItems.Add((
+            "Diğer",
+            $"{positiveItems.Count - visibleSliceCount} ürün",
+            otherValue,
+            colors.Length - 1));
+    }
+
+    var gradientParts = new List<string>();
+    decimal cursor = 0;
+    foreach (var item in distributionItems)
+    {
+        var share = total > 0 ? item.Value / total * 100 : 0;
+        var next = cursor + share;
+        gradientParts.Add(
+            $"{colors[item.ColorIndex]} {cursor.ToString("0.####", CultureInfo.InvariantCulture)}% " +
+            $"{next.ToString("0.####", CultureInfo.InvariantCulture)}%");
+        cursor = next;
+    }
+
+    var distribution = gradientParts.Count > 0
+        ? $"conic-gradient({string.Join(", ", gradientParts)})"
+        : "conic-gradient(#dbe4eb 0 100%)";
+}
+
+<section class="product-flow-visual" aria-label="@Model.Heading">
+    <div class="product-flow-copy">
+        <h4>@Model.Heading</h4>
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p>@Model.Description</p>
+        }
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <div class="inline-empty-state">@Model.EmptyMessage</div>
+    }
+    else
+    {
+        <div class="product-flow-layout @(Model.ShowDistribution ? "has-distribution" : null)">
+            <div class="product-flow-map">
+                <div class="product-flow-feeders" aria-label="@Model.Heading bağlantı listesi">
+                    @for (var index = 0; index < Model.Items.Count; index++)
+                    {
+                        var item = Model.Items[index];
+                        var colorIndex = itemColorIndexes.TryGetValue(item, out var distributionColorIndex)
+                            ? distributionColorIndex
+                            : index % colors.Length;
+                        var share = total > 0 && item.Value.HasValue
+                            ? Math.Max(0, item.Value.Value) / total * 100
+                            : 0;
+                        var shareText = share.ToString("0.##", CultureInfo.InvariantCulture);
+                        <article class="product-flow-item">
+                            <div class="product-flow-item-heading">
+                                <span class="product-flow-swatch flow-color-@colorIndex" aria-hidden="true"></span>
+                                <div><strong>@item.Code</strong><span>@item.Name</span></div>
+                                @if (item.SharedRelationCount > 1)
+                                {
+                                    <span class="product-flow-shared-badge">
+                                        Ortak · @item.SharedRelationCount @Model.SharedRelationLabel
+                                    </span>
+                                }
+                            </div>
+                            @if (item.Value.HasValue)
+                            {
+                                <div class="product-flow-value-row">
+                                    <span>@Model.ValueLabel</span>
+                                    <strong>@item.Value.Value.ToString("N2")</strong>
+                                    @if (Model.ShowDistribution)
+                                    {
+                                        <small>%@share.ToString("N1") katkı</small>
+                                    }
+                                </div>
+                                @if (Model.ShowDistribution)
+                                {
+                                    <div class="product-flow-bar" aria-hidden="true">
+                                        <span class="flow-color-bg-@colorIndex" style="width:@shareText%"></span>
+                                    </div>
+                                }
+                            }
+                            else if (Model.ShowDistribution)
+                            {
+                                <span class="product-flow-pending">Veri bekleniyor</span>
+                            }
+                        </article>
+                    }
+                </div>
+
+                <div class="product-flow-connector" aria-hidden="true">
+                    <span></span><b>→</b>
+                </div>
+
+                <article class="product-flow-center">
+                    <span>@Model.CenterLabel</span>
+                    <strong>@Model.CenterTitle</strong>
+                    @if (!string.IsNullOrWhiteSpace(Model.CenterSubtitle))
+                    {
+                        <small>@Model.CenterSubtitle</small>
+                    }
+                    @if (Model.ShowDistribution)
+                    {
+                        <div><span>@effectiveTotalLabel</span><b>@total.ToString("N2")</b></div>
+                    }
+                </article>
+            </div>
+
+            @if (Model.ShowDistribution)
+            {
+                <aside class="product-flow-distribution" aria-label="@Model.ValueLabel dağılımı">
+                    <div class="product-flow-donut"
+                         style="--flow-distribution:@distribution"
+                         role="img"
+                         aria-label="Toplam @total.ToString("N2") @Model.ValueLabel değerinin ürünlere göre dağılımı">
+                        <div><strong>@total.ToString("N2")</strong><span>@effectiveTotalLabel.ToLowerInvariant()</span></div>
+                    </div>
+                    <div class="product-flow-legend">
+                        @foreach (var item in distributionItems)
+                        {
+                            var share = total > 0 ? item.Value / total * 100 : 0;
+                            <span>
+                                <i class="flow-color-bg-@item.ColorIndex" aria-hidden="true"></i>
+                                <b>@item.Code</b>
+                                <small>%@share.ToString("N1")</small>
+                            </span>
+                        }
+                    </div>
+                    <p>Renklerin yanında ürün kodu ve oran da gösterilir.</p>
+                </aside>
+            }
+        </div>
+    }
+</section>

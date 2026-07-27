@@ -7,6 +7,13 @@
         <h3>Aylık gidişat</h3>
         <p>Gerçekleşme ve batch tarihi salt okunurdur.</p>
     </div>
+    @await Html.PartialAsync("_MonthlyComparisonChart",
+        new BankUrun.Web.ViewModels.MonthlyComparisonChartViewModel
+        {
+            Title = $"{Model.Title} · hedef ve gerçekleşme",
+            Description = $"{Model.Subtitle}. Kesin değerler aşağıdaki aylık kartlarda yer alır.",
+            Months = Model.Months
+        })
     <div class="performance-month-detail-grid">
         @foreach (var month in Model.Months)
         {

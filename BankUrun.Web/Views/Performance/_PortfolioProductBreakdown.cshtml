@@ -1,14 +1,102 @@
 @using BankUrun.Web.Models
+@using System.Globalization
 @model BankUrun.Web.ViewModels.DashboardPortfolioDetailViewModel
+@{
+    var colors = new[] { "#0076a8", "#d82f55", "#2a9d78", "#f0a128", "#7357b8", "#4a7d97" };
+    var targetProducts = Model.Products
+        .Where(product => product.TargetValue > 0)
+        .OrderByDescending(product => product.TargetValue)
+        .ToList();
+    var portfolioTarget = targetProducts.Sum(product => product.TargetValue);
+    var visibleProductCount = targetProducts.Count > 6 ? 5 : targetProducts.Count;
+    var targetDistributionItems = targetProducts
+        .Take(visibleProductCount)
+        .Select((product, index) => (
+            Code: product.ProductCode,
+            Name: product.ProductName,
+            Value: product.TargetValue,
+            ColorIndex: index))
+        .ToList();
+    var targetColorIndexes = targetProducts
+        .Take(visibleProductCount)
+        .Select((product, index) => new { product.MainProductInstanceId, ColorIndex = index })
+        .ToDictionary(item => item.MainProductInstanceId, item => item.ColorIndex);
+    if (targetProducts.Count > 6)
+    {
+        targetDistributionItems.Add((
+            "DİĞER",
+            $"{targetProducts.Count - visibleProductCount} ana ürün",
+            targetProducts.Skip(visibleProductCount).Sum(product => product.TargetValue),
+            5));
+    }
+    var gradientParts = new List<string>();
+    decimal cursor = 0;
+    for (var index = 0; index < targetDistributionItems.Count; index++)
+    {
+        var item = targetDistributionItems[index];
+        var share = portfolioTarget > 0 ? item.Value / portfolioTarget * 100 : 0;
+        var next = cursor + share;
+        gradientParts.Add(
+            $"{colors[item.ColorIndex % colors.Length]} {cursor.ToString("0.####", CultureInfo.InvariantCulture)}% " +
+            $"{next.ToString("0.####", CultureInfo.InvariantCulture)}%");
+        cursor = next;
+    }
+    var targetDistribution = gradientParts.Count > 0
+        ? $"conic-gradient({string.Join(", ", gradientParts)})"
+        : "conic-gradient(#dbe4eb 0 100%)";
+}
 @functions {
     private static string Text(decimal? value) => value.HasValue ? value.Value.ToString("N2") : "Veri bekleniyor";
     private static string Calculation(MainProductCalculationType type) => type == MainProductCalculationType.Average ? "Ortalamalı" : "Kümülatif";
+    private static string RatioTone(decimal? ratio) => ratio switch
+    {
+        >= 90 => "good",
+        >= 70 => "watch",
+        not null => "low",
+        _ => "pending"
+    };
 }
 <div class="performance-detail-section">
     <div class="detail-section-heading"><h3>Ana ürün kırılımı</h3><p>Portföye ürün gamı üzerinden atanan ana ürünlerin dönem sonuçları.</p></div>
+    <section class="portfolio-target-composition" aria-label="Portföy hedef dağılımı">
+        <div class="product-flow-copy">
+            <div>
+                <h4>Portföy hedef bileşimi</h4>
+                <p>Portföyün bağımsız hedefi yoktur; toplam, aşağıdaki ana ürün hedeflerinden oluşur.</p>
+            </div>
+        </div>
+        <div class="portfolio-target-composition-layout">
+            <div class="portfolio-target-donut"
+                 style="--flow-distribution:@targetDistribution"
+                 role="img"
+                 aria-label="@Model.Products.Count ana ürünün toplam @portfolioTarget.ToString("N2") dönem hedefindeki payları">
+                <div><strong>@portfolioTarget.ToString("N2")</strong><span>toplam hedef</span></div>
+            </div>
+            <div class="portfolio-target-composition-list">
+                @for (var index = 0; index < targetDistributionItems.Count; index++)
+                {
+                    var item = targetDistributionItems[index];
+                    var share = portfolioTarget > 0 ? item.Value / portfolioTarget * 100 : 0;
+                    <div>
+                        <i class="flow-color-bg-@(item.ColorIndex % colors.Length)" aria-hidden="true"></i>
+                        <span>@item.Code · @item.Name</span>
+                        <strong>%@share.ToString("N1")</strong>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
     <div class="portfolio-product-breakdown-grid">
-        @foreach (var product in Model.Products)
+        @for (var index = 0; index < Model.Products.Count; index++)
         {
+            var product = Model.Products[index];
+            var targetShare = portfolioTarget > 0 ? product.TargetValue / portfolioTarget * 100 : 0;
+            var targetShareWidth = targetShare.ToString("0.##", CultureInfo.InvariantCulture);
+            var targetColorIndex = targetColorIndexes.GetValueOrDefault(
+                product.MainProductInstanceId,
+                5);
+            var ratioWidth = Math.Min(Math.Max(product.HgRatioPercent ?? 0, 0), 100)
+                .ToString("0.##", CultureInfo.InvariantCulture);
             <article>
                 <div class="portfolio-product-breakdown-heading">
                     <div><strong>@product.ProductCode</strong><span>@product.ProductName</span></div>
@@ -21,6 +109,18 @@
                     <dt>H/G</dt><dd>@(product.HgRatioPercent.HasValue ? $"%{product.HgRatioPercent:N2}" : "—")</dd>
                     <dt>Toplam puan</dt><dd>@Text(product.TotalScore)</dd>
                 </dl>
+                <div class="portfolio-product-target-share">
+                    <div><span>Portföy hedefindeki pay</span><strong>%@targetShare.ToString("N1")</strong></div>
+                    <div class="portfolio-target-share-track" aria-hidden="true">
+                        <span class="flow-color-bg-@(targetColorIndex % colors.Length)" style="width:@targetShareWidth%"></span>
+                    </div>
+                </div>
+                <div class="portfolio-product-ratio-meter @RatioTone(product.HgRatioPercent)">
+                    <div class="dashboard-bar-track" aria-hidden="true">
+                        <div class="dashboard-bar-fill" style="width:@ratioWidth%"></div>
+                    </div>
+                    <span>@(product.HgRatioPercent.HasValue ? $"H/G %{product.HgRatioPercent:N1}" : "H/G bekleniyor")</span>
+                </div>
                 @if (!product.HasParameterConfiguration)
                 {
                     <span class="data-waiting-badge">Parametre bekleniyor</span>

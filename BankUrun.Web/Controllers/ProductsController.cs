@@ -18,6 +18,25 @@ public class ProductsController(
         return View(model);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ProductFlow(
+        int mainProductInstanceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return PartialView(
+                "_ProductFlowVisual",
+                await productService.GetProductFlowAsync(
+                    mainProductInstanceId,
+                    cancellationToken));
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateProduct(CreateProductInput input, CancellationToken cancellationToken)

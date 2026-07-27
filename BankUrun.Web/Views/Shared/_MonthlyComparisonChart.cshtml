@@ -1,0 +1,69 @@
+@using System.Globalization
+@using BankUrun.Web.ViewModels
+@model MonthlyComparisonChartViewModel
+@{
+    const decimal chartHeight = 138m;
+    const decimal baseline = 172m;
+    const decimal chartTop = 34m;
+    var values = Model.Months
+        .SelectMany(month => new[] { month.TargetValue, month.ActualValue.GetValueOrDefault() })
+        .ToList();
+    var maximum = values.Count > 0 ? values.Max() : 0;
+    if (maximum <= 0)
+    {
+        maximum = 1;
+    }
+
+    static string Svg(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+}
+
+<figure class="performance-comparison-chart">
+    <figcaption>
+        <div><strong>@Model.Title</strong><span>@Model.Description</span></div>
+        <div class="performance-chart-legend" aria-label="Grafik açıklaması">
+            <span><i class="is-target" aria-hidden="true"></i>Hedef</span>
+            <span><i class="is-actual" aria-hidden="true"></i>Gerçekleşme</span>
+            <span><i class="is-pending" aria-hidden="true"></i>Batch bekleniyor</span>
+        </div>
+    </figcaption>
+    <div class="performance-chart-scroll">
+        <svg class="performance-month-chart"
+             viewBox="0 0 760 220"
+             role="img"
+             aria-label="@Model.Title">
+            <title>@Model.Title</title>
+            <desc>@Model.Description Kesin değerler aşağıdaki aylık kartlarda da sunulur.</desc>
+            <line class="month-chart-grid" x1="64" y1="@Svg(chartTop)" x2="742" y2="@Svg(chartTop)" />
+            <line class="month-chart-grid" x1="64" y1="@Svg(chartTop + chartHeight / 2)" x2="742" y2="@Svg(chartTop + chartHeight / 2)" />
+            <line class="month-chart-axis" x1="64" y1="@Svg(baseline)" x2="742" y2="@Svg(baseline)" />
+            <text class="month-chart-axis-label" x="58" y="@Svg(chartTop + 4)" text-anchor="end">@maximum.ToString("N0")</text>
+            <text class="month-chart-axis-label" x="58" y="@Svg(chartTop + chartHeight / 2 + 4)" text-anchor="end">@(maximum / 2m).ToString("N0")</text>
+            <text class="month-chart-axis-label" x="58" y="@Svg(baseline + 4)" text-anchor="end">0</text>
+
+            @for (var index = 0; index < Model.Months.Count; index++)
+            {
+                var month = Model.Months[index];
+                var groupX = 82m + index * 108m;
+                var targetHeight = Math.Max(2m, month.TargetValue / maximum * chartHeight);
+                var targetY = baseline - targetHeight;
+                var actualHeight = month.ActualValue.HasValue
+                    ? Math.Max(2m, month.ActualValue.Value / maximum * chartHeight)
+                    : 7m;
+                var actualY = month.ActualValue.HasValue ? baseline - actualHeight : baseline - 7m;
+                <g class="month-chart-group">
+                    <rect class="month-chart-bar is-target"
+                          x="@Svg(groupX)" y="@Svg(targetY)" width="28" height="@Svg(targetHeight)" rx="5">
+                        <title>@month.MonthName hedef: @month.TargetValue.ToString("N2")</title>
+                    </rect>
+                    <rect class="month-chart-bar @(month.ActualValue.HasValue ? "is-actual" : "is-pending")"
+                          x="@Svg(groupX + 34m)" y="@Svg(actualY)" width="28" height="@Svg(actualHeight)" rx="5">
+                        <title>@(month.ActualValue.HasValue
+                            ? $"{month.MonthName} gerçekleşme: {month.ActualValue.Value:N2}"
+                            : $"{month.MonthName}: Batch bekleniyor")</title>
+                    </rect>
+                    <text class="month-chart-label" x="@Svg(groupX + 31m)" y="198" text-anchor="middle">@month.MonthName</text>
+                </g>
+            }
+        </svg>
+    </div>
+</figure>
