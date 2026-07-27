@@ -14,6 +14,10 @@
     <span class="batch-date">Batch tarihi <strong>@Model.BatchDate.ToString("dd.MM.yyyy")</strong></span>
 </section>
 
+@section Scripts {
+    <script src="~/js/performance-visuals.js" asp-append-version="true"></script>
+}
+
 <section class="dashboard-workspace"
          data-dashboard
          data-default-mode="BranchProduct"

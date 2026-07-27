@@ -53,15 +53,30 @@
                 var monthAriaLabel = month.ActualValue.HasValue
                     ? $"{month.MonthName}. Hedef {month.TargetValue:N2}, gerçekleşme {month.ActualValue.Value:N2}"
                     : $"{month.MonthName}. Hedef {month.TargetValue:N2}, gerçekleşme batch bekliyor";
-                <g class="month-chart-group" tabindex="0" role="img" aria-label="@monthAriaLabel">
+                var actualLabel = month.ActualValue.HasValue
+                    ? month.ActualValue.Value.ToString("N2")
+                    : "Batch bekleniyor";
+                <g class="month-chart-group"
+                   tabindex="0"
+                   role="img"
+                   aria-label="@monthAriaLabel"
+                   data-month-chart-summary
+                   data-tooltip-label="@month.MonthName"
+                   data-tooltip-value="@($"Hedef {month.TargetValue:N2} · Gerçekleşme {actualLabel}")">
                     <rect class="month-chart-hit-area"
                           x="@Svg(groupX - 8m)" y="@Svg(chartTop - 8m)" width="78" height="132" rx="8"></rect>
                     <rect class="month-chart-bar is-target"
-                          x="@Svg(groupX)" y="@Svg(targetY)" width="28" height="@Svg(targetHeight)" rx="5">
+                          x="@Svg(groupX)" y="@Svg(targetY)" width="28" height="@Svg(targetHeight)" rx="5"
+                          data-month-chart-value
+                          data-tooltip-label="@($"{month.MonthName} · Hedef")"
+                          data-tooltip-value="@month.TargetValue.ToString("N2")">
                         <title>@month.MonthName hedef: @month.TargetValue.ToString("N2")</title>
                     </rect>
                     <rect class="month-chart-bar @(month.ActualValue.HasValue ? "is-actual" : "is-pending")"
-                          x="@Svg(groupX + 34m)" y="@Svg(actualY)" width="28" height="@Svg(actualHeight)" rx="5">
+                          x="@Svg(groupX + 34m)" y="@Svg(actualY)" width="28" height="@Svg(actualHeight)" rx="5"
+                          data-month-chart-value
+                          data-tooltip-label="@($"{month.MonthName} · Gerçekleşme")"
+                          data-tooltip-value="@actualLabel">
                         <title>@(month.ActualValue.HasValue
                             ? $"{month.MonthName} gerçekleşme: {month.ActualValue.Value:N2}"
                             : $"{month.MonthName}: Batch bekleniyor")</title>

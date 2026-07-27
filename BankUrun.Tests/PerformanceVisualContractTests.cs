@@ -8,6 +8,7 @@ public class PerformanceVisualContractTests
         var source = ReadWebFile("Views", "Performance", "Index.cshtml");
 
         Assert.Contains("~/css/performance-visuals.css", source);
+        Assert.Contains("~/js/performance-visuals.js", source);
         Assert.Contains("asp-append-version=\"true\"", source);
     }
 
@@ -111,15 +112,24 @@ public class PerformanceVisualContractTests
     {
         var chart = ReadWebFile("Views", "Shared", "_MonthlyComparisonChart.cshtml");
         var stylesheet = ReadWebFile("wwwroot", "css", "performance-visuals.css");
+        var client = ReadWebFile("wwwroot", "js", "performance-visuals.js");
 
         Assert.Contains("const decimal chartHeight = 92m", chart);
         Assert.Contains("viewBox=\"0 0 760 164\"", chart);
         Assert.Contains("@((maximum / 2m).ToString(\"N0\"))", chart);
         Assert.DoesNotContain("@(maximum / 2m).ToString", chart);
-        Assert.Contains("class=\"month-chart-group\" tabindex=\"0\" role=\"img\"", chart);
+        Assert.Contains("class=\"month-chart-group\"", chart);
+        Assert.Contains("tabindex=\"0\"", chart);
         Assert.Contains("month-chart-hit-area", chart);
+        Assert.Equal(2, Count(chart, "data-month-chart-value"));
+        Assert.Contains("data-tooltip-value", chart);
+        Assert.Contains("data-month-chart-summary", chart);
         Assert.Contains(".month-chart-group:focus-visible", stylesheet);
+        Assert.Contains(".month-chart-tooltip", stylesheet);
         Assert.Contains("drop-shadow", stylesheet);
+        Assert.Contains("pointermove", client);
+        Assert.Contains("focusin", client);
+        Assert.Contains("aria-describedby", client);
         Assert.Contains("max-width: 820px", stylesheet);
         Assert.Contains(".performance-detail-heading p", stylesheet);
         Assert.Contains("color: #43596b", stylesheet);
