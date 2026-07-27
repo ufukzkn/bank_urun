@@ -209,6 +209,23 @@ with target_scope as (
   join main_product_parameters parameter on parameter.main_product_instance_id = instance.id and parameter.group_id = portfolio.group_id
   cross join lateral generate_series(case when instance.term = 1 then 1 else 7 end, case when instance.term = 1 then 6 else 12 end) month_value(month)
   where (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1),(2026,2))
+), target_plan as (
+  select scope.*,
+         mod(ascii(substr(scope.portfolio_code, 2, 1)) * 11
+           + ascii(substr(scope.portfolio_code, 3, 1)) * 13
+           + ascii(substr(scope.portfolio_code, 4, 1)) * 17
+           + ascii(substr(scope.portfolio_code, 5, 1)) * 19
+           + ascii(substr(scope.portfolio_code, 7, 1)) * 23
+           + ascii(substr(scope.portfolio_code, 8, 1)) * 29
+           + ascii(substr(scope.product_code, 1, 1)) * 31
+           + coalesce(ascii(substr(scope.product_code, 2, 1)), 0) * 37, 37) as target_pattern,
+         7 + mod(ascii(substr(scope.portfolio_code, 2, 1)) * 7
+           + ascii(substr(scope.portfolio_code, 3, 1)) * 11
+           + ascii(substr(scope.portfolio_code, 4, 1)) * 13
+           + ascii(substr(scope.portfolio_code, 5, 1)) * 17
+           + ascii(substr(scope.product_code, 1, 1)) * 19
+           + coalesce(ascii(substr(scope.product_code, 2, 1)), 0) * 23, 6) as missing_month
+  from target_scope scope
 )
 insert into portfolio_main_product_monthly_targets (
   portfolio_id, group_id, main_product_parameter_id, month, target_value, created_at, updated_at)
@@ -219,7 +236,73 @@ select scope.portfolio_id, scope.group_id, scope.parameter_id, scope.month,
          + scope.month * 1703 + scope.year * 11 + scope.term * 97, 480000))::numeric
          * case when scope.calculation_type = 'Average' then 3 else 1 end, 2),
        now(), now()
-from target_scope scope;
+from target_plan scope
+where not (
+  scope.year = 2026 and scope.term = 2
+  and (
+    scope.target_pattern = 0
+    or (scope.target_pattern in (1, 2) and scope.month between 10 and 12)
+    or (scope.target_pattern between 3 and 5 and scope.month = scope.missing_month)
+  )
+);
+
+do $$
+begin
+  if exists (
+    with expected_contexts as (
+      select portfolio.id as portfolio_id, parameter.id as parameter_id
+      from portfolios portfolio
+      join product_gamut_main_product_assignments assignment
+        on assignment.product_gamut_id = portfolio.product_gamut_id
+      join main_product_instances instance
+        on instance.main_product_id = assignment.main_product_id
+      join main_product_parameters parameter
+        on parameter.main_product_instance_id = instance.id
+       and parameter.group_id = portfolio.group_id
+      where (instance.year, instance.term) in ((2024,1),(2024,2),(2025,1),(2025,2),(2026,1))
+    )
+    select 1
+    from expected_contexts context
+    left join portfolio_main_product_monthly_targets target
+      on target.portfolio_id = context.portfolio_id
+     and target.main_product_parameter_id = context.parameter_id
+    group by context.portfolio_id, context.parameter_id
+    having count(target.id) <> 6
+  ) then
+    raise exception 'Kapalı dönem hedef mock verisi altı ayın tamamını içermelidir.';
+  end if;
+
+  if exists (
+    with expected_contexts as (
+      select portfolio.id as portfolio_id, parameter.id as parameter_id
+      from portfolios portfolio
+      join product_gamut_main_product_assignments assignment
+        on assignment.product_gamut_id = portfolio.product_gamut_id
+      join main_product_instances instance
+        on instance.main_product_id = assignment.main_product_id
+       and instance.year = 2026 and instance.term = 2
+      join main_product_parameters parameter
+        on parameter.main_product_instance_id = instance.id
+       and parameter.group_id = portfolio.group_id
+    ), target_counts as (
+      select context.portfolio_id, context.parameter_id, count(target.id)::integer as month_count
+      from expected_contexts context
+      left join portfolio_main_product_monthly_targets target
+        on target.portfolio_id = context.portfolio_id
+       and target.main_product_parameter_id = context.parameter_id
+      group by context.portfolio_id, context.parameter_id
+    ), expected_counts(month_count) as (
+      values (0), (3), (5), (6)
+    )
+    select 1
+    from expected_counts expected
+    where not exists (
+      select 1 from target_counts actual where actual.month_count = expected.month_count
+    )
+  ) then
+    raise exception '2026/2 hedef mock verisi 0/3/5/6 aylık örneklerin tamamını içermelidir.';
+  end if;
+end $$;
 
 with actual_scope as (
   select distinct portfolio.id as portfolio_id, portfolio.code as portfolio_code,
@@ -260,11 +343,11 @@ select metric.portfolio_id, metric.sub_product_id, 'Sub', metric.year, metric.te
 from actual_values metric;
 
 insert into audit_logs (action, entity_name, entity_key, description, actor, created_at)
-select 'SeedMockData', 'System', 'mock-v21',
-       '4 grup, 62 şube, çoklu grup/portföy ürün bağlamları, BI/KO/PR ürün gamları, ST/UZ/OZ tipleri, portföy ana ürün hedefleri ve alt ürün gerçekleşmeleri yüklendi.',
+select 'SeedMockData', 'System', 'mock-v22',
+       '4 grup, 62 şube, çoklu grup/portföy ürün bağlamları, BI/KO/PR ürün gamları, ST/UZ/OZ tipleri, geçmiş dönemlerde tam ve 2026/2 döneminde deterministik 0/3/5/6 aylık portföy ana ürün hedefleri ile alt ürün gerçekleşmeleri yüklendi.',
        'seed-script', now()
 where not exists (
-  select 1 from audit_logs where action = 'SeedMockData' and entity_key = 'mock-v20'
+  select 1 from audit_logs where action = 'SeedMockData' and entity_key = 'mock-v22'
 );
 
 commit;

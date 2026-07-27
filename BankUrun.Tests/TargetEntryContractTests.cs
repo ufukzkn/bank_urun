@@ -65,14 +65,22 @@ public class TargetEntryContractTests
     }
 
     [Fact]
-    public void SeedContainsProductsAcrossGroupsAndTwoPortfolioContexts()
+    public void SeedContainsProductsAcrossGroupsAndDeterministicMissingTargets()
     {
         var seed = ReadProjectFile("scripts", "seed-mock-data.sql");
 
         Assert.Contains("cross join group_definitions groups", seed);
         Assert.Contains("scope.branch_code = '120'", seed);
         Assert.Contains("'P' || scope.branch_code || '-' || scope.gamut_code || '02'", seed);
-        Assert.Contains("mock-v21", seed);
+        Assert.Contains("mock-v22", seed);
+        Assert.Contains("target_pattern = 0", seed);
+        Assert.Contains("target_pattern in (1, 2)", seed);
+        Assert.Contains("target_pattern between 3 and 5", seed);
+        Assert.Contains("scope.year = 2026 and scope.term = 2", seed);
+        Assert.Contains("scope.month between 10 and 12", seed);
+        Assert.Contains("scope.month = scope.missing_month", seed);
+        Assert.Contains("having count(target.id) <> 6", seed);
+        Assert.Contains("values (0), (3), (5), (6)", seed);
     }
 
     [Fact]
