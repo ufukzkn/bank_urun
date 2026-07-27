@@ -404,7 +404,24 @@
 }
 
 .product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-composition {
-    max-width: 360px;
+    max-width: 460px;
+}
+
+.product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-chart {
+    height: 220px;
+    width: 220px;
+}
+
+.product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-center {
+    width: 126px;
+}
+
+.product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-center strong {
+    font-size: .94rem;
+}
+
+.product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-center span {
+    font-size: .7rem;
 }
 
 .interactive-donut-composition {
@@ -844,6 +861,13 @@
         justify-items: stretch;
         padding: 1rem 0 0;
     }
+    .product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-chart {
+        height: 196px;
+        width: 196px;
+    }
+    .product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-center {
+        width: 112px;
+    }
     .product-flow-distribution > p { grid-column: auto; margin-left: 0; text-align: center; }
 }
 
@@ -888,6 +912,16 @@
     .branch-performance-signals { grid-template-columns: 1fr; }
     .branch-performance-action { grid-column: auto; justify-self: stretch; width: 100%; }
     .branch-performance-action small { text-align: left; }
+}
+
+@media (max-width: 480px) {
+    .product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-chart {
+        height: 168px;
+        width: 168px;
+    }
+    .product-flow-layout.has-distribution .product-flow-distribution .interactive-donut-center {
+        width: 96px;
+    }
 }
 
 @container performance-table-scroll (max-width: 620px) {

@@ -62,7 +62,8 @@ public class PerformanceVisualContractTests
         Assert.Contains("\"feeders distribution distribution distribution\"", stylesheet);
         Assert.Contains("transform: rotate(-90deg)", stylesheet);
         Assert.Contains("height: 142px", stylesheet);
-        Assert.DoesNotContain("height: 196px", stylesheet);
+        Assert.Contains("height: 220px", stylesheet);
+        Assert.Contains("max-width: 460px", stylesheet);
         Assert.Contains("grid-template-columns: minmax(0, 1fr) 54px minmax(165px, .58fr) minmax(180px, 240px)", stylesheet);
         Assert.Contains(".product-flow-layout.has-distribution .product-flow-feeders", stylesheet);
         Assert.DoesNotContain("max-height: min(680px, 62vh)", stylesheet);
