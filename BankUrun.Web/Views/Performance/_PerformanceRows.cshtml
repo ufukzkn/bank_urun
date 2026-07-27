@@ -23,12 +23,12 @@
         _ => "performance-tone-pending"
     };
 
-    private static string RankWidth(int rank, int candidateCount)
+    private static string RankPosition(int rank, int candidateCount)
     {
-        var width = candidateCount <= 1
-            ? 100m
-            : (candidateCount - rank) * 100m / (candidateCount - 1);
-        return Math.Max(0, Math.Min(100, width))
+        var position = candidateCount <= 1
+            ? 0m
+            : (rank - 1) * 100m / (candidateCount - 1);
+        return Math.Max(0, Math.Min(100, position))
             .ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
     }
 }
@@ -56,7 +56,7 @@
                     <div class="performance-rank-position">
                         <span>@row.Rank / @row.RankCandidateCount</span>
                         <span class="performance-rank-track" role="img" aria-label="@row.RankCandidateCount şube arasında @(row.Rank). sıra">
-                            <span style="width:@RankWidth(row.Rank.Value, row.RankCandidateCount)%"></span>
+                            <span style="--rank-position:@RankPosition(row.Rank.Value, row.RankCandidateCount)%"></span>
                         </span>
                     </div>
                 }
@@ -132,7 +132,10 @@
                                     </div>
                                     <div class="branch-rank-scale" role="img"
                                          aria-label="@(row.Rank.HasValue ? $"{row.RankCandidateCount} şube arasında {row.Rank}. sıra" : "Sıralama için veri bekleniyor")">
-                                        <span style="width:@(row.Rank.HasValue ? RankWidth(row.Rank.Value, row.RankCandidateCount) : "0")%"></span>
+                                        @if (row.Rank.HasValue)
+                                        {
+                                            <span style="--rank-position:@RankPosition(row.Rank.Value, row.RankCandidateCount)%"></span>
+                                        }
                                     </div>
                                     <small>@(row.Rank.HasValue
                                         ? $"Toplam puana göre {row.RankCandidateCount} şube ile karşılaştırıldı."
@@ -194,7 +197,7 @@ else if (Model.Mode == PerformanceMode.BranchProduct)
                     <div class="performance-rank-position">
                         <span>@row.SegmentRank / @row.SegmentRankCandidateCount</span>
                         <span class="performance-rank-track" role="img" aria-label="@row.SegmentRankCandidateCount şube arasında @(row.SegmentRank). ürün içi sıra">
-                            <span style="width:@RankWidth(row.SegmentRank.Value, row.SegmentRankCandidateCount)%"></span>
+                            <span style="--rank-position:@RankPosition(row.SegmentRank.Value, row.SegmentRankCandidateCount)%"></span>
                         </span>
                     </div>
                 }
@@ -256,7 +259,7 @@ else if (Model.Mode == PerformanceMode.MainProduct)
                     <div class="performance-rank-position">
                         <span>@row.Rank / @row.RankCandidateCount</span>
                         <span class="performance-rank-track" role="img" aria-label="@row.RankCandidateCount ana ürün arasında @(row.Rank). sıra">
-                            <span style="width:@RankWidth(row.Rank.Value, row.RankCandidateCount)%"></span>
+                            <span style="--rank-position:@RankPosition(row.Rank.Value, row.RankCandidateCount)%"></span>
                         </span>
                     </div>
                 }
@@ -313,7 +316,7 @@ else
                     <div class="performance-rank-position">
                         <span>@row.OfficialRank / @row.OfficialRankCandidateCount</span>
                         <span class="performance-rank-track" role="img" aria-label="@row.OfficialRankCandidateCount portföy arasında @(row.OfficialRank). grup gam sırası">
-                            <span style="width:@RankWidth(row.OfficialRank.Value, row.OfficialRankCandidateCount)%"></span>
+                            <span style="--rank-position:@RankPosition(row.OfficialRank.Value, row.OfficialRankCandidateCount)%"></span>
                         </span>
                     </div>
                 }
@@ -325,7 +328,7 @@ else
                     <div class="performance-rank-position">
                         <span>@row.BranchRank / @row.BranchRankCandidateCount</span>
                         <span class="performance-rank-track" role="img" aria-label="@row.BranchRankCandidateCount portföy arasında @(row.BranchRank). şube içi sıra">
-                            <span style="width:@RankWidth(row.BranchRank.Value, row.BranchRankCandidateCount)%"></span>
+                            <span style="--rank-position:@RankPosition(row.BranchRank.Value, row.BranchRankCandidateCount)%"></span>
                         </span>
                     </div>
                 }

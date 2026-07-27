@@ -606,20 +606,27 @@
 }
 
 .performance-rank-track {
-    background: #dfe7ed;
+    background: linear-gradient(90deg, #bfe5d2 0%, #dbe8ee 52%, #f1cbd2 100%);
+    border: 1px solid #cddae2;
     border-radius: 999px;
     display: block;
     height: 5px;
-    overflow: hidden;
+    position: relative;
     width: 68px;
 }
 
 .performance-rank-track > span {
-    background: linear-gradient(90deg, #d82f55, #0877a8);
-    border-radius: inherit;
+    background: #0877a8;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(16, 63, 88, .32);
     display: block;
-    height: 100%;
-    min-width: 3px;
+    height: 9px;
+    left: clamp(4px, var(--rank-position), calc(100% - 4px));
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 9px;
 }
 
 .portfolio-target-composition-layout {
@@ -813,18 +820,25 @@
 .branch-product-dots i.is-complete { background: #1b8b62; border-color: #1b8b62; }
 
 .branch-rank-scale {
-    background: linear-gradient(90deg, #edf1f4 0%, #d9e9f1 65%, #c2e3d2 100%);
+    background: linear-gradient(90deg, #bfe5d2 0%, #dbe8ee 52%, #f1cbd2 100%);
+    border: 1px solid #cddae2;
     border-radius: 999px;
     height: 9px;
     margin-top: .38rem;
-    overflow: hidden;
+    position: relative;
 }
 .branch-rank-scale > span {
-    background: linear-gradient(90deg, #d55666, #0a7da6 72%, #15855a);
-    border-radius: inherit;
+    background: #0877a8;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(16, 63, 88, .34);
     display: block;
-    height: 100%;
-    min-width: 2px;
+    height: 15px;
+    left: clamp(7px, var(--rank-position), calc(100% - 7px));
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 15px;
 }
 
 .branch-performance-action {

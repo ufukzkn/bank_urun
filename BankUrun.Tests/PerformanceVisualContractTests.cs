@@ -198,6 +198,12 @@ public class PerformanceVisualContractTests
         Assert.Equal(5, Count(rows, "class=\"performance-rank-track\""));
         Assert.Equal(5, Count(rows, "class=\"performance-rank-position\""));
         Assert.Contains("role=\"img\"", rows);
+        Assert.Contains("private static string RankPosition", rows);
+        Assert.Contains("(rank - 1) * 100m / (candidateCount - 1)", rows);
+        Assert.Equal(6, Count(rows, "--rank-position:"));
+        Assert.DoesNotContain("RankWidth", rows);
+        Assert.Contains("left: clamp(4px, var(--rank-position)", ReadWebFile(
+            "wwwroot", "css", "performance-visuals.css"));
         Assert.Contains("Ürün içi sıra", snapshot);
         Assert.DoesNotContain(">Segment sırası", snapshot);
     }
