@@ -153,6 +153,10 @@ public class PerformanceVisualContractTests
         Assert.Contains(".performance-detail-heading p", stylesheet);
         Assert.Contains("color: #43596b", stylesheet);
         Assert.Contains(".performance-search-table .list-detail-row td .product-flow-center > small", stylesheet);
+        Assert.Contains("color: #fff !important", stylesheet);
+        Assert.Contains(".product-flow-distribution > p", stylesheet);
+        Assert.Contains("color: #40586a", stylesheet);
+        Assert.Contains("font-size: .7rem", stylesheet);
     }
 
     [Fact]

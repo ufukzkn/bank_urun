@@ -374,11 +374,12 @@
 
 .product-flow-center > strong { font-size: .9rem; }
 .product-flow-center > small {
-    color: #fff;
+    color: #fff !important;
     font-size: .72rem;
     font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 40, 68, .28);
 }
-.performance-search-table .list-detail-row td .product-flow-center > small { color: #fff; }
+.performance-search-table .list-detail-row td .product-flow-center > small { color: #fff !important; }
 .product-flow-center > div {
     border-top: 1px solid rgba(255,255,255,.24);
     display: flex;
@@ -487,9 +488,10 @@
     width: 100%;
 }
 .interactive-donut-center span {
-    color: #536879;
+    color: #354f62;
     display: -webkit-box;
     font-size: .63rem;
+    font-weight: 650;
     line-height: 1.2;
     margin-top: .18rem;
     overflow: hidden;
@@ -566,7 +568,14 @@
     font-size: .65rem;
     font-variant-numeric: tabular-nums;
 }
-.product-flow-distribution > p { color: #778693; font-size: .61rem; margin: .45rem 0 0; text-align: center; }
+.product-flow-distribution > p {
+    color: #40586a;
+    font-size: .7rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: .55rem 0 0;
+    text-align: center;
+}
 
 .flow-color-0, .flow-color-bg-0 { background-color: #0076a8; }
 .flow-color-1, .flow-color-bg-1 { background-color: #d82f55; }
